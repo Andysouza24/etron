@@ -21,7 +21,7 @@ async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     await runDDL(`DROP TABLE IF EXISTS ${sanitiseIdentifier(tableName)}`, database, outputLocation);
 
     // create table with the new schema
-    console.log(newSchema);
+    console.log("new schema: " + newSchema);
     await createAthenaTable(newSchema, tableName, dataLocation, database, outputLocation);
 
     // save the new schema
@@ -57,7 +57,7 @@ function generateSchema(data) {
             const deducedType = deduceType(value, column);
 
             if (!schema[column]) {
-                schema[column] = deduceType;
+                schema[column] = deducedType;
             } else if (schema[column] !== deducedType) {
                 // fallback to string
                 schema[column] = "string";
