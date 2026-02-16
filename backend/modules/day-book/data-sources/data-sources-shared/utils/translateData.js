@@ -15,7 +15,7 @@ function translateData(rawData) {
                 rows = Array.isArray(parsed) ? parsed : [parsed];
             } else {
                 // assume it's a csv
-                rows = parse(trimmed, { columns: true, skip_empty_lines: true });
+                rows = parse(trimmed, { columns: true, skip_empty_lines: true, cast: false });
             }
 
         } else if (Array.isArray(rawData)) {
@@ -44,11 +44,22 @@ function translateData(rawData) {
 
         // add a timestamp and id to each row
         const timestamp = new Date().toISOString();
-        rows = rows.map((row) => ({
-            ...row, 
-            timestamp,
-            rowId: uuidv4(), 
-        }));
+        rows = rows.map((row) => {
+            const normalizedRow = {};
+            // Convert NaN values to null to prevent schema inference issues
+            for (const [key, value] of Object.entries(row)) {
+                if (typeof value === 'number' && Number.isNaN(value)) {
+                    normalizedRow[key] = null;
+                } else {
+                    normalizedRow[key] = value;
+                }
+            }
+            return {
+                ...normalizedRow,
+                timestamp,
+                rowId: uuidv4(),
+            };
+        });
 
         return rows;
     } catch (error) {

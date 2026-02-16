@@ -57,26 +57,50 @@ async function toParquet(data, schema) {
 
             switch (type) {
                 case "bigint":
-                    castedRow[name] = Number(value);
+                    const bigintVal = Number.isNaN(Number(value)) ? null : Number(value);
+                    // Extra safety check - ensure we never pass NaN to Parquet
+                    if (bigintVal !== null && Number.isNaN(bigintVal)) {
+                        console.warn(`Warning: NaN detected in bigint column "${name}" with value: ${value}, converting to null`);
+                        castedRow[name] = null;
+                    } else {
+                        castedRow[name] = bigintVal;
+                    }
                     break;
                 case "double":
                 case "decimal(18,2)":
-                    castedRow[name] = Number(value);
+                    const doubleVal = Number.isNaN(Number(value)) ? null : Number(value);
+                    // Extra safety check - ensure we never pass NaN to Parquet
+                    if (doubleVal !== null && Number.isNaN(doubleVal)) {
+                        console.warn(`Warning: NaN detected in double column "${name}" with value: ${value}, converting to null`);
+                        castedRow[name] = null;
+                    } else {
+                        castedRow[name] = doubleVal;
+                    }
                     break;
                 case "boolean":
                     castedRow[name] = Boolean(value);
                     break;
                 case "timestamp":
-                    // Handle bigint timestamps or strings
+                    // Convert value to a Date object
+                    let dateObj;
                     if (typeof value === 'bigint') {
-                        value = Number(value);
-                    } else if (typeof value === 'string' && /^\d+$/.test(value)) {
-                        value = Number(value);
+                        dateObj = new Date(Number(value));
+                    } else if (typeof value === 'string') {
+                        // Try parsing as ISO string first, then as numeric timestamp
+                        dateObj = new Date(value);
+                    } else if (typeof value === 'number') {
+                        dateObj = new Date(value);
                     } else if (value instanceof Date) {
-                        value = value.getTime();
+                        dateObj = value;
+                    } else {
+                        dateObj = new Date(value);
                     }
 
-                    castedRow[name] = new Date(Number(value));
+                    if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+                        castedRow[name] = dateObj;
+                    } else {
+                        castedRow[name] = null;
+                    }
                     break;
                 case "string":
                 default:

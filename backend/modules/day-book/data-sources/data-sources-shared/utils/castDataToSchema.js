@@ -12,11 +12,13 @@ function castDataToSchema(data, schema) {
 
             switch (type) {
                 case "bigint":
-                    castedRow[name] = Number.isNaN(Number(value)) ? null : parseInt(value, 10);
+                    const bigintVal = Number.isNaN(Number(value)) ? null : parseInt(value, 10);
+                    castedRow[name] = (bigintVal !== null && Number.isNaN(bigintVal)) ? null : bigintVal;
                     break;
                 case "double":
                 case "decimal(18,2)":
-                    castedRow[name] = Number.isNaN(Number(value)) ? null : parseFloat(value);
+                    const doubleVal = Number.isNaN(Number(value)) ? null : parseFloat(value);
+                    castedRow[name] = (doubleVal !== null && Number.isNaN(doubleVal)) ? null : doubleVal;
                     break;
                 case "boolean":
                     if (typeof value === "string") {
