@@ -1,6 +1,10 @@
 const { parse } = require("csv-parse/sync");
 const { v4: uuidv4 } = require('uuid');
 
+function sanitiseKey(name) {
+    return name.replace(/[^A-Za-z0-9_]/g, "_");
+}
+
 // normalize data into an array of objects
 function translateData(rawData) {
     let rows = [];
@@ -46,12 +50,13 @@ function translateData(rawData) {
         const timestamp = new Date().toISOString();
         rows = rows.map((row) => {
             const normalizedRow = {};
-            // Convert NaN values to null to prevent schema inference issues
+            // Sanitise keys and convert NaN values to null to prevent schema inference issues
             for (const [key, value] of Object.entries(row)) {
+                const sanitisedKey = sanitiseKey(key);
                 if (typeof value === 'number' && Number.isNaN(value)) {
-                    normalizedRow[key] = null;
+                    normalizedRow[sanitisedKey] = null;
                 } else {
-                    normalizedRow[key] = value;
+                    normalizedRow[sanitisedKey] = value;
                 }
             }
             return {
