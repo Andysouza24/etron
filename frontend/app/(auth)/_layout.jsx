@@ -5,9 +5,9 @@ import { fetchUserAttributes, signOut, updateUserAttributes } from 'aws-amplify/
 import { useVerification } from '../../contexts/VerificationContext';
 import { saveWorkspaceInfo } from '../../storage/workspaceStorage';
 import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
-import { saveRole } from '../../storage/permissionsStorage';
 import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
+import { savePermissionsCache } from '../../storage/permissionsStorage';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
@@ -31,28 +31,36 @@ export default function AuthLayout() {
             const userAttributes = await fetchUserAttributes();
 
             hasWorkspaceAttribute = userAttributes["custom:has_workspace"];
+            console.log("DEBUG: hasWorkspaceAttribute =", hasWorkspaceAttribute);
 
             // if the attribute doesn't exist, set it to false
             if (hasWorkspaceAttribute == null) {
                 await setHasWorkspaceAttribute(false);
                 const refreshed = await fetchUserAttributes();
                 hasWorkspaceAttribute = refreshed["custom:has_workspace"];
+                console.log("DEBUG: refreshed hasWorkspaceAttribute =", hasWorkspaceAttribute);
             }
     
         } catch (error) {
+            console.error("DEBUG: Error fetching attributes:", error);
             console.error("Error fetching workspace status:", error);
             return false;
         }
 
         if (hasWorkspaceAttribute === "true") {
+            console.log("DEBUG: hasWorkspaceAttribute is true, fetching workspace...");
             const userAttributes = await fetchUserAttributes();
             const userId = userAttributes.sub;
+            console.log("DEBUG: userId =", userId);
 
             let workspace;
             try {
                 const result = await apiGet(endpoints.workspace.core.getByUserId(userId));
+                console.log("DEBUG: raw API response =", JSON.stringify(result.data));
                 workspace = result.data;
             } catch (error) {
+                console.error("DEBUG: Workspace fetch FAILED:", error.message);
+                console.error("DEBUG: Full error:", JSON.stringify(error.response?.data));
                 await setHasWorkspaceAttribute(false);
                 if (error.message.includes("Workspace not found")) {
                     console.log("No workspace yet.");
@@ -66,12 +74,16 @@ export default function AuthLayout() {
                 console.error("Error fetching workspace:", error);
                 return false;
             }
+            console.log("DEBUG: workspace =", JSON.stringify(workspace));
+            console.log("DEBUG: workspace.workspaceId =", workspace?.workspaceId);
             
             if (workspace.workspaceId) {
+                console.log("DEBUG: Found workspaceId, saving...");
                 console.log("WorkspaceId received from server:", workspace.workspaceId);
                 return true;
             }
 
+            console.log("DEBUG: No workspaceId in response, signing out");
             // if user attribute has_workspace === true but not in local storage force sign out
             console.log("WorkspaceId cannot be fetched from local storage");
             await signOut();
@@ -118,19 +130,25 @@ export default function AuthLayout() {
             console.error("Error saving user info into storage:", error);
         }
 
-        try {
-            const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
-            await saveRole(result.data);
-        } catch (error) {
-            console.error("Error saving user's role details into local storage:", error);
-        }
-        
-        try {
-            const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            console.log("saved workspace info:", result.data);
-        } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
+        // TODO: consider moving seeding to increase reuse
+        if (workspaceId) {
+            try{
+                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspaceId));
+                console.log("DEBUG: permissions response =", JSON.stringify(result.data));
+                console.log("DEBUG: permissions =", JSON.stringify(result.data.permissions));
+                console.log("DEBUG: isOwner =", result.data.isOwner);
+                console.log("DEBUG: version =", result.data.version);
+            
+                await savePermissionsCache({
+                    permissions: result.data.permissions,
+                    isOwner: result.data.isOwner,
+                    version: result.data.version
+                });
+                console.log("Permissions cache seeded");
+            } catch (error) {
+                console.error("Failed to seed permissions cache: ", error?.message);
+            }
+            
         }
     }
 
@@ -147,12 +165,12 @@ export default function AuthLayout() {
 
             const workspaceExists = await checkWorkspaceExists().catch(() => false);
             if (!workspaceExists) {
-                console.log("No workplace")
+                console.log("No workspace")
                 router.replace("/(auth)/workspace-choice")
                 return;
             }
             
-            saveInfoIntoStorage();
+            await saveInfoIntoStorage();
             router.replace("/(auth)/dashboard")
         } else if (authStatus === `configuring`) {
             console.log("Auth status configuring...")

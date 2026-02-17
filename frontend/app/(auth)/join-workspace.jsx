@@ -16,7 +16,7 @@ import { router } from "expo-router";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
 import StackLayout from "../../components/layout/StackLayout";
 import { saveUserInfo } from "../../storage/userStorage";
-import { saveRole } from "../../storage/permissionsStorage";
+import { savePermissionsCache } from "../../storage/permissionsStorage";
 
 
 const JoinWorkspace = () => {
@@ -140,11 +140,16 @@ const JoinWorkspace = () => {
                 console.error("Error saving user info into storage:", error);
             }
 
+            // TODO: consider moving seeding to increase reuse
             try {
-                const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspace.workspaceId));
-                await saveRole(result.data);
+                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspace.workspaceId));
+                await savePermissionsCache({
+                    permissions: result.data.permissions,
+                    isOwner: result.data.isOwner,
+                    version: result.data.version
+                });
             } catch (error) {
-                console.error("Error saving user's role details into local storage:", error);
+                console.error("Failed to seed permissions cache: ", error?.message);
             }
 
             await handleUpdateUserAttribute('custom:has_workspace', "true");

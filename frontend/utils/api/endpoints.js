@@ -23,6 +23,8 @@ const endpoints = {
 			transfer: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/transfer`,
 			delete: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}`,
 			getDefaultPermissions: `${WORKSPACE_BASE_URL}/permissions`,
+			getPermissionsVersion: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/permissions/version`,
+			getEffectivePermissions: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/permissions/effective`,
 		},
 
 		invites: {

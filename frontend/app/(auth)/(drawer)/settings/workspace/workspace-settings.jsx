@@ -18,11 +18,29 @@ import {
     getCurrentUser,
 } from 'aws-amplify/auth';
 import DropDown from "../../../../../components/common/input/DropDown";
-import { isOwnerRole } from "../../../../../storage/permissionsStorage";
 import { hasPermission } from "../../../../../utils/permissions";
 import ResponsiveScreen from "../../../../../components/layout/ResponsiveScreen";
 import { Platform } from "react-native";
 import PermissionGate from "../../../../../components/common/PermissionGate";
+import { getCachedIsOwner } from "../../../../../storage/permissionsStorage";
+import { useHasPermission } from "../../../../../hooks/useHasPermission";
+
+const WorkspaceSettingsItem = ({ option }) => {
+    const { allowed } = useHasPermission(option.permKey);
+    const router = useRouter();
+
+    return (
+        <PermissionGate
+            allowed={allowed}
+            onAllowed={() => router.navigate(option.route)}
+        >
+            <DescriptiveButton
+                label={option.label}
+                description={option.description}
+            />  
+        </PermissionGate>
+    );
+}
 
 const WorkspaceManagement = () => {
     const router = useRouter();
@@ -65,7 +83,6 @@ const WorkspaceManagement = () => {
         },*/
     ];
 
-    const [menuOptions, setMenuOptions] = useState([]);
 
     useEffect(() => {
         fetchData();
@@ -77,22 +94,12 @@ const WorkspaceManagement = () => {
 
         let ownerCheck
         try {
-            ownerCheck = await isOwnerRole();
+            ownerCheck = await getCachedIsOwner();
             setIsOwner(ownerCheck);
         } catch (error) {
             console.error("Error checking owner role:", error);
             setIsOwner(false);
         }
-
-        // filter menu buttons by permissions
-        const evaluatedMenuOptions = [];
-        for (const option of permissionButtonMap) {
-            const allowed = option.permKey ? await hasPermission(option.permKey) : true;
-
-            evaluatedMenuOptions.push({ ...option, allowed, key:option.label});
-        }
-        setMenuOptions(evaluatedMenuOptions);
-
         if (!ownerCheck) return;
 
         try {
@@ -237,7 +244,9 @@ const WorkspaceManagement = () => {
             loadingOverlayActive={loading}
         >
             <StackLayout spacing={12}>
-                {menuOptions.map(renderOption)}
+                {permissionButtonMap.map((option)  => (
+                    <WorkspaceSettingsItem option={option} key={option.label} />
+                ))}
             </StackLayout>
             
             {isOwner && (

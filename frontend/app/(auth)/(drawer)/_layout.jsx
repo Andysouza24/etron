@@ -1,4 +1,4 @@
-// Author(s): Noah Bradley
+// Author(s): Noah Bradley, Holly Wyatt
 
 import { useState, useEffect } from "react";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
@@ -9,6 +9,9 @@ import DescriptiveButton from "../../../components/common/buttons/DescriptiveBut
 import { commonStyles } from "../../../assets/styles/stylesheets/common";
 import PermissionGate from "../../../components/common/PermissionGate";
 import { hasPermission } from "../../../utils/permissions";
+import { usePermissionSync } from "../../../hooks/usePermissionSync";
+import { getWorkspaceId } from "../../../storage/workspaceStorage";
+import { useHasPermission } from "../../../hooks/useHasPermission";
 
 const generalOptions = [
     {
@@ -87,7 +90,8 @@ const DrawerRow = ({ label, icon, onPress, active = false, style }) => {
     )
 }
 
-const DrawerButton = ({route, options, navigation, allowed, isActive }) => {
+const DrawerButton = ({route, options, navigation, permKey, isActive }) => {
+    const { allowed } = useHasPermission(permKey)
     return (
         <PermissionGate
             allowed={allowed}
@@ -109,29 +113,6 @@ const DrawerButton = ({route, options, navigation, allowed, isActive }) => {
 const CustomDrawer = (props) => {
     const { navigation, drawerState, setDrawerState, state, descriptors } = props;
     const theme = useTheme();
-    const [allowedMap, setAllowedMap] = useState({});
-
-    const allOptions = [...generalOptions, ...dayBookOptions, ...boardOptions];
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            const entries = await Promise.all(
-                allOptions.map(async (option) => {
-                    if (option.permKey) {
-                        try {
-                            const allowed = await hasPermission(option.permKey);
-                            return [option.name, !!allowed];
-                        } catch {
-                            return [option.name, false];
-                        }
-                    }
-                return [option.name, true];
-                })
-            );
-            if (mounted) setAllowedMap(Object.fromEntries(entries));
-        })();
-        return () => { mounted = false; };
-    }, []);
 
     const activeRouteName = state?.routes?.[state.index]?.name;
 
@@ -140,13 +121,14 @@ const CustomDrawer = (props) => {
     let boardRoutes = [];
     state.routes.forEach((route) => {
         const name = route.name;
-        const allowed = allowedMap[name] ?? true;
+        const option = [...generalOptions, ...dayBookOptions, ...boardOptions].find((o) => o.name === name);
+        const permKey = option?.permKey || null;
         if (generalOptions.some((page) => page.name === name)) {
-            generalRoutes.push({ route, allowed });
+            generalRoutes.push({ route, permKey });
         } else if (dayBookOptions.some((page) => page.name === name)) {
-            dayBookRoutes.push({ route, allowed });
+            dayBookRoutes.push({ route, permKey });
         } else if (boardOptions.some((page) => page.name === name)) {
-            boardRoutes.push({ route, allowed });
+            boardRoutes.push({ route, permKey });
         }
     });
 
@@ -187,14 +169,14 @@ const CustomDrawer = (props) => {
                         />
                     </View>
                 ) : (
-                    displayedRoutes.map(({ route, allowed }) => (
+                    displayedRoutes.map(({ route, permKey }) => (
                         <DrawerButton
                             key={route.key}
                             route={route}
                             options={descriptors[route.key].options}
                             navigation={navigation}
                             isActive={activeRouteName == route.name}
-                            allowed={allowed}
+                            permKey={permKey}
                             style={{backgroundColor:"#000000"}}
                         />
                     ))
@@ -202,11 +184,11 @@ const CustomDrawer = (props) => {
             </DrawerContentScrollView>
             <View style={styles.bottomSection}>
                 <View style={styles.divider} />
-                {generalRoutes.map(({ route, allowed }) => (
+                {generalRoutes.map(({ route, permKey }) => (
                     <DrawerButton
                         key={route.key}
                         route={route}
-                        allowed={allowed}
+                        permKey={permKey}
                         options={descriptors[route.key].options}
                         navigation={navigation}
                         isActive={activeRouteName == route.name}    
@@ -220,6 +202,16 @@ const CustomDrawer = (props) => {
 export default function DrawerLayout() {
     const theme = useTheme();
     const [drawerState, setDrawerState] = useState("default");
+    const [workspaceId, setWorkspaceId] = useState(null);
+    
+    useEffect(() => {
+        (async () => {
+            const id = await getWorkspaceId();
+            setWorkspaceId(id);
+        })();
+    }, []);
+
+    const { forceRefresh } = usePermissionSync(workspaceId);
 
     return (
         <Drawer

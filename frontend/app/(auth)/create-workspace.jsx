@@ -15,7 +15,7 @@ import { saveWorkspaceInfo } from "../../storage/workspaceStorage";
 import { updateUserAttribute, signOut, fetchUserAttributes } from "aws-amplify/auth";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
 import { saveUserInfo } from "../../storage/userStorage";
-import { saveRole } from "../../storage/permissionsStorage";
+import { savePermissionsCache } from "../../storage/permissionsStorage";
 
 const CreateWorkspace = () => {
     const router = useRouter();
@@ -96,11 +96,16 @@ const CreateWorkspace = () => {
                 console.error("Error saving user info into storage:", error);
             }
 
+            // TODO: consider moving seeding to increase reuse
             try {
-                const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspace.workspaceId));
-                await saveRole(result.data);
+                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspace.workspaceId));
+                await savePermissionsCache({
+                    permissions: result.data.permissions,
+                    isOwner: result.data.isOwner,
+                    version: result.data.version
+                });
             } catch (error) {
-                console.error("Error saving user's role details into local storage:", error);
+                console.error("Failed to seed permissions cache: ", error?.message);
             }
 
             // update user attribute to be in a workspace

@@ -10,9 +10,28 @@ import StackLayout from "../../../../components/layout/StackLayout";
 import ResponsiveScreen from "../../../../components/layout/ResponsiveScreen";
 import { hasPermission } from "../../../../utils/permissions";
 import PermissionGate from "../../../../components/common/PermissionGate";
+import { useHasPermission } from "../../../../hooks/useHasPermission";
+
+const CollaborationItem = ({ item }) => {
+    const router = useRouter();
+    const { allowed } = useHasPermission(item.permKey);
+
+    return (
+        <PermissionGate
+        key={item.label}
+        allowed={allowed}
+        onAllowed={item.onPress}
+        >
+            <DescriptiveButton
+                icon={item.icon}
+                label={item.label}
+                description={item.description}
+            />
+        </PermissionGate>
+    )
+}
 
 const Collaboration = () => {
-    const [menuOptions, setMenuOptions] = useState([]);
 
     const router = useRouter();
     const theme = useTheme();
@@ -43,22 +62,7 @@ const Collaboration = () => {
             onPress: () => router.navigate("collaboration/workspace-log"),
             permKey: "app.collaboration.app.audit.view_workspace_audit_log"
         }
-    ];
-
-    useEffect(() => {
-        evaluateWorkspaceOptions();
-    }, [])    
-
-    async function evaluateWorkspaceOptions() {
-        const evaluatedWorkspaceOptions = [];
-
-        for (const option of workspaceOptionButtons) {
-            const allowed = await hasPermission(option.permKey);
-            evaluatedWorkspaceOptions.push({ ...option, allowed })
-        }
-
-        setMenuOptions(evaluatedWorkspaceOptions);
-    }
+    ];  
 
     return (
 		<ResponsiveScreen
@@ -69,18 +73,12 @@ const Collaboration = () => {
             scroll={true}
 		>
             <StackLayout spacing={12}>
-                {menuOptions.map((item) => (
-                    <PermissionGate
+                {workspaceOptionButtons.map((item) => (
+                    <CollaborationItem item={item}
                         key={item.label}
                         allowed={item.allowed}
                         onAllowed={item.onPress}
-                    >
-                        <DescriptiveButton
-                            icon={item.icon}
-                            label={item.label}
-                            description={item.description}
-                        />
-                    </PermissionGate>
+                    />
                 ))}
             </StackLayout>
         </ResponsiveScreen>

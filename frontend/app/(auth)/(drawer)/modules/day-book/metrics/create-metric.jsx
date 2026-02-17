@@ -27,6 +27,7 @@ import { hasPermission } from '../../../../../../utils/permissions';
 import PermissionGate from '../../../../../../components/common/PermissionGate';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import axios from 'axios';
+import { useHasPermission } from '../../../../../../hooks/useHasPermission';
 
 
 const CreateMetric = () => {
@@ -37,17 +38,11 @@ const CreateMetric = () => {
     const [loading, setLoading] = useState(false);
     const [dataSourceMappings, setDataSourceMappings] = useState([]);  //Array of data source id + name pairs
     const [loadingDataSourceMappings, setLoadingDataSourceMappings] = useState(true);  // Flag so that the program knows that the data is still being downloaded
-    const [viewDataPermission, setViewDataPermission] = useState(false);
+    const { allowed: viewDataPermission } = useHasPermission("modules.daybook.datasources.view_data");
 
     useEffect(() => {  // When page loads, load a list of all data sources
-        loadPermission();
         initialiseDataSourceList();
     }, []);
-    
-    async function loadPermission() {
-        const viewDataPermission = hasPermission("modules.daybook.datasources.view_data");
-        setViewDataPermission(viewDataPermission);
-    }
 
     async function initialiseDataSourceList() {
         const workspaceId = await getWorkspaceId();

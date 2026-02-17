@@ -1,4 +1,4 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { 
@@ -181,6 +181,70 @@ async function getUserByWorkspaceIdAndEmail(workspaceId, email) {
     return result.Items[0];
 }
 
+// TODO: double check correct file
+// update with role array
+// get the roleId of a user in a workspace
+function getUserRoleIds(user){
+    if (!user) return [];
+    if (user.roleIds && Array.isArray(user.roleIds)) return user.roleIds;
+    if (user.roleId) return [user.roleId];
+    return [];
+}
+
+
+// set the role of a user in a workspace and bumps permission version
+async function setUserRoles(workspaceId, userId, roleId) {
+    const params = {
+        TableName: tableName,
+        Key: { workspaceId, userId },
+        UpdateExpression: "SET #roleId = :roleId, permissionsVersion = if_not_exists(permissionsVersion, :zero) + :one, updatedAt = :now",
+        ExpressionAttributeValues: {
+            ":roleId": roleId,
+            ":zero": 0,
+            ":one": 1,
+            ":now": new Date().toISOString()
+        },
+        ReturnValues: "ALL_NEW"
+    };
+    const result = await dynamoDB.send(new UpdateCommand(params));
+    return result.Attributes;
+}
+
+// bump permissions version for a user in a workspace
+async function bumpPermissionsVersion(workspaceId, userId) {
+    // consider updated at
+    const params = {
+        TableName: tableName,
+        Key: { workspaceId, userId },
+        UpdateExpression: "SET permissionsVersion = if_not_exists(permissionsVersion, :zero) + :one",
+        ExpressionAttributeValues: {
+            ":zero": 0,
+            ":one": 1
+        }
+    };
+    await dynamoDB.send(new UpdateCommand(params));
+}
+
+// TODO: double check role implementation - role as array or single value
+// bump permissions version for all users with a given role in a workspace
+async function bumpPermissionsVersionForRole(workspaceId, roleId) {
+    const users = await getUsersByWorkspaceId(workspaceId);
+
+    const affectedUsers = users.filter(u => {
+        const id = getUserRoleIds(u);
+        return id.includes(roleId);
+    });
+
+    if (affectedUsers.length === 0) return;
+
+    const batchSize = 10;
+    for (let i = 0; i < affectedUsers.length; i += batchSize) {
+        const batch = affectedUsers.slice(i, i + batchSize);
+        await Promise.all(batch.map(user => bumpPermissionsVersion(workspaceId, user.userId)));
+
+    }
+}
+
 // remove all the users
 async function removeAllUsers(workspaceId) {
     const { Items } = await dynamoDB.send(new QueryCommand({
@@ -212,5 +276,9 @@ module.exports = {
     getUserByUserId,
     getUsersByWorkspaceId,
     getUserByWorkspaceIdAndEmail,
-    removeAllUsers
+    removeAllUsers,
+    getUserRoleIds,
+    setUserRoles,
+    bumpPermissionsVersion,
+    bumpPermissionsVersionForRole,
 }

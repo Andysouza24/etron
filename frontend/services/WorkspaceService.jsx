@@ -4,6 +4,7 @@ import endpoints from "../utils/api/endpoints";
 import apiClient from "../utils/api/apiClient";
 import AuthService from "./AuthService";
 import { saveWorkspaceInfo, extractWorkspaceId, getWorkspaceInfo, removeWorkspaceInfo } from "../storage/workspaceStorage";
+import { savePermissionsCache } from "../storage/permissionsStorage";
 
 class WorkspaceService {
 	constructor(client) {
@@ -78,6 +79,21 @@ class WorkspaceService {
 			}
 			await saveWorkspaceInfo(selected);
 			console.log("[WorkspaceService] Workspace saved", { workspaceId: id });
+
+			// seed permissions cache immediately after workspace is set
+			if (id) {
+				try{
+					const permsResponse = await this.apiClient.get(endpoints.workspace.core.getEffectivePermissions(id));
+					await savePermissionsCache({
+						permissions: permsResponse.data.permissions,
+						isOwner: permsResponse.data.isOwner,
+						version: permsResponse.data.version
+					});
+					console.log("[WorkspaceService] Permissions cache seeded");
+				} catch (permError) {
+					console.warn("[WorkspaceService] Failed to seed permissions cache: ", permError?.message);
+				}
+			}
 			return selected;
 		} catch (error) {
 			try {
