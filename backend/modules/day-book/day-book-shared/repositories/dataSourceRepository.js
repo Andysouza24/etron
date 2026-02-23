@@ -135,6 +135,7 @@ async function updateDataSource(workspaceId, dataSourceId, dataSourceItem) {
 // update datasource status
 async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
     const updateFields = [];
+    const removeFields = [];
     const expressionAttributeValues = {};
     const expressionAttributeNames = {};
 
@@ -142,14 +143,24 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
     expressionAttributeValues[":status"] = statusItem.status;
     expressionAttributeNames["#status"] = "status";
 
-    updateFields.push("#error = :error");
-    expressionAttributeValues[":error"] = statusItem.errorMessage;
-    expressionAttributeNames["#error"] = "error";
-    
+    // Only set error if there's an actual error message, otherwise remove it
+    if (statusItem.errorMessage) {
+        updateFields.push("#error = :error");
+        expressionAttributeValues[":error"] = statusItem.errorMessage;
+        expressionAttributeNames["#error"] = "error";
+    } else {
+        removeFields.push("#error");
+        expressionAttributeNames["#error"] = "error";
+    }
 
     updateFields.push("#lastUpdate = :lastUpdate");
     expressionAttributeValues[":lastUpdate"] = new Date().toISOString();
     expressionAttributeNames["#lastUpdate"] = "lastUpdate";
+
+    let updateExpression = "SET " + updateFields.join(", ");
+    if (removeFields.length > 0) {
+        updateExpression += " REMOVE " + removeFields.join(", ");
+    }
 
     await dynamoDB.send(
         new UpdateCommand( {
@@ -158,7 +169,7 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
                 workspaceId: workspaceId,
                 dataSourceId: dataSourceId
             },
-            UpdateExpression: "SET " + updateFields.join(", "),
+            UpdateExpression: updateExpression,
             ExpressionAttributeValues: expressionAttributeValues,
             ExpressionAttributeNames: expressionAttributeNames,
         })

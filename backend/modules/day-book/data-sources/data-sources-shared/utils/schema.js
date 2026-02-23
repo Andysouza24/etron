@@ -21,7 +21,7 @@ async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     await runDDL(`DROP TABLE IF EXISTS ${sanitiseIdentifier(tableName)}`, database, outputLocation);
 
     // create table with the new schema
-    console.log(newSchema);
+    console.log("new schema: " + newSchema);
     await createAthenaTable(newSchema, tableName, dataLocation, database, outputLocation);
 
     // save the new schema
@@ -57,7 +57,7 @@ function generateSchema(data) {
             const deducedType = deduceType(value, column);
 
             if (!schema[column]) {
-                schema[column] = deduceType;
+                schema[column] = deducedType;
             } else if (schema[column] !== deducedType) {
                 // fallback to string
                 schema[column] = "string";
@@ -73,7 +73,7 @@ function generateSchema(data) {
 }
 
 function deduceType(value, columnName = "") {
-    if (value == null) return "string";
+    if (value == null || Number.isNaN(value)) return "string";
 
     if (typeof value === "number") {
         return Number.isInteger(value) ? "bigint" : "double";
@@ -85,7 +85,7 @@ function deduceType(value, columnName = "") {
 
     if (typeof value === "string") {
         const trimmed = value.trim();
-        if (trimmed === "") return "string";
+        if (trimmed === "" || trimmed.toLowerCase() === "nan") return "string";
 
         // check for ISO timestamps
         if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(trimmed)) {

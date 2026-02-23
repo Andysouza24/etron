@@ -1,6 +1,10 @@
 const { parse } = require("csv-parse/sync");
 const { v4: uuidv4 } = require('uuid');
 
+function sanitiseKey(name) {
+    return name.replace(/[^A-Za-z0-9_]/g, "_");
+}
+
 // normalize data into an array of objects
 function translateData(rawData) {
     let rows = [];
@@ -15,7 +19,7 @@ function translateData(rawData) {
                 rows = Array.isArray(parsed) ? parsed : [parsed];
             } else {
                 // assume it's a csv
-                rows = parse(trimmed, { columns: true, skip_empty_lines: true });
+                rows = parse(trimmed, { columns: true, skip_empty_lines: true, cast: false });
             }
 
         } else if (Array.isArray(rawData)) {
@@ -44,11 +48,23 @@ function translateData(rawData) {
 
         // add a timestamp and id to each row
         const timestamp = new Date().toISOString();
-        rows = rows.map((row) => ({
-            ...row, 
-            timestamp,
-            rowId: uuidv4(), 
-        }));
+        rows = rows.map((row) => {
+            const normalizedRow = {};
+            // Sanitise keys and convert NaN values to null to prevent schema inference issues
+            for (const [key, value] of Object.entries(row)) {
+                const sanitisedKey = sanitiseKey(key);
+                if (typeof value === 'number' && Number.isNaN(value)) {
+                    normalizedRow[sanitisedKey] = null;
+                } else {
+                    normalizedRow[sanitisedKey] = value;
+                }
+            }
+            return {
+                ...normalizedRow,
+                timestamp,
+                rowId: uuidv4(),
+            };
+        });
 
         return rows;
     } catch (error) {
