@@ -15,6 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import PermissionGate from "../../../../../../components/common/PermissionGate";
 import { hasPermission } from "../../../../../../utils/permissions";
+import { useHasPermission } from "../../../../../../hooks/useHasPermission";
 
 const StatusPill = ({ status }) => {
 	if (!status) return null;
@@ -106,8 +107,8 @@ const DataManagement = () => {
 	const [lastManualRefresh, setLastManualRefresh] = useState(0);
 	const [uploadingMap, setUploadingMap] = useState({});
 	const [workspaceId, setWorkspaceId] = useState(null);
-	const [viewDataPermission, setViewDataPermission] = useState(false);
-	const [manageDataSourcesPermission, setManageDataSourcesPermission] = useState(false);
+	const { allowed: viewDataPermission } = useHasPermission("modules.daybook.datasources.view_data");
+	const { allowed: manageDataSourcesPermission } = useHasPermission("modules.daybook.datasources.manage_dataSources");
 
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewStatus, setPreviewStatus] = useState('idle');
@@ -151,20 +152,12 @@ const DataManagement = () => {
 
 	useFocusEffect(
 		useCallback(() => {
-			loadPermission();
 			if (!hasInitiallyLoadedRef.current) {
 				fetchDataSources();
 				hasInitiallyLoadedRef.current = true;
 			}
-		}, [loadPermission, fetchDataSources])
+		}, [fetchDataSources])
 	);
-
-	async function loadPermission() {
-		const viewDataPermission = await hasPermission("modules.daybook.datasources.view_data");
-		setViewDataPermission(viewDataPermission);
-		const manageDataSourcesPermission = await hasPermission("modules.daybook.datasources.manage_dataSources");
-		setManageDataSourcesPermission(manageDataSourcesPermission);
-	}
 
 	const handleUploadLocalCsv = useCallback(async (source) => {
 		try {

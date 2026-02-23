@@ -5,9 +5,9 @@ import { fetchUserAttributes, signOut, updateUserAttributes } from 'aws-amplify/
 import { useVerification } from '../../contexts/VerificationContext';
 import { saveWorkspaceInfo } from '../../storage/workspaceStorage';
 import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
-import { saveRole } from '../../storage/permissionsStorage';
 import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
+import workspaceService from '../../services/WorkspaceService';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
@@ -100,37 +100,13 @@ export default function AuthLayout() {
     }
 
     const saveInfoIntoStorage = async() => {
-        const userAttributes = await fetchUserAttributes();
-
-        let workspaceId;
         try {
+            const userAttributes = await fetchUserAttributes();
             const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            workspaceId = result.data.workspaceId;
+            await workspaceService.setupWorkspaceStorage(result.data, userAttributes.sub);
+            console.log("[_layout.jsx] Workspace storage setup completed");
         } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
-        }
-
-        try {
-            const result = await apiGet(endpoints.workspace.users.getUser(workspaceId, userAttributes.sub));
-            await saveUserInfo(result.data);  // Saves into local storage
-        } catch (error) {
-            console.error("Error saving user info into storage:", error);
-        }
-
-        try {
-            const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
-            await saveRole(result.data);
-        } catch (error) {
-            console.error("Error saving user's role details into local storage:", error);
-        }
-        
-        try {
-            const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            console.log("saved workspace info:", result.data);
-        } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
+            console.error("[_layout.jsx] Error saving workspace info into storage:", error);
         }
     }
 
@@ -147,12 +123,12 @@ export default function AuthLayout() {
 
             const workspaceExists = await checkWorkspaceExists().catch(() => false);
             if (!workspaceExists) {
-                console.log("No workplace")
+                console.log("No workspace")
                 router.replace("/(auth)/workspace-choice")
                 return;
             }
             
-            saveInfoIntoStorage();
+            await saveInfoIntoStorage();
             router.replace("/(auth)/dashboard")
         } else if (authStatus === `configuring`) {
             console.log("Auth status configuring...")

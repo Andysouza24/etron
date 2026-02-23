@@ -1,6 +1,6 @@
 // Author(s): Rhys Cleary
 
-const { getWorkspaceByUserId, transferWorkspaceOwnership, createWorkspace, updateWorkspace, getWorkspaceByWorkspaceId, deleteWorkspace, getWorkspacePermissions } = require("./workspaceService");
+const { getWorkspaceByUserId, transferWorkspaceOwnership, createWorkspace, updateWorkspace, getWorkspaceByWorkspaceId, deleteWorkspace, getWorkspacePermissions, getUserPermissionsVersion, getUserEffectivePermissions } = require("./workspaceService");
 
 
 exports.handler = async (event) => {
@@ -85,6 +85,32 @@ exports.handler = async (event) => {
             // GET DEFAULT WORKSPACE PERMISSIONS
             case "GET /workspace/permissions": {
                 body = await getWorkspacePermissions();
+                break;
+            }
+
+            // GET USER PERMISSIONS VERSION - lightweight check
+            case "GET /workspace/{workspaceId}/permissions/version": {
+                if (!pathParams.workspaceId) {
+                    throw new Error("Missing required path parameter workspaceId");
+                }
+                if (typeof pathParams.workspaceId !== "string") {
+                    throw new Error("workspaceId must be a UUID, 'string'");
+                }
+
+                body = await getUserPermissionsVersion(authUserId, pathParams.workspaceId);
+                break;
+            }
+
+            // GET USER EFFECTIVE PERMISSIONS - full permissions fetch
+            case "GET /workspace/{workspaceId}/permissions/effective": {
+                if (!pathParams.workspaceId) {
+                    throw new Error("Missing required path parameter workspaceId");
+                }
+                if (typeof pathParams.workspaceId !== "string") {
+                    throw new Error("workspaceId must be a UUID, 'string'");
+                }
+
+                body = await getUserEffectivePermissions(authUserId, pathParams.workspaceId);
                 break;
             }
   

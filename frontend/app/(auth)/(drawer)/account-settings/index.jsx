@@ -13,8 +13,8 @@ import { useTheme, Text } from "react-native-paper";
 import { useVerification } from '../../../../contexts/VerificationContext';
 import { verifyPassword } from '../../../../utils/verifyPassword';
 import endpoints from '../../../../utils/api/endpoints';
-import { isOwnerRole } from '../../../../storage/permissionsStorage';
 import DropDown from '../../../../components/common/input/DropDown';
+import { getCachedIsOwner, clearPermissionsCache } from '../../../../storage/permissionsStorage';
 
 import {
     getCurrentUser,
@@ -54,7 +54,7 @@ const Account = () => {
         loadAccountEmail();
         (async () => {
             try {
-                const owner = await isOwnerRole();
+                const owner = await getCachedIsOwner();
                 setIsOwner(!!owner);
             if (owner) {
                 const workspaceId = await getWorkspaceId();
@@ -110,6 +110,7 @@ const Account = () => {
                 console.error("Error deleting user details in workspace:", error);
                 return;
             }
+            await clearPermissionsCache(); // clear permissions cache on account deletion
             await deleteUser();  // Deletes user from Cognito
             setDialogVisible(false);
             // _layout will automatically redirect to sign in page from here
@@ -145,6 +146,7 @@ const Account = () => {
             const workspaceId = await getWorkspaceId();
             const { userId } = await getCurrentUser();
             await apiDelete(endpoints.workspace.users.remove(workspaceId, userId));
+            await clearPermissionsCache(); // clear permissions cache on leaving workspace
             setLeaveDialogVisible(false);
             router.navigate("/workspace-choice");
         } catch (error) {
@@ -193,6 +195,7 @@ const Account = () => {
             });
             
             await apiDelete(endpoints.workspace.users.remove(workspaceId, currentUserId));
+            await clearPermissionsCache(); // clear permissions cache on leaving workspace
             setOwnerFlowVisible(false);
             
             router.navigate("/workspace-choice");
@@ -227,6 +230,7 @@ const Account = () => {
         try {
             const workspaceId = await getWorkspaceId();
             await apiDelete(endpoints.workspace.core.delete(workspaceId));
+            await clearPermissionsCache(); // clear permissions cache on leaving workspace
             setOwnerFlowVisible(false);
             router.navigate("/workspace-choice");
         } catch (error) {

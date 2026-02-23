@@ -1,46 +1,42 @@
-// Author(s): Noah Bradley
+// Author(s): Noah Bradley, Holly Wyatt
 
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
-const roleKey = "role";
+const KEYS = {
+    PERMISSIONS: "cached_permissions",
+    VERSION: "cached_permission_version",
+    IS_OWNER: "cached_is_owner"
+};
 
-export async function saveRole(role) {
-    try {
-        const roleValue = JSON.stringify(role);
-        await AsyncStorage.setItem(roleKey, roleValue);
-    } catch (error) {
-        console.error("Error saving role: ", error);
-    }
+// save permissions, version, and ownership status to AsyncStorage
+export async function savePermissionsCache({ permissions, isOwner, version }) {
+    await AsyncStorage.multiSet([
+        [KEYS.PERMISSIONS, JSON.stringify(permissions || [])],
+        [KEYS.VERSION, String(version || 0)],
+        [KEYS.IS_OWNER, JSON.stringify(isOwner || false)]
+    ]);
 }
 
-export async function getRole() {
-    try {
-        const roleValue = await AsyncStorage.getItem(roleKey);
-        return roleValue != null ? JSON.parse(roleValue) : null;
-    } catch (error) {
-        console.error("Error retrieving role:", error);
-        return null;
-    }
+// get cached permissions from AsyncStorage
+export async function getCachedPermissions() {
+    const raw = await AsyncStorage.getItem(KEYS.PERMISSIONS);
+    return raw ? JSON.parse(raw) : null;
 }
 
-export async function getPermissions() {
-    try {
-        const roleValue = await AsyncStorage.getItem(roleKey);
-        return roleValue != null ? JSON.parse(roleValue).permissions : null;
-    } catch (error) {
-        console.error("Error retrieving permissions:", error);
-    }
+// get cached version from AsyncStorage
+export async function getCachedVersion() {
+    const raw = await AsyncStorage.getItem(KEYS.VERSION);
+    return parseInt(raw || "0", 10);
 }
 
-export async function isOwnerRole() {
-    try {
-        const roleValue = await AsyncStorage.getItem(roleKey);
-        if (!roleValue) return false;
+// get cached is owner from AsyncStorage
+export async function getCachedIsOwner() {
+    const raw = await AsyncStorage.getItem(KEYS.IS_OWNER);
+    console.log("[PermissionsStorage] getCachedIsOwner raw value:", raw, "type:", typeof raw);
+    return raw ? JSON.parse(raw) : false;
+}
 
-        const role = JSON.parse(roleValue);
-        return !!role.owner;
-    } catch (error) {
-        console.error("Error checking role for owner:", error);
-        return false;
-    }
+// clear all cached permissions data from AsyncStorage
+export async function clearPermissionsCache() {
+    await AsyncStorage.multiRemove(Object.values(KEYS));
 }

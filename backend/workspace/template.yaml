@@ -118,6 +118,20 @@ Resources:
             Method: get
             RestApiId: !Ref eTRONApi
 
+        GetPermissionsVersion:
+          Type: Api
+          Properties:
+            Path: /workspace/{workspaceId}/permissions/version
+            Method: get
+            RestApiId: !Ref eTRONApi
+
+        GetEffectivePermissions:
+          Type: Api
+          Properties:
+            Path: /workspace/{workspaceId}/permissions/effective
+            Method: get
+            RestApiId: !Ref eTRONApi
+
   # Invite Lambda 
   WorkspaceInvitesFunction:
     Type: AWS::Serverless::Function

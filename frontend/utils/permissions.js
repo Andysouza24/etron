@@ -1,22 +1,23 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
-import { getPermissions, isOwnerRole } from "../storage/permissionsStorage";
+import { getCachedPermissions, getCachedIsOwner } from "../storage/permissionsStorage";
 
 export async function hasPermission(requiredPermissions) {
     try {
         // if owner return true
-        if (await isOwnerRole()) return true;
+        const isOwner = await getCachedIsOwner();
+        if (isOwner) return true;
 
-        const userPermissions = await getPermissions();
-        if (!userPermissions) return false; // default to false
+        // get cached permissions
+        const userPermissions = await getCachedPermissions();
+        if (!userPermissions) return false;
 
-        // normalise the required prmissions to an array
-        const requiredList = Array.isArray(requiredPermissions) 
-            ? requiredPermissions 
-            : [requiredPermissions];
+        // permission array
+        const requiredList = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
 
         // if the user has everything that's required return true
-        return requiredList.every(permission => userPermissions.includes(permission));
+        return requiredList.every(perm => userPermissions.includes(perm));
+        
     } catch (error) {
         console.error("Error checking permissions:", error);
         return false;

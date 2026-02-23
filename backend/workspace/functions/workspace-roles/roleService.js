@@ -7,6 +7,7 @@ const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const {v4 : uuidv4} = require('uuid');
 const { hasPermission } = require("@etron/shared/utils/permissions");
 const { logAuditEvent } = require("@etron/shared/utils/auditLogger");
+const { permissionCache } = require("@etron/shared/utils/permissionCache");
 
 // Permissions for this service
 const PERMISSIONS = {
@@ -95,6 +96,9 @@ async function deleteRoleInWorkspace(authUserId, workspaceId, roleId) {
     if (role.owner) {
         throw new Error("You cannot delete the Owner role");
     }
+
+    permissionCache.invalidateWorkspace(workspaceId); // invalidate cache for all users in the workspace
+    await workspaceUsersRepository.bumpPermissionsVersionForRole(workspaceId, roleId); // bump permissions version for role
 
     await workspaceRepo.removeRole(workspaceId, roleId);
 
@@ -218,6 +222,9 @@ async function updateRoleInWorkspace(authUserId, workspaceId, roleId, payload) {
     }
 
     const updatedRole = await workspaceRepo.updateRole(workspaceId, roleId, updatedFields);
+
+    permissionCache.invalidateWorkspace(workspaceId); // invalidate cache for all users in the workspace
+    await workspaceUsersRepository.bumpPermissionsVersionForRole(workspaceId, roleId); // bump permissions version for role
 
     // log audit
     await logAuditEvent({

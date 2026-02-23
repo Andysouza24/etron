@@ -13,6 +13,7 @@ import { Linking } from 'react-native';
 import { AccountStorage } from '../storage/accountStorage';
 import AuthService from './AuthService';
 import { removeWorkspaceInfo } from '../storage/workspaceStorage';
+import { clearPermissionsCache } from '../storage/permissionsStorage';
 import workspaceService from './WorkspaceService';
 
 class AccountService {
@@ -94,6 +95,7 @@ class AccountService {
         try {
             await signOut();
             try { await removeWorkspaceInfo(); } catch {}
+            try { await clearPermissionsCache(); } catch {} // clear cached permissions on sign out
             console.log("User signed out successfully.");
             return { success: true };
         } catch (error) {

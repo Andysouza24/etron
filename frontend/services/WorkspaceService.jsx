@@ -4,6 +4,8 @@ import endpoints from "../utils/api/endpoints";
 import apiClient from "../utils/api/apiClient";
 import AuthService from "./AuthService";
 import { saveWorkspaceInfo, extractWorkspaceId, getWorkspaceInfo, removeWorkspaceInfo } from "../storage/workspaceStorage";
+import { savePermissionsCache } from "../storage/permissionsStorage";
+import { saveUserInfo } from "../storage/userStorage";
 
 class WorkspaceService {
 	constructor(client) {
@@ -78,6 +80,10 @@ class WorkspaceService {
 			}
 			await saveWorkspaceInfo(selected);
 			console.log("[WorkspaceService] Workspace saved", { workspaceId: id });
+
+			// seed permissions cache immediately after workspace is set
+			await this.seedPermissionsCache(id);
+
 			return selected;
 		} catch (error) {
 			try {
@@ -95,6 +101,41 @@ class WorkspaceService {
 			return null;
 		}
 	}
+
+	// seed permissions cache for current workspace
+	async seedPermissionsCache(workspaceId) {
+		if (!workspaceId) return;
+		try {
+			const permsResponse = await this.apiClient.get(endpoints.workspace.core.getEffectivePermissions(workspaceId));
+			await savePermissionsCache({
+				permissions: permsResponse.data.permissions,
+				isOwner: permsResponse.data.isOwner,
+				version: permsResponse.data.version
+			});
+			console.log("[WorkspaceService] Permissions cache seeded");
+		} catch (error) {
+			console.warn("[WorkspaceService] Failed to seed permissions cache: ", error?.message);
+		}
+	}
+
+	// setup workspace info and permissions cache in storage
+	async setupWorkspaceStorage(workspace, userId) {
+		const workspaceId = extractWorkspaceId(workspace);
+		await saveWorkspaceInfo(workspace);
+
+		if (workspaceId && userId) {
+			try {
+				const userResult = await this.apiClient.get(endpoints.workspace.core.getUser(workspaceId, userId));
+				await saveUserInfo(userResult.data);
+			} catch (error) {
+				console.warn("[WorkspaceService] Failed to save user info into storage:", error?.message);
+			}
+		}
+
+		await this.seedPermissionsCache(workspaceId);
+	}
+
+
 }
 
 const workspaceService = new WorkspaceService(apiClient);

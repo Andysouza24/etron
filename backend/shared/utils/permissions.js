@@ -4,6 +4,7 @@ const workspaceRepo = require("../repositories/workspaceRepository");
 const { GetObjectCommand, NoSuchKey, S3Client, S3ServiceException } = require("@aws-sdk/client-s3");
 const { getAppPermissions } = require("../repositories/appConfigBucketRepository");
 const s3Client = new S3Client({});
+const { permissionCache } = require("./permissionCache");
 
 // get the default permissions. Permissions with defaultStatus: true
 async function getDefaultPermissions() {
@@ -50,30 +51,65 @@ async function getDefaultPermissions() {
     return result;
 }
 
-// check if the user has permissions
-async function hasPermission(userId, workspaceId, permissionKey) {
-    if (!userId || typeof userId !== "string") {
-        throw new Error("Invalid or missing userId");
-    }
 
-    if (!workspaceId || typeof workspaceId !== "string") {
-        throw new Error("Invalid or missing workspaceId");
-    }
-
+// resolve the effective permissions from DynamoDB, bypassing the cache
+async function _resolveEffectivePermissions(userId, workspaceId){
     const user = await workspaceUsersRepo.getUser(workspaceId, userId);
-    if (!user?.roleId) return false;
+    const roleIds = workspaceUsersRepo.getUserRoleIds(user);
 
-    const role = await workspaceRepo.getRoleById(workspaceId, user.roleId);
-    if (!role) return false;
+    if (roleIds.length === 0) {
+        return { permissions: [], isOwner: false, version: 0 };
+    }
 
-    // Owners always have permissions (exceptions can be added later)
-    if (role.owner) return true
+    const roles = await Promise.all(
+        roleIds.map(id => workspaceRepo.getRoleById(workspaceId, id))
+    );
 
-    // check for specific permission
-    return role.permissions?.includes(permissionKey) || false;       
+    const isOwner = roles.some(role => role?.owner === true);
+    if (isOwner) {
+        return {
+            permissions: [],
+            isOwner: true,
+            version: user.permissionsVersion || 0
+        };
+    }
+
+    const permissionSet = new Set();
+    for (const role of roles) {
+        if (role?.permissions) {
+            for (const perm of role.permissions) {
+                permissionSet.add(perm);
+            }
+        }
+    }
+
+    return {
+        permissions: Array.from(permissionSet),
+        isOwner: false,
+        version: user.permissionsVersion || 0
+    };
+
+}
+
+// returns the effective permissions for a user in a workspace, using Lambda in memory cache
+async function getEffectivePermissions(userId, workspaceId) {
+    const cached = permissionCache.get(workspaceId, userId);
+    if (cached) return cached;
+
+    const effective = await _resolveEffectivePermissions(userId, workspaceId);
+    permissionCache.set(workspaceId, userId, effective);
+    return effective;
+}
+
+// check a single permission
+async function hasPermission(userId, workspaceId, permissionKey) {
+    const effective = await getEffectivePermissions(userId, workspaceId);
+    if (effective.isOwner) return true;
+    return effective.permissions.includes(permissionKey);
 }
 
 module.exports = {
     getDefaultPermissions,
+    getEffectivePermissions,
     hasPermission
 };

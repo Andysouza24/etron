@@ -19,6 +19,8 @@ import * as MediaLibrary from "expo-media-library";
 import { hasPermission } from "../../../../../../../utils/permissions";
 import PermissionGate from "../../../../../../../components/common/PermissionGate";
 import { captureRef } from "react-native-view-shot";
+import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
+
 
 const ViewMetric = () => {
     const { metricId } = useLocalSearchParams();
@@ -29,25 +31,19 @@ const ViewMetric = () => {
     const [deleting, setDeleting] = useState(false);
     const [coloursState, setColoursState] = useState(["red", "blue", "green", "purple"]);
     const [exporting, setExporting] = useState(false);
-    const [manageMetricsPermission, setManageMetricsPermission] = useState(false);
     const [exportModalVisible, setExportModalVisible] = useState(false);
     const [backgroundMode, setBackgroundMode] = useState("white");
     const [axisColorModeState, setAxisColorModeState] = useState("dark");
+    const { allowed: manageMetricsPermission } = useHasPermission("modules.daybook.metrics.manage_metrics");
 
     const router = useRouter();
     const viewShotRef = useRef();
     const theme = useTheme();
 
     useEffect(() => {
-        loadPermission();
         getMetricSettings();
     }, [metricId]);
 
-    async function loadPermission() {
-        const manageMetricsPermission = await hasPermission("modules.daybook.metrics.manage_metrics");
-        console.log("managemetricspermission:", manageMetricsPermission);
-        setManageMetricsPermission(manageMetricsPermission);
-    }
 
     async function getMetricSettings() {
         setLoading(true);

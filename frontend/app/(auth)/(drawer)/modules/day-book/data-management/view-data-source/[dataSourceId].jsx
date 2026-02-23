@@ -22,7 +22,7 @@ import formatDateTime from "../../../../../../../utils/format/formatISODate"
 import { apiGet } from "../../../../../../../utils/api/apiClient";
 import endpoints from "../../../../../../../utils/api/endpoints";
 import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
-import { getPermissions } from "../../../../../../../storage/permissionsStorage";
+import { getCachedPermissions } from "../../../../../../../storage/permissionsStorage";
 import { getUserInfo } from "../../../../../../../storage/userStorage";
 import ItemNotFound from "../../../../../../../components/common/errors/MissingItem";
 
