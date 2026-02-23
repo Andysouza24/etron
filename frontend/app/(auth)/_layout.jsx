@@ -31,36 +31,28 @@ export default function AuthLayout() {
             const userAttributes = await fetchUserAttributes();
 
             hasWorkspaceAttribute = userAttributes["custom:has_workspace"];
-            console.log("DEBUG: hasWorkspaceAttribute =", hasWorkspaceAttribute);
 
             // if the attribute doesn't exist, set it to false
             if (hasWorkspaceAttribute == null) {
                 await setHasWorkspaceAttribute(false);
                 const refreshed = await fetchUserAttributes();
                 hasWorkspaceAttribute = refreshed["custom:has_workspace"];
-                console.log("DEBUG: refreshed hasWorkspaceAttribute =", hasWorkspaceAttribute);
             }
     
         } catch (error) {
-            console.error("DEBUG: Error fetching attributes:", error);
             console.error("Error fetching workspace status:", error);
             return false;
         }
 
         if (hasWorkspaceAttribute === "true") {
-            console.log("DEBUG: hasWorkspaceAttribute is true, fetching workspace...");
             const userAttributes = await fetchUserAttributes();
             const userId = userAttributes.sub;
-            console.log("DEBUG: userId =", userId);
 
             let workspace;
             try {
                 const result = await apiGet(endpoints.workspace.core.getByUserId(userId));
-                console.log("DEBUG: raw API response =", JSON.stringify(result.data));
                 workspace = result.data;
             } catch (error) {
-                console.error("DEBUG: Workspace fetch FAILED:", error.message);
-                console.error("DEBUG: Full error:", JSON.stringify(error.response?.data));
                 await setHasWorkspaceAttribute(false);
                 if (error.message.includes("Workspace not found")) {
                     console.log("No workspace yet.");
@@ -74,16 +66,12 @@ export default function AuthLayout() {
                 console.error("Error fetching workspace:", error);
                 return false;
             }
-            console.log("DEBUG: workspace =", JSON.stringify(workspace));
-            console.log("DEBUG: workspace.workspaceId =", workspace?.workspaceId);
             
             if (workspace.workspaceId) {
-                console.log("DEBUG: Found workspaceId, saving...");
                 console.log("WorkspaceId received from server:", workspace.workspaceId);
                 return true;
             }
 
-            console.log("DEBUG: No workspaceId in response, signing out");
             // if user attribute has_workspace === true but not in local storage force sign out
             console.log("WorkspaceId cannot be fetched from local storage");
             await signOut();
