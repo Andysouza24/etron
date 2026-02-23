@@ -14,8 +14,7 @@ import endpoints from "../../utils/api/endpoints";
 import { saveWorkspaceInfo } from "../../storage/workspaceStorage";
 import { updateUserAttribute, signOut, fetchUserAttributes } from "aws-amplify/auth";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
-import { saveUserInfo } from "../../storage/userStorage";
-import { savePermissionsCache } from "../../storage/permissionsStorage";
+import workspaceService from "../../services/WorkspaceService";
 
 const CreateWorkspace = () => {
     const router = useRouter();
@@ -83,36 +82,13 @@ const CreateWorkspace = () => {
 
             
             const result = await apiPost(endpoints.workspace.core.create, workspaceData);
-            
-            // save workspace and user info to local storage
-            const workspace = result.data
-            saveWorkspaceInfo(workspace);
-
+            const workspace = result.data;
             const userAttributes = await fetchUserAttributes();
-            try {
-                const result = await apiGet(endpoints.workspace.users.getUser(workspace.workspaceId, userAttributes.sub));
-                await saveUserInfo(result.data);  // Saves into local storage
-            } catch (error) {
-                console.error("Error saving user info into storage:", error);
-            }
 
-            // TODO: consider moving seeding to increase reuse
-            try {
-                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspace.workspaceId));
-                await savePermissionsCache({
-                    permissions: result.data.permissions,
-                    isOwner: result.data.isOwner,
-                    version: result.data.version
-                });
-            } catch (error) {
-                console.error("Failed to seed permissions cache: ", error?.message);
-            }
-
-            // update user attribute to be in a workspace
+            await workspaceService.setupWorkspaceStorage(workspace, userAttributes.sub);
             await handleUpdateUserAttribute('custom:has_workspace', "true");
 
             setCreating(false);
-
 
             // navigate to the profile
             router.replace("/dashboard");

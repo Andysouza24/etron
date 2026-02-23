@@ -7,7 +7,7 @@ import { saveWorkspaceInfo } from '../../storage/workspaceStorage';
 import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
 import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
-import { savePermissionsCache } from '../../storage/permissionsStorage';
+import workspaceService from '../../services/WorkspaceService';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
@@ -112,43 +112,13 @@ export default function AuthLayout() {
     }
 
     const saveInfoIntoStorage = async() => {
-        const userAttributes = await fetchUserAttributes();
-
-        let workspaceId;
         try {
+            const userAttributes = await fetchUserAttributes();
             const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            workspaceId = result.data.workspaceId;
+            await workspaceService.setupWorkspaceStorage(result.data, userAttributes.sub);
+            console.log("[_layout.jsx] Workspace storage setup completed");
         } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
-        }
-
-        try {
-            const result = await apiGet(endpoints.workspace.users.getUser(workspaceId, userAttributes.sub));
-            await saveUserInfo(result.data);  // Saves into local storage
-        } catch (error) {
-            console.error("Error saving user info into storage:", error);
-        }
-
-        // TODO: consider moving seeding to increase reuse
-        if (workspaceId) {
-            try{
-                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspaceId));
-                console.log("DEBUG: permissions response =", JSON.stringify(result.data));
-                console.log("DEBUG: permissions =", JSON.stringify(result.data.permissions));
-                console.log("DEBUG: isOwner =", result.data.isOwner);
-                console.log("DEBUG: version =", result.data.version);
-            
-                await savePermissionsCache({
-                    permissions: result.data.permissions,
-                    isOwner: result.data.isOwner,
-                    version: result.data.version
-                });
-                console.log("Permissions cache seeded");
-            } catch (error) {
-                console.error("Failed to seed permissions cache: ", error?.message);
-            }
-            
+            console.error("[_layout.jsx] Error saving workspace info into storage:", error);
         }
     }
 

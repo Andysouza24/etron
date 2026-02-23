@@ -15,8 +15,7 @@ import { saveWorkspaceInfo } from "../../storage/workspaceStorage";
 import { router } from "expo-router";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
 import StackLayout from "../../components/layout/StackLayout";
-import { saveUserInfo } from "../../storage/userStorage";
-import { savePermissionsCache } from "../../storage/permissionsStorage";
+import workspaceService from "../../services/WorkspaceService";
 
 
 const JoinWorkspace = () => {
@@ -127,30 +126,10 @@ const JoinWorkspace = () => {
             }
 
             const result = await apiGet(endpoints.workspace.core.getWorkspace(workspaceId));
-
-            // save workspace and user info to local storage
             const workspace = result.data;
-            saveWorkspaceInfo(workspace);
-
             const userAttributes = await fetchUserAttributes();
-            try {
-                const result = await apiGet(endpoints.workspace.users.getUser(workspace.workspaceId, userAttributes.sub));
-                await saveUserInfo(result.data);  // Saves into local storage
-            } catch (error) {
-                console.error("Error saving user info into storage:", error);
-            }
 
-            // TODO: consider moving seeding to increase reuse
-            try {
-                const result = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspace.workspaceId));
-                await savePermissionsCache({
-                    permissions: result.data.permissions,
-                    isOwner: result.data.isOwner,
-                    version: result.data.version
-                });
-            } catch (error) {
-                console.error("Failed to seed permissions cache: ", error?.message);
-            }
+            await workspaceService.setupWorkspaceStorage(workspace, userAttributes.sub);
 
             await handleUpdateUserAttribute('custom:has_workspace', "true");
 
