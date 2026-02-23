@@ -320,7 +320,6 @@ async function transferWorkspaceOwnership(authUserId, workspaceId, payload) {
 
     const updatedUser = await workspaceUsersRepo.updateUser(workspaceId, authUserId, updatedUserItem);
     
-    // TODO: make function to reduce repeated code
     // invalidate cache for both users
     permissionCache.invalidate(workspaceId, receipientUserId);
     permissionCache.invalidate(workspaceId, authUserId);

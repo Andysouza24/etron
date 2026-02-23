@@ -181,8 +181,6 @@ async function getUserByWorkspaceIdAndEmail(workspaceId, email) {
     return result.Items[0];
 }
 
-// TODO: double check correct file
-// update with role array
 // get the roleId of a user in a workspace
 function getUserRoleIds(user){
     if (!user) return [];
@@ -225,7 +223,6 @@ async function bumpPermissionsVersion(workspaceId, userId) {
     await dynamoDB.send(new UpdateCommand(params));
 }
 
-// TODO: double check role implementation - role as array or single value
 // bump permissions version for all users with a given role in a workspace
 async function bumpPermissionsVersionForRole(workspaceId, roleId) {
     const users = await getUsersByWorkspaceId(workspaceId);

@@ -97,7 +97,6 @@ async function deleteRoleInWorkspace(authUserId, workspaceId, roleId) {
         throw new Error("You cannot delete the Owner role");
     }
 
-    // TODO: make function to reduce repeated code
     permissionCache.invalidateWorkspace(workspaceId); // invalidate cache for all users in the workspace
     await workspaceUsersRepository.bumpPermissionsVersionForRole(workspaceId, roleId); // bump permissions version for role
 

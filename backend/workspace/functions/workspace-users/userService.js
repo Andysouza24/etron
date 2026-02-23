@@ -123,7 +123,6 @@ async function updateUserInWorkspace(authUserId, workspaceId, userId, payload) {
 
     const result = await workspaceUsersRepo.updateUser(workspaceId, userId, updatedUserItem);
 
-    // TODO: make function to reduce repeated code
     permissionCache.invalidate(workspaceId, userId); // invalidate cache for the user
     await workspaceUsersRepo.bumpPermissionsVersion(workspaceId, userId); // bump permissions version for the user
 
