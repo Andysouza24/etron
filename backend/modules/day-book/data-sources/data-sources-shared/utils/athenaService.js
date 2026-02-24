@@ -122,9 +122,9 @@ async function createAthenaTable(schema, tableName, dataLocation, database, outp
         throw new Error("Cannot create Athena table: the schema is empty");
     }
     const sanitisedTableName = sanitiseIdentifier(tableName); 
-    const columns = schema.map(column => `${sanitiseIdentifier(column.name)} ${column.type}`).join(", ");
+    const columns = schema.map(column => `\`${sanitiseIdentifier(column.name)}\` ${column.type}`).join(", ");
 
-    const ddl = `CREATE EXTERNAL TABLE ${sanitisedTableName} (${columns}) STORED AS PARQUET LOCATION '${dataLocation}'`;
+    const ddl = `CREATE EXTERNAL TABLE \`${sanitisedTableName}\` (${columns}) STORED AS PARQUET LOCATION '${dataLocation}'`;
 
     console.log("Athena DDL:\n", ddl);
 
