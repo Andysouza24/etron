@@ -16,7 +16,7 @@ Linking.addEventListener('url', (event) => { //deep linking; used for microsoft/
     console.log('App was opened with URL:', event.url);
 })
 
-const currentTheme = themes['dark'];
+const currentTheme = themes['light'];
 
 export default function RootLayout() {
     return (    

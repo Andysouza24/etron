@@ -1,6 +1,75 @@
 import { MD3LightTheme, MD3DarkTheme } from "react-native-paper";
 
+const themeColors = {
+    primary: '#BBEFFB',
+    secondary: '#4A519F',
+    lightNeutral: '#EEF1F6',
+    darkNeutral: '#40484C',
+
+    brightPink: '#EF476F',
+    brightPinkObverse: '#360726',
+
+    orange: '#F78C6F',
+    orangeObverse: '#451B03',
+
+    yellow: '#FFD166',
+    yellowObverse: '#543512',
+
+    lime: '#B3E11D',
+    limeObverse: '#061E16',
+
+    green: '#06D6A0',
+    greenObverse: '#0E3529',
+
+    blue: '#2DC6E8',
+    blueObverse: '#07385A',
+
+    purple: '#CCC1EC',
+    purpleObverse: '#5D2353',
+
+    black: '#000000',
+    inverseGrey: '#1D1A1A',
+    inverseDarkGrey: '#545454',
+    darkGrey: '#ABABAB',
+    grey: '#E2E5E5',
+    white: '#FFFFFF',
+
+    lightBackground: '#FFFFFF',
+    darkBackground: '#181C1F',
+}
+
+
 const LightTheme = {
+    ...MD3LightTheme,
+    colors: {
+        ...MD3LightTheme.colors,
+        ...themeColors,
+        primary: themeColors.primary,
+        secondary: themeColors.secondary,
+        text: themeColors.darkNeutral,
+        textAlt: themeColors.black,
+        placeholderText: themeColors.darkGrey,
+        outline: themeColors.primary , // the colour for text input and button outlines
+        buttonBackground: themeColors.grey, // background for cards and outlined buttons
+        buttonBackgroundAlt: themeColors.lightNeutral,
+        background: themeColors.lightBackground,
+        lowOpacityButton: "rgba(247, 247, 247, 0.3)",
+        midOpacityButton: "rgba(247, 247, 247, 0.7)",
+        lowOpacityText: "rgba(29, 29, 29, 1)",
+        error: themeColors.brightPink, // error messages and dangerous actions
+        //error: '#EF4747', // red version
+        icon: themeColors.darkNeutral,
+        divider: themeColors.lightNeutral,
+        navigationRailBackground: themeColors.lightNeutral,
+        themeGreen: themeColors.green,
+        themeGrey: themeColors.darkGrey,
+        textGreen: themeColors.greenObverse, // green text
+        focusedBackground: themeColors.darkNeutral,
+        altGM: themeColors.inverseGrey,
+        surface: themeColors.lightBackground,
+        onTile: themeColors.primary,
+        activeBackground: themeColors.secondary,
+    }
 
 };
 
@@ -35,7 +104,8 @@ const DarkTheme = {
         focusedBackground: '#263e46', // #118AB2 at 20% opacity
 
         altGM: '#F7F7F7',
-        surface: "#1E1E1E"
+        surface: "#1E1E1E",
+        onTile: themeColors.primary,
     },
 };
 

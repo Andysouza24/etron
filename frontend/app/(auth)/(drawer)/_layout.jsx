@@ -69,8 +69,8 @@ const boardOptions = [
 const DrawerRow = ({ label, icon, onPress, active = false, style }) => {
     const theme = useTheme();
     const lightBackground = theme.colors.altGM;
-    const activeBackground = theme.colors.focusedBackground;
-    const onTile = "#000000"
+    const activeBackground = theme.colors.activeBackground;
+    const onTile = theme.colors.onTile;
 
     return (
         <TouchableOpacity
@@ -177,7 +177,7 @@ const CustomDrawer = (props) => {
                             navigation={navigation}
                             isActive={activeRouteName == route.name}
                             permKey={permKey}
-                            style={{backgroundColor:"#000000"}}
+                            style={{backgroundColor: theme.colors.buttonBackground}}
                         />
                     ))
                 )}

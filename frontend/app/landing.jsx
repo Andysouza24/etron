@@ -11,11 +11,11 @@ const Landing = () => {
 	const theme = useTheme();
 
 	return (
-		<ImageBackground
+		/*<ImageBackground
 			source={require('../assets/images/LandingTextBackground.png')}
 			style={styles.background}
 			resizeMode='cover'
-		>	
+		>*/
 			<ResponsiveScreen transparent>
 				<View style={styles.container}>
 					
@@ -49,7 +49,7 @@ const Landing = () => {
 					</View>
 				</View>
 			</ResponsiveScreen>
-		</ImageBackground>
+		/*</ImageBackground>*/
 	);
 };
 
