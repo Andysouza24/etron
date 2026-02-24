@@ -22,12 +22,16 @@ function validateFormat(data) {
             return { valid: false, error: `Row ${i} has inconsistent headers` };
         }
 
+        
+        // Use this to reject empty fields when implementing toggle accept/reject empty fields in the UI
+        /*
         // check for empty fields
         for (const [key, value] of Object.entries(row)) {
             if (value === null || value === undefined || value === "") {
                 return { valid: false, error: `Empty field for ${key} in row ${i}` };
             }
         }
+        */
     }
 
     return { valid: true };
