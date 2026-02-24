@@ -69,7 +69,7 @@ const apiClient = {
     async post(url, data = {}, config = {}) {
         const baseHeaders = await getHeaders();
         const headers = { ...baseHeaders, ...(config.headers || {}) };
-        const resp = await axios({ method: 'post', url, data, headers, params: config.params, timeout: config.timeout });
+        const resp = await axios({ method: 'post', url, headers, data, params: config.params, timeout: config.timeout });
         return { data: resp.data, status: resp.status, headers: resp.headers };
     },
     async put(url, data = {}, config = {}) {
