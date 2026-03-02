@@ -11,21 +11,21 @@ async function toParquet(data, schema) {
     for (const column of schema) {
         switch (column.type) {
             case "bigint":
-                schemaDef[column.name] = { type: 'INT64' };
+                schemaDef[column.name] = { type: 'INT64', optional: true };
                 break;
             case "double":
             case "decimal(18,2)":
-                schemaDef[column.name] = { type: 'DOUBLE' };
+                schemaDef[column.name] = { type: 'DOUBLE', optional: true };
                 break;
             case "boolean":
-                schemaDef[column.name] = { type: 'BOOLEAN' };
+                schemaDef[column.name] = { type: 'BOOLEAN', optional: true };
                 break;
             case "timestamp":
-                schemaDef[column.name] = { type: 'TIMESTAMP_MILLIS' };
+                schemaDef[column.name] = { type: 'TIMESTAMP_MILLIS', optional: true };
                 break;
             case "string":
             default:
-                schemaDef[column.name] = { type: 'UTF8' };
+                schemaDef[column.name] = { type: 'UTF8', optional: true };
                 break;
 
         }

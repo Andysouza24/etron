@@ -48,6 +48,7 @@ exports.handler = async (event) => {
 
             // TEST DATA SOURCE CONNECTION
             case "POST /day-book/data-sources/test-connection": {
+                console.log('[handler] test-connection', { sourceType: requestJSON.sourceType, authType: requestJSON.config?.authType });
                 body = await testConnection(authUserId, requestJSON);
                 break;
             }

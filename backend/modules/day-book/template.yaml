@@ -55,6 +55,8 @@ Resources:
     Properties:
       CodeUri: ./data-sources/functions/data-source-core
       Handler: dataSourceHandler.handler
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
           POLLING_LAMBDA_NAME: !Ref DataSourcePollFunction

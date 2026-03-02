@@ -425,6 +425,8 @@ async function deleteDataSourceInWorkspace(authUserId, workspaceId, dataSourceId
 async function testConnection(authUserId, payload) {
     const { sourceType, config, secrets } = payload;
 
+    console.log('[testConnection] start', { sourceType, authType: config?.authType, endpoint: config?.endpoint, hasSecrets: !!secrets });
+
     // try polling
     try {
 
@@ -455,10 +457,14 @@ async function testConnection(authUserId, payload) {
 
         const data = await adapter.poll(config, secrets);
 
-        // return the data from the endpoint
-        return { status: "success", data: data };
+        // Only return a summary/preview to avoid exceeding Lambda 6MB response limit
+        const preview = Array.isArray(data) ? data.slice(0, 5) : (typeof data === 'object' ? { keys: Object.keys(data || {}) } : {});
+        console.log('[testConnection] success', { sourceType, rowCount: Array.isArray(data) ? data.length : 'N/A' });
+
+        return { status: "success", message: "Connection successful", preview };
 
     } catch (error) {
+        console.error('[testConnection] failed', { sourceType, error: error.message });
         // if the data source fails polling return error
         const errorItem = {
             status: "error",
@@ -563,7 +569,9 @@ async function viewData(authUserId, workspaceId, dataSourceId, options = {}) {  
 
     // get the schema from the dataSource
     const schema = await getDataSchema(workspaceId, dataSourceId);
-    if (!schema || schema.length === 0) throw new Error("Schema not found for this data source");
+    if (!schema || schema.length === 0) {
+        throw new Error("Data is still being processed. Please wait a moment and try again.");
+    }
 
     const columns = schema.map(column => sanitiseIdentifier(column.name)).join(", ");
     const tableName = sanitiseIdentifier(`ds_${dataSourceId}`);
@@ -604,7 +612,9 @@ async function viewDataForMetric(authUserId, workspaceId, dataSourceId, metricId
     
     // get the schema from the dataSource
     const schema = await getDataSchema(workspaceId, dataSourceId);
-    if (!schema || schema.length === 0) throw new Error("Schema not found for this data source");
+    if (!schema || schema.length === 0) {
+        throw new Error("Data is still being processed. Please wait a moment and try again.");
+    }
 
     // get the metric columns
     const metricColumns = await metricRepo.getMetricVariableNames(workspaceId, metricId);

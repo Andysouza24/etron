@@ -18,7 +18,7 @@ async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     // update the athena table
     console.log("Updating Athena table:", tableName);
 
-    await runDDL(`DROP TABLE IF EXISTS ${sanitiseIdentifier(tableName)}`, database, outputLocation);
+    await runDDL(`DROP TABLE IF EXISTS \`${sanitiseIdentifier(tableName)}\``, database, outputLocation);
 
     // create table with the new schema
     console.log("new schema: " + newSchema);
