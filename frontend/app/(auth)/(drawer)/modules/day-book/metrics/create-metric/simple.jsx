@@ -1,14 +1,14 @@
 import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
-import Header from "../../../../../../components/layout/Header";
+import Header from '../../../../../../../components/layout/Header';
 import { Text, Card, ActivityIndicator, DataTable, Modal, Portal, Button, Chip, useTheme, IconButton } from "react-native-paper";
-import BasicButton from "../../../../../../components/common/buttons/BasicButton";
-import DropDown from '../../../../../../components/common/input/DropDown';
-import TextField from '../../../../../../components/common/input/TextField';
-import MetricCheckbox from '../../../../../../components/common/buttons/MetricCheckbox';
-import MetricRadioButton from '../../../../../../components/common/buttons/MetricRadioButton';
-import GraphTypes from './graph-types';
+import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
+import DropDown from '../../../../../../../components/common/input/DropDown';
+import TextField from '../../../../../../../components/common/input/TextField';
+import MetricCheckbox from '../../../../../../../components/common/buttons/MetricCheckbox';
+import MetricRadioButton from '../../../../../../../components/common/buttons/MetricRadioButton';
+import GraphTypes from '../graph-types';
 import * as FileSystem from 'expo-file-system';
 import { Storage } from 'aws-amplify';
 
@@ -17,17 +17,17 @@ import {
     fetchUserAttributes,
     getCurrentUser
 } from 'aws-amplify/auth';
-import { getWorkspaceId } from "../../../../../../storage/workspaceStorage"
-import endpoints from '../../../../../../utils/api/endpoints';
-import { apiGet, apiPost } from '../../../../../../utils/api/apiClient';
+import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage"
+import endpoints from '../../../../../../../utils/api/endpoints';
+import { apiGet, apiPost } from '../../../../../../../utils/api/apiClient';
 
 import ColorPicker from 'react-native-wheel-color-picker';
-import ResponsiveScreen from '../../../../../../components/layout/ResponsiveScreen';
-import { hasPermission } from '../../../../../../utils/permissions';
-import PermissionGate from '../../../../../../components/common/PermissionGate';
+import ResponsiveScreen from '../../../../../../../components/layout/ResponsiveScreen';
+import { hasPermission } from '../../../../../../../utils/permissions';
+import PermissionGate from '../../../../../../../components/common/PermissionGate';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import axios from 'axios';
-import { useHasPermission } from '../../../../../../hooks/useHasPermission';
+import { useHasPermission } from '../../../../../../../hooks/useHasPermission';
 
 
 const CreateMetric = () => {

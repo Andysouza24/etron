@@ -1,4 +1,4 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { 
     DynamoDBDocumentClient, 
@@ -46,6 +46,36 @@ async function updateMetric(workspaceId, metricId, metricItem) {
         updateFields.push("#config = :config");
         expressionAttributeValues[":config"] = metricItem.config;
         expressionAttributeNames["#config"] = "config";
+    }
+
+    if (metricItem.metricType !== undefined) {
+        updateFields.push("#metricType = :metricType");
+        expressionAttributeValues[":metricType"] = metricItem.metricType;
+        expressionAttributeNames["#metricType"] = "metricType";
+    }
+
+    if (metricItem.sourceMetrics !== undefined) {
+        updateFields.push("#sourceMetrics = :sourceMetrics");
+        expressionAttributeValues[":sourceMetrics"] = metricItem.sourceMetrics;
+        expressionAttributeNames["#sourceMetrics"] = "sourceMetrics";
+    }
+
+    if (metricItem.calculation !== undefined) {
+        updateFields.push("#calculation = :calculation");
+        expressionAttributeValues[":calculation"] = metricItem.calculation;
+        expressionAttributeNames["#calculation"] = "calculation";
+    }
+
+    if (metricItem.aggregationMethod !== undefined) {
+        updateFields.push("#aggregationMethod = :aggregationMethod");
+        expressionAttributeValues[":aggregationMethod"] = metricItem.aggregationMethod;
+        expressionAttributeNames["#aggregationMethod"] = "aggregationMethod";
+    }
+
+    if (metricItem.trendDirection !== undefined) {
+        updateFields.push("#trendDirection = :trendDirection");
+        expressionAttributeValues[":trendDirection"] = metricItem.trendDirection;
+        expressionAttributeNames["#trendDirection"] = "trendDirection";
     }
 
     updateFields.push("#updatedAt = :updatedAt");
