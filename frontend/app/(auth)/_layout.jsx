@@ -8,6 +8,7 @@ import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
 import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
 import workspaceService from '../../services/WorkspaceService';
+import { MetricProvider } from '../../contexts/MetricContext';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
@@ -149,8 +150,8 @@ export default function AuthLayout() {
 
 
     return (         
-        <>
+        <MetricProvider>
             <Slot />
-        </> 
+        </MetricProvider> 
     );
 }
