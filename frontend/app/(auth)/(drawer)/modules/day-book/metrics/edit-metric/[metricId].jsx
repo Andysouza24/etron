@@ -388,7 +388,7 @@ const EditMetric = () => {
                                 sliderSize={30}
                                 noSnap
                                 gapSize={10}
-                                palette={['#000000','#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522','#ffffffff']}
+                                palette={[theme.colors.metricsPink, theme.colors.metricsOrange, theme.colors.metricsYellow, theme.colors.metricsLime, theme.colors.metricsGreen, theme.colors.metricsBlue, theme.colors.metricsPurple]}
                             />
                             </View>
                         </View>

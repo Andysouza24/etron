@@ -6,7 +6,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "yarn": "1.22.22"
     },
     "preview": {
       "distribution": "internal"

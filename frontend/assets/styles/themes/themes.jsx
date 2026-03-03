@@ -69,6 +69,15 @@ const LightTheme = {
         surface: themeColors.lightBackground,
         onTile: themeColors.primary,
         activeBackground: themeColors.secondary,
+        // ---- METRICS ----
+
+        metricsPink: themeColors.brightPink,
+        metricsOrange: themeColors.orange,
+        metricsYellow: themeColors.yellow,
+        metricsLime: themeColors.lime,
+        metricsGreen: themeColors.green,
+        metricsBlue: themeColors.blue,
+        metricsPurple: themeColors.purple,
     }
 
 };
@@ -106,6 +115,16 @@ const DarkTheme = {
         altGM: '#F7F7F7',
         surface: "#1E1E1E",
         onTile: themeColors.primary,
+
+        // ---- METRICS ----
+
+        metricsPink: themeColors.brightPink,
+        metricsOrange: themeColors.orange,
+        metricsYellow: themeColors.yellow,
+        metricsLime: themeColors.lime,
+        metricsGreen: themeColors.green,
+        metricsBlue: themeColors.blue,
+        metricsPurple: themeColors.purple,
     },
 };
 

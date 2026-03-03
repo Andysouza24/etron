@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "platforms":[
+    "platforms": [
       "ios",
       "android"
     ],
@@ -60,15 +60,15 @@
     "experiments": {
       "typedRoutes": true
     },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "003b5c2f-3456-427b-ab80-4311639976e5"
-      }
-    },
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/003b5c2f-3456-427b-ab80-4311639976e5"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6137eb4a-cf50-41a5-8205-e53fd149cc15"
+      }
     }
   }
 }

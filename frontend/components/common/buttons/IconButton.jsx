@@ -17,17 +17,17 @@ const IconButton = ({
     <View>
       <Button
           icon={() => (
-            <Icon source={icon} size={24} color={theme.colors.themeGrey} />
+            <Icon source={icon} size={24} color={theme.colors.text} />
           )}
         compact
         mode="elevated"
-        textColor={theme.colors.themeGrey}
+        textColor={theme.colors.text}
         loading={loading}
         style={[
           styles.button,
           fullWidth ? styles.fullWidth : styles.fixedWidth,
           style,
-          {backgroundColor: theme.colors.buttonBackground, }
+          {backgroundColor: theme.colors.buttonBackgroundAlt, }
         ]}
         contentStyle={styles.content}
         labelStyle={styles.label}

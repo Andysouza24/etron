@@ -198,7 +198,7 @@ const ViewMetric = () => {
                                 xKey: metricSettings.config.independentVariable,
                                 yKeys: metricSettings.config.dependentVariables,
                                 colours: metricSettings.config.colours || coloursState,
-                                axisColorMode: "dark",
+                                axisColorMode: theme.dark ? "dark" : "light",
                             })}
                         </View>
                     </Card.Content>

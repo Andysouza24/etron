@@ -219,7 +219,7 @@ const CreateMetric = () => {
 
     const [chosenIndependentVariable, setChosenIndependentVariable] = useState([]);
     const [chosenDependentVariables, setChosenDependentVariables] = useState([]);
-    const [coloursState, setColoursState] = useState(['#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522']);
+    const [coloursState, setColoursState] = useState([theme.colors.metricsPink, theme.colors.metricsOrange, theme.colors.metricsYellow, theme.colors.metricsLime, theme.colors.metricsGreen, theme.colors.metricsBlue, theme.colors.metricsPurple]);
     const [wheelIndex, setWheelIndex] = useState(0);
     const [metricName, setMetricName] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);

@@ -36,6 +36,7 @@ const TestConnectionSection = ({
         onPress={onTestConnection}
         loading={isTestingConnection}
         disabled={!canTest}
+        backgroundColor={theme.colors.primary}
       />
       {testResponse && (
         <>
