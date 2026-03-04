@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import metricService from '../services/MetricService';
+import metricService from '../../../../services/MetricService';
 
 export default function useMetric() {
     // manage local state

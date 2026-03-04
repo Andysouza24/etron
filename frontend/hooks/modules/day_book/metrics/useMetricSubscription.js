@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { API, graphqlOperation } from "aws-amplify";
-import { onMetricUpdated } from "../graphql/subscriptions";
-import { getWorkspaceId } from "../../../storage/workspaceStorage";
+import { onMetricUpdated } from "../../graphql/subscriptions";
+import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 
 export default function useMetricsSubscription(onUpdate) {
   useEffect(() => {
