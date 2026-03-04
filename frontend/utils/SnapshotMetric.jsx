@@ -65,7 +65,7 @@ export default function SnapshotMetric({
 
   if (!dataRows) return null;
 
-  const graphDef = GraphTypes[metric.config.type];
+  const graphDef = GraphTypes[metric.config.type] || GraphTypes[metric.config.graphType];
   if (!graphDef) {
     onError?.(new Error("Unknown graph type"));
     return null;

@@ -155,7 +155,7 @@ const MetricCardList = ({ metrics, searchQuery }) => {
                     style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}
                 >
                     {row.map((metric) => {
-                        const previewImage = GraphTypes[metric.config?.type]?.previewImage;
+                        const previewImage = (GraphTypes[metric.config?.type] || GraphTypes[metric.config?.graphType])?.previewImage;
                         return (
                             <TouchableOpacity
                                 key={metric.metricId}

@@ -161,7 +161,7 @@ const ViewMetric = () => {
         ) 
     }
 
-    const graphDef = GraphTypes[metricSettings.config.type];
+    const graphDef = GraphTypes[metricSettings.config.type] || GraphTypes[metricSettings.config.graphType];
     let filteredData = convertToGraphData(metricData);
     if (metricSettings.config.selectedRows?.length > 0) {
         filteredData = filteredData.filter((row) =>
