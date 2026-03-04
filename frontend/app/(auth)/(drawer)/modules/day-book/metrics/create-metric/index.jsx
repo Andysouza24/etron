@@ -5,36 +5,20 @@ import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveS
 import { View } from "react-native";
 import { useState } from "react";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
+import { metricTypeOptions } from "../../../../../../../utils/constants/modules/day-book/metrics/metricType";
 
-const metricTypes = [
-    {
-        key: 'data-source',
-        title: 'Simple Metric',
-        description: 'New metric created from a single data source.',
-        route: '/modules/day-book/metrics/create-metric/simple',
-    },
-    {
-        key: 'dimensional',
-        title: 'Dimensional Metric',
-        description: 'New dimensional metric created from existing metrics.',
-        route: '/modules/day-book/metrics/create-metric/dimensional',
-    },
-    {
-        key: 'calculated',
-        title: 'Calculated Metric',
-        description: 'New calculated metric created from existing metrics.',
-        route: '/modules/day-book/metrics/create-metric/calculated',
-    },
-];
 
 const SelectMetricType = () => {
     const router = useRouter();
     const theme = useTheme();
     const [type, setType] = useState(null);
-    const selectedType = metricTypes.find(t => t.key === type);
+    const selectedType = metricTypeOptions.find(t => t.key === type);
     const handleContinue = () => {
         if (selectedType) {
-            router.push(selectedType.route);
+            router.push({
+                pathname: selectedType.route,
+                params: { metricType: selectedType.key },
+            });
         }
     };
 
@@ -51,7 +35,7 @@ const SelectMetricType = () => {
                 </Text>
                 <View /* add list styling */>
                     <RadioButton.Group onValueChange={setType} value={type}>
-                        {metricTypes.map((metricType) => (
+                        {metricTypeOptions.map((metricType) => (
                           <View key={metricType.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
                             <RadioButton value={metricType.key} />
                             <View style={{ flex: 1, marginLeft: 8 }}>
