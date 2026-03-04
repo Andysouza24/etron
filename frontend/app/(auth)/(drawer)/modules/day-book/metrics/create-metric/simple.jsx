@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { View, ScrollView } from "react-native";
+import { useRouter } from "expo-router";
 import Header from "../../../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
@@ -28,6 +29,7 @@ function convertToGraphData(rows) {
 }
 
 const CreateSimpleMetric = () => {
+    const router = useRouter();
     const { allowed: viewDataPermission } = useHasPermission("modules.daybook.datasources.view_data");
 
     // --- data source ---
@@ -136,6 +138,10 @@ const CreateSimpleMetric = () => {
                     visible={existingMetricsVisible}
                     onDismiss={() => setExistingMetricsVisible(false)}
                     dataSourceId={ds.dataSourceId}
+                    onMetricPress={(metric) => {
+                        setExistingMetricsVisible(false);
+                        router.navigate(`/modules/day-book/metrics/view-metric/${metric.metricId}`);
+                    }}
                 />
             </DataSourceSelector>
         </ScrollView>
