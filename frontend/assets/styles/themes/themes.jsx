@@ -24,6 +24,9 @@ const themeColors = {
     blue: '#2DC6E8',
     blueObverse: '#07385A',
 
+    lightBlue: '#BCD4F6',
+    lightBlueObverse: '#293158',
+
     purple: '#CCC1EC',
     purpleObverse: '#5D2353',
 
@@ -77,6 +80,7 @@ const LightTheme = {
         metricsLime: themeColors.lime,
         metricsGreen: themeColors.green,
         metricsBlue: themeColors.blue,
+        metricsLightBlue: themeColors.lightBlue,
         metricsPurple: themeColors.purple,
     }
 
@@ -124,6 +128,7 @@ const DarkTheme = {
         metricsLime: themeColors.lime,
         metricsGreen: themeColors.green,
         metricsBlue: themeColors.blue,
+        metricsLightBlue: themeColors.lightBlue,
         metricsPurple: themeColors.purple,
     },
 };
