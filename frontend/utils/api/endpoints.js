@@ -121,6 +121,7 @@ const endpoints = {
 				getMetric: (metricId) => `${METRICS_BASE_URL}/${metricId}`,
 				getMetrics: `${METRICS_BASE_URL}`,
 				removeMetric: (metricId) => `${METRICS_BASE_URL}/${metricId}`,
+				getMetricsByDataSource: (dataSourceId) => `${METRICS_BASE_URL}/by-data-source/${dataSourceId}`,
 			},
 
 			reports: {

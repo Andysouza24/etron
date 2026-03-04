@@ -229,10 +229,25 @@ async function deleteMetricInWorkspace(authUserId, workspaceId, metricId) {
     return {message: "Metric successfully deleted"};
 }
 
+async function getMetricsByDataSourceInWorkspace(authUserId, workspaceId, dataSourceId) {
+    await validateWorkspaceId(workspaceId);
+    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.VIEW_METRICS);
+
+    if (!isAuthorised) {
+        throw new Error("User does not have permission to perform action");
+    }
+
+    const allMetrics = await metricRepo.getMetricsByWorkspaceId(workspaceId);
+    const filtered = allMetrics.filter(m => m.dataSourceId === dataSourceId);
+
+    return filtered;
+}
+
 module.exports = {
     createMetricInWorkspace,
     updateMetricInWorkspace,
     getMetricInWorkspace,
     getMetricsInWorkspace,
+    getMetricsByDataSourceInWorkspace,
     deleteMetricInWorkspace
 };

@@ -4,7 +4,7 @@ import { getWorkspaceId } from "../storage/workspaceStorage";
 
 class MetricService {
     async #withWorkspace(payload = {}) {
-        const workspaceId = getWorkspaceId();
+        const workspaceId = await getWorkspaceId();
         return { workspaceId, ...payload };
     }
 
@@ -37,6 +37,11 @@ class MetricService {
     // fetch metric data
     async getMetricData(dataSourceId, metricId){
         return apiGet(endpoints.modules.day_book.data_sources.viewDataForMetric(dataSourceId, metricId), await this.#withWorkspace());
+    }
+
+    // get metrics by data source
+    async getMetricsByDataSource(dataSourceId){
+        return apiGet(endpoints.modules.day_book.metrics.getMetricsByDataSource(dataSourceId), await this.#withWorkspace());
     }
 
     // TODO: get upload/download URLs

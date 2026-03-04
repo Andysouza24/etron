@@ -1,4 +1,5 @@
 import React from "react";
+import { View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
 import DropDown from "../../../common/input/DropDown";
 import PermissionGate from "../../../common/PermissionGate";
@@ -10,6 +11,8 @@ export default function DataSourceSelector({
     downloadStatus,
     viewDataPermission,
     onViewData,
+    onViewExistingMetrics,
+    dataSourceId,
     children,
 }) {
     return (
@@ -25,11 +28,20 @@ export default function DataSourceSelector({
             {downloadStatus === "downloading" && <ActivityIndicator size="large" />}
             {downloadStatus === "downloaded" && (
                 <>
-                    <PermissionGate allowed={viewDataPermission}>
-                        <Button icon="file" mode="text" onPress={onViewData}>
-                            View Data
-                        </Button>
-                    </PermissionGate>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
+                        <PermissionGate allowed={viewDataPermission}>
+                            <Button icon="file" mode="text" onPress={onViewData}>
+                                View Data
+                            </Button>
+                        </PermissionGate>
+
+                        {dataSourceId && (
+                            <Button icon="chart-box-outline" mode="text" onPress={onViewExistingMetrics}>
+                                View Existing Metrics
+                            </Button>
+                        )}
+                    </View>
+
                     {children}
                 </>
             )}

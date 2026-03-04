@@ -14,7 +14,7 @@ import useMetricDataSource from "../../../../../../../hooks/modules/day_book/met
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import { simpleStyles } from "../../../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
-
+import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/ExistingMetricsModal";
 
 function convertToGraphData(rows) {
     return rows.map((row) => {
@@ -40,6 +40,7 @@ const CreateSimpleMetric = () => {
     const [chosenDependentVariables, setChosenDependentVariables] = useState([]);
     const [selectedRows, setSelectedRows] = useState([]);
     const [dataVisible, setDataVisible] = useState(false);
+    const [existingMetricsVisible, setExistingMetricsVisible] = useState(false);
 
     const dependentArray = useMemo(
         () => (Array.isArray(chosenDependentVariables) ? chosenDependentVariables : chosenDependentVariables ? [chosenDependentVariables] : []),
@@ -104,6 +105,8 @@ const CreateSimpleMetric = () => {
                 downloadStatus={ds.downloadStatus}
                 viewDataPermission={viewDataPermission}
                 onViewData={() => setDataVisible(true)}
+                onViewExistingMetrics={() => setExistingMetricsVisible(true)}
+                dataSourceId={ds.dataSourceId}
             >
                 <VariableSelector
                     variableNames={ds.dataSourceVariableNames}
@@ -127,6 +130,12 @@ const CreateSimpleMetric = () => {
                     onDismiss={() => setDataVisible(false)}
                     data={ds.dataSourceData}
                     variableNames={ds.dataSourceVariableNames}
+                />
+
+                <ExistingMetricsModal
+                    visible={existingMetricsVisible}
+                    onDismiss={() => setExistingMetricsVisible(false)}
+                    dataSourceId={ds.dataSourceId}
                 />
             </DataSourceSelector>
         </ScrollView>

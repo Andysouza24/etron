@@ -275,6 +275,13 @@ Resources:
             Path: /day-book/metrics
             Method: get
             RestApiId: !Ref eTRONApi
+        
+        RemoveMetricsByDataSource:
+          Type: Api 
+          Properties:
+            Path: /day-book/metrics/by-data-source/{dataSourceId}
+            Method: get
+            RestApiId: !Ref eTRONApi
 
         RemoveMetric:
           Type: Api 
