@@ -15,7 +15,7 @@ import BasicButton from "../../components/common/buttons/BasicButton";
 import IconButton from "../../components/common/buttons/IconButton";
 import Divider from "./Divider";
 import SearchFilterCard from "../cards/searchFilterCard";
-import useDataSources from "../../hooks/useDataSource";
+import useDataSources from "../../hooks/modules/day_book/data-sources/useDataSource";
 
 // Status components
 const LoadingView = ({ title, message }) => (

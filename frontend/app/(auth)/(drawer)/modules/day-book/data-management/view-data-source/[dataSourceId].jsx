@@ -16,7 +16,7 @@ import {
 	getSupportedTypes,
 	getAdapterInfo,
 } from "../../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
-import useDataSources from "../../../../../../../hooks/useDataSource";
+import useDataSources from "../../../../../../../hooks/modules/day_book/data-sources/useDataSource";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import formatDateTime from "../../../../../../../utils/format/formatISODate"
 import { apiGet } from "../../../../../../../utils/api/apiClient";

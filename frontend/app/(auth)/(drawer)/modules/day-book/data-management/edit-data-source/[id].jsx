@@ -4,7 +4,7 @@ import { Text, TextInput, Button, useTheme, HelperText, ActivityIndicator } from
 import { useLocalSearchParams, router } from "expo-router";
 import Header from "../../../../../../../components/layout/Header";
 import { commonStyles } from "../../../../../../../assets/styles/stylesheets/common";
-import useDataSources from "../../../../../../../hooks/useDataSource";
+import useDataSources from "../../../../../../../hooks/modules/day_book/data-sources/useDataSource";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 
 const UpdateDataSourceScreen = () => {
