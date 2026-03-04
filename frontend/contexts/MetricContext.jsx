@@ -13,6 +13,7 @@ export function MetricProvider({ children }) {
     const [metrics, setMetrics] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [metricTypeFilter, setMetricTypeFilter] = useState(null);
 
     const loadMetrics = useCallback(async (showLoading = true) => {
         try {
@@ -115,13 +116,26 @@ export function MetricProvider({ children }) {
         console.log("[MetricContext] Real-time metric update: ", updatedMetric);
     });*/
 
+    // filter metrics by type
+    const filteredMetrics = useMemo(() => {
+        if (!metricTypeFilter) return metrics;
+        return metrics.filter(m => m.type === metricTypeFilter);
+    }, [metrics, metricTypeFilter]);
+
+    // helper to get metrics by type
+    const getMetricsByType = useCallback((type) => {
+        return metrics.filter(m => m.type === type);
+    }, [metrics]);
+
     // provide context value
     const value = useMemo(() => ({
         // states
         metrics,
+        filteredMetrics,
         loading,
         error,
         ensureMetrics,
+        metricTypeFilter,
 
         // actions
         createMetric,
@@ -129,8 +143,10 @@ export function MetricProvider({ children }) {
         updateMetric,
         getMetricData,
         getMetric,
+        getMetricsByType,
+        setMetricTypeFilter,
         refresh: () => loadMetrics(true),
-    }), [metrics, loading, error, ensureMetrics, createMetric, deleteMetric, updateMetric, getMetricData, getMetric, loadMetrics]);
+    }), [metrics, filteredMetrics, loading, error, ensureMetrics, metricTypeFilter, createMetric, deleteMetric, updateMetric, getMetricData, getMetric, getMetricsByType, loadMetrics]);
 
     return (
         <MetricContext.Provider value={value}>

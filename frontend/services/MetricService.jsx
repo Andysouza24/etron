@@ -40,6 +40,18 @@ class MetricService {
     }
 
     // TODO: get upload/download URLs
+    // TODO: fix
+    /*async uploadGraphToS3(payload){
+        return apiPut( TODO: endpoint here, await this.#withWorkspace(payload));
+    }*/
+
+    /*
+    const response = await fetch(fileUploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "image/png" },
+        body: arrayBuffer,
+    });
+    */
 
 }
 
