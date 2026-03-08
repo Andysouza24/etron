@@ -18,6 +18,8 @@ import { simpleStyles } from "../../../../../../../assets/styles/stylesheets/day
 import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/ExistingMetricsModal";
 import ValueSelector from "../../../../../../../components/modules/day-book/metrics/ValueSelector";
 import DateSelector from "../../../../../../../components/modules/day-book/metrics/DateSelector";
+import GraphTypes from "../graph-types";
+import DropDown from "../../../../../../../components/common/input/DropDown";
 
 function convertToGraphData(rows) {
     return rows.map((row) => {
@@ -45,21 +47,21 @@ const CreateSimpleMetric = () => {
     const [selectedRows, setSelectedRows] = useState([]);
     const [dataVisible, setDataVisible] = useState(false);
     const [existingMetricsVisible, setExistingMetricsVisible] = useState(false);
-    const [valueSelection, setValueSelection] = useState([]);
-    const [dateSelection, setDateSelection] = useState([]);
+    const [valueSelection, setValueSelection] = useState(null);
+    const [dateSelection, setDateSelection] = useState(null);
 
-    const dependentArray = useMemo(
+    /*const dependentArray = useMemo(
         () => (Array.isArray(chosenDependentVariables) ? chosenDependentVariables : chosenDependentVariables ? [chosenDependentVariables] : []),
         [chosenDependentVariables]
-    );
+    );*/
 
     // --- validation ---
     const validate = useCallback(
         (currentStep) => {
-            if (currentStep === 0) return chosenIndependentVariable.length > 0 && !!selectedMetric;
+            if (currentStep === 0) return !!valueSelection && !!dateSelection;
             return true;
         },
-        [chosenIndependentVariable, selectedMetric]
+        [valueSelection, dateSelection]
     );
 
     // --- form hook ---
@@ -76,17 +78,17 @@ const CreateSimpleMetric = () => {
             config: {
                 type: selectedMetric,
                 metricType: form.metricType,
-                independentVariable: chosenIndependentVariable,
-                dependentVariables: chosenDependentVariables,
+                independentVariable: dateSelection,
+                dependentVariables: valueSelection ? [valueSelection] : [],
                 colours: form.coloursState,
                 selectedRows,
             },
         });
-    }, [form, ds.dataSourceId, chosenIndependentVariable, chosenDependentVariables, selectedRows, selectedMetric, submitMetric]);
+    }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, submitMetric]);
 
     // --- continue disabled ---
     const formContinueDisabled =
-        (form.step === 0 && (chosenIndependentVariable.length === 0 || !selectedMetric)) ||
+        (form.step === 0 && (!valueSelection || !dateSelection)) ||
         (form.step === 1 && !form.metricName);
 
     // --- graph data for preview ---
@@ -114,6 +116,19 @@ const CreateSimpleMetric = () => {
                 onViewExistingMetrics={() => setExistingMetricsVisible(true)}
                 dataSourceId={ds.dataSourceId}
             >
+                <View style={simpleStyles.formSection}>
+                    <DropDown
+                        title="Select Metric Type"
+                        items={Object.values(GraphTypes).map((g) => ({
+                            value: g.value,
+                            label: g.label,
+                        }))}
+                        showRouterButton={false}
+                        onSelect={setSelectedMetric}
+                        value={selectedMetric}
+                    />
+                </View>
+
                 <View style={simpleStyles.formSection}>
                     <ValueSelector
                         variableNames={ds.dataSourceVariableNames}
@@ -155,14 +170,14 @@ const CreateSimpleMetric = () => {
     const renderCustomizeStep = () => (
         <CustomiseMetricStep
             form={form}
-            dependentVariables={dependentArray}
+            dependentVariables={valueSelection ? [valueSelection] : []}
             viewShotRef={viewShotRef}
             graphPreview={({ colours }) => (
                 <GraphPreview
                     graphType={selectedMetric}
                     data={graphData}
-                    xKey={chosenIndependentVariable}
-                    yKeys={dependentArray}
+                    xKey={dateSelection}
+                    yKeys={valueSelection ? [valueSelection] : []}
                     colours={colours}
                 />
             )}
