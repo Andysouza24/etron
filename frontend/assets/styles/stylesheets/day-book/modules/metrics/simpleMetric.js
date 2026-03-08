@@ -5,6 +5,9 @@ export const simpleStyles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 24,
     },
+    formSection: {
+        marginBottom: 20,
+    },
     button: {
         marginTop: 20,
     },

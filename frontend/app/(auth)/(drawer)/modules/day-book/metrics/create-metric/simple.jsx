@@ -16,6 +16,8 @@ import useMetricSubmission from "../../../../../../../hooks/modules/day_book/met
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import { simpleStyles } from "../../../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/ExistingMetricsModal";
+import ValueSelector from "../../../../../../../components/modules/day-book/metrics/ValueSelector";
+import DateSelector from "../../../../../../../components/modules/day-book/metrics/DateSelector";
 
 function convertToGraphData(rows) {
     return rows.map((row) => {
@@ -43,6 +45,8 @@ const CreateSimpleMetric = () => {
     const [selectedRows, setSelectedRows] = useState([]);
     const [dataVisible, setDataVisible] = useState(false);
     const [existingMetricsVisible, setExistingMetricsVisible] = useState(false);
+    const [valueSelection, setValueSelection] = useState([]);
+    const [dateSelection, setDateSelection] = useState([]);
 
     const dependentArray = useMemo(
         () => (Array.isArray(chosenDependentVariables) ? chosenDependentVariables : chosenDependentVariables ? [chosenDependentVariables] : []),
@@ -110,22 +114,23 @@ const CreateSimpleMetric = () => {
                 onViewExistingMetrics={() => setExistingMetricsVisible(true)}
                 dataSourceId={ds.dataSourceId}
             >
-                <VariableSelector
-                    variableNames={ds.dataSourceVariableNames}
-                    selectedMetric={selectedMetric}
-                    onSelectMetric={setSelectedMetric}
-                    independentVariable={chosenIndependentVariable}
-                    onIndependentChange={setChosenIndependentVariable}
-                    dependentVariables={chosenDependentVariables}
-                    onDependentChange={setChosenDependentVariables}
-                />
+                <View style={simpleStyles.formSection}>
+                    <ValueSelector
+                        variableNames={ds.dataSourceVariableNames}
+                        valueSelection={valueSelection}
+                        onValueSelectionChange={setValueSelection}
+                        selectionTitle="Select value to track"
+                    />
+                </View>
 
-                <RowSelector
-                    data={ds.dataSourceData}
-                    idKey={ds.dataSourceVariableNames[0]}
-                    selectedRows={selectedRows}
-                    onSelectedRowsChange={setSelectedRows}
-                />
+                <View style={simpleStyles.formSection}>
+                    <DateSelector
+                        variableNames={ds.dataSourceVariableNames}
+                        valueSelection={dateSelection}
+                        onValueSelectionChange={setDateSelection}
+                        selectionTitle="Select date variable"
+                    />
+                </View>
 
                 <DataPreviewModal
                     visible={dataVisible}
