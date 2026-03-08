@@ -118,7 +118,7 @@ const CreateSimpleMetric = () => {
             >
                 <View style={simpleStyles.formSection}>
                     <DropDown
-                        title="Select Metric Type"
+                        title="Select Display Type"
                         items={Object.values(GraphTypes).map((g) => ({
                             value: g.value,
                             label: g.label,
