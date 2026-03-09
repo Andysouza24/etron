@@ -1,4 +1,4 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
@@ -6,17 +6,19 @@ const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
 const metricRepo = require("@etron/day-book-shared/repositories/metricRepository")
 const {v4 : uuidv4} = require('uuid');
 const adapterFactory = require("@etron/data-sources-shared/adapters/adapterFactory");
-const { saveStoredData, removeAllStoredData, getUploadUrl, getStoredData, getDataSchema, saveSchema, savePartitionedData, loadPartitionedData, removeAllMetricData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
+const { saveStoredData, removeAllStoredData, getUploadUrl, getStoredData, getDataSchema, saveSchema, savePartitionedData, loadPartitionedData, removeAllMetricData, appendToStoredData, replaceStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
 const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
 const { translateData } = require("@etron/data-sources-shared/utils/translateData");
 const { toParquet } = require("@etron/data-sources-shared/utils/typeConversion");
-const { generateSchema } = require("@etron/data-sources-shared/utils/schema");
+const { generateSchema, classifyColumn, detectNumericType } = require("@etron/data-sources-shared/utils/schema");
+const { saveSchemaAndUpdateTable } = require("@etron/data-sources-shared/utils/schema");
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const { runQuery } = require("@etron/data-sources-shared/utils/athenaService");
 const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataToSchema");
 const { hasPermission } = require("@etron/shared/utils/permissions");
 const { LambdaClient, InvokeCommand } = require('@aws-sdk/client-lambda');
 const { logAuditEvent } = require("@etron/shared/utils/auditLogger");
+const { detectDateFormat, parseWithUserFormat } = require("@etron/data-sources-shared/utils/dateParser");
 
 // Permissions for this service
 const PERMISSIONS = {
@@ -735,6 +737,185 @@ async function updatePartitionedData(authUserId, dataSourceId, payload) {
     }
 }
 
+
+// Preview the auto-detected schema for uploaded CSV data.
+// Returns the schema with categories (date/value/dimension) and a sample of data.
+// The user can review and adjust field categories before confirming.
+async function previewSchema(authUserId, payload) {
+    const { workspaceId, rawData } = payload;
+    await validateWorkspaceId(workspaceId);
+
+    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
+    if (!isAuthorised) {
+        throw new Error("User does not have permission to perform action");
+    }
+
+    if (!rawData) {
+        throw new Error("No data provided for preview");
+    }
+
+    const translatedData = translateData(rawData);
+
+    if (translatedData.length === 0) {
+        throw new Error("The provided data is empty");
+    }
+
+    const { valid, error } = validateFormat(translatedData);
+    if (!valid) throw new Error(`Invalid data format: ${error}`);
+
+    // Generate schema with auto-detected types and categories
+    const schema = generateSchema(translatedData.slice(0, 100));
+
+    // Add suggested value types for dimension columns that could be numeric
+    for (const column of schema) {
+        if (column.category === "dimension") {
+            const values = translatedData.slice(0, 100).map(row => row[column.name]);
+            const numericType = detectNumericType(values, column.name);
+            if (numericType) {
+                column.suggestedValueType = numericType;
+            }
+        }
+    }
+
+    // Return schema and a small data sample for the user to review
+    return {
+        schema,
+        sampleData: translatedData.slice(0, 10),
+        totalRows: translatedData.length
+    };
+}
+
+// Confirm and process the schema after the user has reviewed/adjusted field categories.
+// Takes the user's confirmed schema (with category overrides) and processes the upload.
+async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
+    const { workspaceId, confirmedSchema, rawData } = payload;
+    await validateWorkspaceId(workspaceId);
+
+    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
+    if (!isAuthorised) {
+        throw new Error("User does not have permission to perform action");
+    }
+
+    const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
+    if (!dataSource) {
+        throw new Error(`Data source not found: ${dataSourceId}`);
+    }
+
+    if (!confirmedSchema || !Array.isArray(confirmedSchema) || confirmedSchema.length === 0) {
+        throw new Error("Confirmed schema is required");
+    }
+
+    if (!rawData) {
+        throw new Error("No data provided");
+    }
+
+    try {
+        const translatedData = translateData(rawData);
+
+        if (translatedData.length === 0) {
+            await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+                status: "no_data",
+                errorMessage: "No data existent"
+            });
+            return { success: false };
+        }
+
+        const { valid, error } = validateFormat(translatedData);
+        if (!valid) throw new Error(`Invalid data format: ${error}`);
+
+        // Generate auto-detected schema to get the base types
+        const autoSchema = generateSchema(translatedData.slice(0, 100));
+
+        // Build the final schema based on user's confirmed categories
+        const finalSchema = autoSchema.map(col => {
+            const userCol = confirmedSchema.find(c => c.name === col.name);
+            if (!userCol) return col;
+
+            const toCat = userCol.category || col.category;
+
+            // --- Transitioning to DATE ---
+            if (toCat === "date") {
+                // User specified a date format string explicitly
+                if (userCol.userDateFormat) {
+                    return { name: col.name, type: "timestamp", category: "date", userDateFormat: userCol.userDateFormat };
+                }
+                // If column was already detected as date with a format, keep it
+                if (col.type === "timestamp" && col.dateFormat) {
+                    return col;
+                }
+                // Try to auto-detect a date format from the data
+                const dateValues = translatedData.slice(0, 100).map(row => row[col.name]);
+                const dateFormat = detectDateFormat(dateValues);
+                if (dateFormat) {
+                    return { name: col.name, type: "timestamp", category: "date", dateFormat };
+                }
+                // Try native JS Date parsing as fallback
+                const testValues = dateValues.filter(v => v != null && String(v).trim() !== "").slice(0, 10);
+                const canParse = testValues.length > 0 && testValues.every(v => !isNaN(new Date(v).getTime()));
+                if (canParse) {
+                    return { name: col.name, type: "timestamp", category: "date" };
+                }
+                // Cannot convert — keep original type but mark category
+                return { ...col, category: "date" };
+            }
+
+            // --- Transitioning to VALUE ---
+            if (toCat === "value") {
+                if (col.category === "value") {
+                    // Already a value — user may have changed the sub-type
+                    if (userCol.type && userCol.type !== col.type) {
+                        return { name: col.name, type: userCol.type, category: "value" };
+                    }
+                    return col;
+                }
+                // Changing from non-value (dimension/date) to value
+                const numValues = translatedData.slice(0, 100).map(row => row[col.name]);
+                const detectedType = detectNumericType(numValues, col.name);
+                const newType = userCol.type || detectedType || "double";
+                return { name: col.name, type: newType, category: "value" };
+            }
+
+            // --- Transitioning to DIMENSION ---
+            if (toCat === "dimension") {
+                if (col.category === "dimension") return col;
+                return { name: col.name, type: "string", category: "dimension" };
+            }
+
+            return col;
+        });
+
+        // Cast rows to the final schema
+        const castedData = castDataToSchema(translatedData, finalSchema);
+
+        // Convert to parquet
+        const parquetBuffer = await toParquet(castedData, finalSchema);
+
+        // Save data depending on method
+        if (dataSource.method === "extend") {
+            await appendToStoredData(workspaceId, dataSourceId, castedData, finalSchema);
+        } else {
+            await replaceStoredData(workspaceId, dataSourceId, parquetBuffer);
+        }
+
+        // Save the schema to S3
+        await saveSchemaAndUpdateTable(workspaceId, dataSourceId, finalSchema);
+
+        // Update status
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "active",
+            errorMessage: null
+        });
+
+        return { success: true, schema: finalSchema };
+    } catch (error) {
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "error",
+            errorMessage: error.message
+        });
+        throw error;
+    }
+}
+
 module.exports = {
     createRemoteDataSource,
     createLocalDataSource,
@@ -748,5 +929,7 @@ module.exports = {
     viewDataForMetric,
     getLocalDataSourceUploadUrl,
     getAvailableSpreadsheets,
-    updatePartitionedData
+    updatePartitionedData,
+    previewSchema,
+    confirmSchemaAndProcess
 };

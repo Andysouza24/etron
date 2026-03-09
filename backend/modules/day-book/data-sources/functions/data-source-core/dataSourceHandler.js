@@ -1,6 +1,6 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
-const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData } = require("./dataSourceService");
+const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData, previewSchema, confirmSchemaAndProcess } = require("./dataSourceService");
 
 exports.handler = async (event) => {
     let statusCode = 200;
@@ -90,6 +90,30 @@ exports.handler = async (event) => {
             // PREVIEW REMOTE DATA SOURCE CONNECTION
             case "POST /day-book/data-sources/preview/remote": {
                 body = await getRemotePreview(authUserId, requestJSON);
+                break;
+            }
+
+            // PREVIEW SCHEMA FOR CSV DATA (auto-detect field categories)
+            case "POST /day-book/data-sources/preview-schema": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                body = await previewSchema(authUserId, requestJSON);
+                break;
+            }
+
+            // CONFIRM SCHEMA AND PROCESS DATA SOURCE UPLOAD
+            case "POST /day-book/data-sources/{dataSourceId}/confirm-schema": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                if (!pathParams.dataSourceId) {
+                    throw new Error("Missing dataSourceId in path parameters");
+                }
+                if (typeof pathParams.dataSourceId !== "string") {
+                    throw new Error("dataSourceId must be a UUID, 'string'");
+                }
+                body = await confirmSchemaAndProcess(authUserId, pathParams.dataSourceId, requestJSON);
                 break;
             }
 
