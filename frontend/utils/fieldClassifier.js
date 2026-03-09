@@ -16,7 +16,8 @@ export function classifySchemaFields(schema) {
     if (!Array.isArray(schema)) return { dateFields, dimensionFields, valueFields };
 
     for (const field of schema) {
-        const category = classifyFieldType(field.type);
+        // Use pre-classified category from backend if available, otherwise infer from type
+        const category = field.category || classifyFieldType(field.type);
         const classified = { name: field.name, type: field.type, category };
 
         if (category === "date") dateFields.push(classified);

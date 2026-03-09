@@ -3,7 +3,7 @@
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { Button, View } from 'react-native';
+import { View } from 'react-native';
 import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
 import TextField from '../../../../../../../components/common/input/TextField';
 import { RadioButton } from 'react-native-paper';
@@ -12,11 +12,19 @@ import endpoints from "../../../../../../../utils/api/endpoints"
 import { router } from 'expo-router';
 import ResponsiveScreen from '../../../../../../../components/layout/ResponsiveScreen';
 import Header from '../../../../../../../components/layout/Header';
+import FieldCategoryReview from '../../../../../../../components/modules/day-book/data-sources/FieldCategoryReview';
+import BasicButton from '../../../../../../../components/common/buttons/BasicButton';
 
 const LocalCSV = () => {
     const [deviceFilePath, setDeviceFilePath] = useState(null);
+    const [rawCsvText, setRawCsvText] = useState(null);
     const [dataDetailsStatus, setDataDetailsStatus] = useState("unstarted");
     const [loading, setLoading] = useState(false);
+
+    // Schema review state
+    const [schemaPreview, setSchemaPreview] = useState(null);
+    const [confirmedSchema, setConfirmedSchema] = useState(null);
+    const [schemaStep, setSchemaStep] = useState(false);
 
     const userSelectFile = async () => {
         try {
@@ -35,6 +43,16 @@ const LocalCSV = () => {
             const file = result.assets[0];  // [0] means it only keeps the first file, as result will be an array of files
             setDeviceFilePath(file.uri);
 
+            // Read the CSV content for schema preview
+            try {
+                const textResponse = await fetch(file.uri);
+                const text = await textResponse.text();
+                setRawCsvText(text);
+            } catch (err) {
+                console.warn("Could not read CSV text for preview:", err);
+                setRawCsvText(null);
+            }
+
             setDataDetailsStatus("loaded");
         } catch (error) {
             setDataDetailsStatus("unstarted");
@@ -44,77 +62,81 @@ const LocalCSV = () => {
 
     const [isUploadingData, setIsUploadingData] = useState(false);
 
-    const uploadFile = async (sourceFilePath, uploadUrl) => {
-        setIsUploadingData(true);
-        try {
-            console.log('Retrieving file...');
-            const response = await fetch(sourceFilePath);
-            const blob = await response.blob();
-
-            console.log('Uploading file to S3 Bucket...');
-            await fetch(uploadUrl, {
-                method: "PUT",
-                body: blob,
-                headers: {
-                    "Content-Type": "text/csv",
-                },
-            });
-            console.log('File uploaded successfully');
-        } catch (error) {
-            console.error('Error uploading file:', error);
-        } finally {
-            setIsUploadingData(false);
-        }
-    }
-
-    const createDataSource = async () => {
+    const handlePreviewSchema = async () => {
         setLoading(true);
-        const workspaceId = await getWorkspaceId();
-        
-        let dataSourceDetails = {
-            workspaceId: workspaceId,
-            name: dataSourceName,            
-            sourceType: "local-csv",
-            method: method
-            //expiry: TODO,
-        }
-
         try {
-            let result = await apiPost(  // Returns an object containing an upload URL
-                endpoints.modules.day_book.data_sources.addLocal,
-                dataSourceDetails
+            const workspaceId = await getWorkspaceId();
+
+            const result = await apiPost(
+                endpoints.modules.day_book.data_sources.previewSchema,
+                { workspaceId, rawData: rawCsvText }
             );
-            setLoading(false);
-            return result.data;
+
+            const preview = result.data;
+            setSchemaPreview(preview);
+            setConfirmedSchema(preview.schema);
+            setSchemaStep(true);
         } catch (error) {
-            console.error("Error posting via endpoint:", error);
+            console.error("Error previewing schema:", error);
+            alert("Failed to preview field types: " + (error.message || error));
+        } finally {
             setLoading(false);
-            return null;
         }
-    }
+    };
+
+    const handleSchemaChange = (updatedSchema) => {
+        setConfirmedSchema(updatedSchema);
+    };
+
+    const handleBackToDetails = () => {
+        setSchemaStep(false);
+        setSchemaPreview(null);
+        setConfirmedSchema(null);
+    };
 
     const handleFinalise = async () => {
         setLoading(true);
         try {
-            const createResponse = await createDataSource();
+            const workspaceId = await getWorkspaceId();
+
+            // Step 1: Create the data source record
+            let dataSourceDetails = {
+                workspaceId: workspaceId,
+                name: dataSourceName,            
+                sourceType: "local-csv",
+                method: method
+            };
+
+            const createResult = await apiPost(
+                endpoints.modules.day_book.data_sources.addLocal,
+                dataSourceDetails
+            );
+
+            const createResponse = createResult.data;
             if (!createResponse) {
-                throw new Error("No response from API.")
+                throw new Error("No response from API.");
             }
 
-            const { uploadUrl } = createResponse;
-            if (!uploadUrl) {
-                throw new Error("No upload URL in API response.");
-            }
+            const dataSourceId = createResponse.dataSourceId;
 
-            await uploadFile(deviceFilePath, uploadUrl);
+            // Confirm schema and process the data via the new endpoint
+            await apiPost(
+                endpoints.modules.day_book.data_sources.confirmSchema(dataSourceId),
+                {
+                    workspaceId,
+                    confirmedSchema: confirmedSchema,
+                    rawData: rawCsvText
+                }
+            );
 
             router.navigate("modules/day-book/data-management");
         } catch (error) {
             console.error("Error finalising CSV upload:", error);
+            alert("Failed to create data source: " + (error.message || error));
         } finally {
             setLoading(false);
         }
-    }
+    };
     
     const [method, setMethod] = useState('overwrite');
     const [dataSourceName, setDataSourceName] = useState("");
@@ -127,26 +149,47 @@ const LocalCSV = () => {
                 center = {false}
                 loadingOverlayActive={loading || isUploadingData}
             >
-                <Button onPress={userSelectFile} title="Pick a CSV File" disabled={isUploadingData} />
-            
-                {dataDetailsStatus == "none" && (
-                    <Text>No data selected</Text>
-                )}
-                {dataDetailsStatus == "loading" && (
-                    <ActivityIndicator />
-                )}
-                {dataDetailsStatus == "loaded" && (
+                {!schemaStep ? (
+                    <>
+                        <BasicButton fullWidth onPress={userSelectFile} label="Pick a CSV File" disabled={isUploadingData} />
+                    
+                        {dataDetailsStatus == "none" && (
+                            <Text>No data selected</Text>
+                        )}
+                        {dataDetailsStatus == "loading" && (
+                            <ActivityIndicator />
+                        )}
+                        {dataDetailsStatus == "loaded" && (
+                            <View>
+                                <TextField 
+                                    label = "Source Name"
+                                    placeholder = "Source Name"
+                                    onChangeText = {setDataSourceName}
+                                />
+                                <RadioButton.Group onValueChange={newValue => setMethod(newValue)} value={method}>
+                                    <RadioButton.Item label="Overwrite" value="overwrite" />
+                                    <RadioButton.Item label="Extend" value="extend" />
+                                </RadioButton.Group>
+                                <BasicButton
+                                    fullWidth
+                                    onPress={handlePreviewSchema}
+                                    label="Review Fields"
+                                    disabled={isUploadingData || dataSourceName == "" || !rawCsvText}
+                                />
+                            </View>
+                        )}
+                    </>
+                ) : (
                     <View>
-                        <TextField 
-                            label = "Source Name"
-                            placeholder = "Source Name"
-                            onChangeText = {setDataSourceName}
+                        <FieldCategoryReview
+                            schema={schemaPreview.schema}
+                            onChange={handleSchemaChange}
+                            sampleData={schemaPreview.sampleData}
                         />
-                        <RadioButton.Group onValueChange={newValue => setMethod(newValue)} value={method}>
-                            <RadioButton.Item label="Overwrite" value="overwrite" />
-                            <RadioButton.Item label="Extend" value="extend" />
-                        </RadioButton.Group>
-                        <Button onPress={handleFinalise} title="Create Source" disabled={isUploadingData || dataSourceName == ""} />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                            <BasicButton onPress={handleBackToDetails} label="Back" />
+                            <BasicButton onPress={handleFinalise} label="Create Source" disabled={loading} />
+                        </View>
                     </View>
                 )}
             </ResponsiveScreen>

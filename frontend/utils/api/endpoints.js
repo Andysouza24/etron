@@ -98,6 +98,8 @@ const endpoints = {
 				removeDataSource: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}`,
 				testConnection: `${DATASOURCES_BASE_URL}/test-connection`,
 				remotePreview: `${DATASOURCES_BASE_URL}/preview/remote`,
+				previewSchema: `${DATASOURCES_BASE_URL}/preview-schema`,
+				confirmSchema: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/confirm-schema`,
 				viewData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data`,
 				viewDataForMetric: (dataSourceId, metricId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data-for-metric/${metricId}`,
 				getUploadUrl: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/upload`,
