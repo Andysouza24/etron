@@ -65,9 +65,9 @@ const ReportsAndExportsManagement = () => {
             scroll={true}
         >
             <StackLayout spacing={12}>
-                {menuButtonMap.map((item) => {
+                {menuButtonMap.map((item) => (
                     <ReportsMenuItem key={item.label} item={item} />
-                })}
+                ))}
             </StackLayout>
             </ResponsiveScreen>
     );
