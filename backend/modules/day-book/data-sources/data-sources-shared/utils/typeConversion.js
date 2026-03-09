@@ -1,5 +1,7 @@
 const parquet = require('parquetjs-lite');
 const { Writable } = require('stream');
+const { parseDate, parseWithUserFormat } = require('./dateParser');
+const { sanitiseNumberString } = require('./numberSanitiser');
 
 async function toParquet(data, schema) {
     if (!Array.isArray(data) || data.length === 0) {
@@ -57,8 +59,8 @@ async function toParquet(data, schema) {
 
             switch (type) {
                 case "bigint":
-                    const bigintVal = Number.isNaN(Number(value)) ? null : Number(value);
-                    // Extra safety check - ensure we never pass NaN to Parquet
+                    const sanitisedBI = sanitiseNumberString(String(value));
+                    const bigintVal = Number.isNaN(Number(sanitisedBI)) ? null : Number(sanitisedBI);
                     if (bigintVal !== null && Number.isNaN(bigintVal)) {
                         console.warn(`Warning: NaN detected in bigint column "${name}" with value: ${value}, converting to null`);
                         castedRow[name] = null;
@@ -68,8 +70,8 @@ async function toParquet(data, schema) {
                     break;
                 case "double":
                 case "decimal(18,2)":
-                    const doubleVal = Number.isNaN(Number(value)) ? null : Number(value);
-                    // Extra safety check - ensure we never pass NaN to Parquet
+                    const sanitisedDB = sanitiseNumberString(String(value));
+                    const doubleVal = Number.isNaN(Number(sanitisedDB)) ? null : Number(sanitisedDB);
                     if (doubleVal !== null && Number.isNaN(doubleVal)) {
                         console.warn(`Warning: NaN detected in double column "${name}" with value: ${value}, converting to null`);
                         castedRow[name] = null;
@@ -81,19 +83,30 @@ async function toParquet(data, schema) {
                     castedRow[name] = Boolean(value);
                     break;
                 case "timestamp":
-                    // Convert value to a Date object
+                    // Data arriving here is typically already ISO strings from castDataToSchema.
+                    // Try native Date first (handles ISO strings, epoch numbers, Date objects).
+                    // Only fall back to format-specific parsers for raw data edge cases.
                     let dateObj;
-                    if (typeof value === 'bigint') {
-                        dateObj = new Date(Number(value));
-                    } else if (typeof value === 'string') {
-                        // Try parsing as ISO string first, then as numeric timestamp
-                        dateObj = new Date(value);
-                    } else if (typeof value === 'number') {
-                        dateObj = new Date(value);
-                    } else if (value instanceof Date) {
+
+                    if (value instanceof Date) {
                         dateObj = value;
-                    } else {
+                    } else if (typeof value === 'bigint') {
+                        dateObj = new Date(Number(value));
+                    } else if (typeof value === 'string' || typeof value === 'number') {
                         dateObj = new Date(value);
+                    }
+
+                    // If native parse failed and we have format hints, try them
+                    if ((!dateObj || isNaN(dateObj.getTime())) && typeof value === 'string') {
+                        dateObj = null;
+                        if (column.userDateFormat) {
+                            const parsed = parseWithUserFormat(value, column.userDateFormat);
+                            if (parsed) dateObj = new Date(parsed);
+                        }
+                        if (!dateObj && column.dateFormat) {
+                            const parsed = parseDate(value, column.dateFormat);
+                            if (parsed) dateObj = new Date(parsed);
+                        }
                     }
 
                     if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
