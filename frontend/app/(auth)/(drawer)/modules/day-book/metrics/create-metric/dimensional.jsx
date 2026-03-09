@@ -24,12 +24,21 @@ import DimensionSelector from "../../../../../../../components/modules/day-book/
 import metricService from "../../../../../../../services/MetricService";
 
 
+function parseNumeric(value) {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+        const stripped = value.replace(/,/g, "");
+        const num = Number(stripped);
+        if (!isNaN(num) && stripped !== "") return num;
+    }
+    return value;
+}
+
 function convertToGraphData(rows) {
     return rows.map((row) => {
         const newRow = {};
         for (const [key, value] of Object.entries(row)) {
-            const num = Number(value);
-            newRow[key] = !isNaN(num) ? num : value;
+            newRow[key] = parseNumeric(value);
         }
         return newRow;
     });
@@ -80,21 +89,26 @@ const Dimensional = () => {
         })();
     }, [metricSelection]);
 
-    const metricDimensions = useMemo(() => {
-        if (!metricConfig) return [];
-        return [
-            ...(metricConfig.dependentVariables ?? []),
-            ...(metricConfig.independentVariable ? [metricConfig.independentVariable] : []),
-        ];
+    // the value field tracked by the selected metric
+    const valueField = useMemo(() => {
+        if (!metricConfig?.dependentVariables?.length) return null;
+        return metricConfig.dependentVariables[0];
     }, [metricConfig]);
+
+    // unique values present in the chosen dimension column
+    const dimensionValues = useMemo(() => {
+        if (!dimensionSelection || !ds.dataSourceData.length) return [];
+        const unique = [...new Set(ds.dataSourceData.map((row) => row[dimensionSelection]))];
+        return unique.filter((v) => v != null).map(String);
+    }, [dimensionSelection, ds.dataSourceData]);
 
     // --- validation ---
     const validate = useCallback(
         (currentStep) => {
-            if (currentStep === 0) return !!valueSelection && !!dateSelection;
+            if (currentStep === 0) return !!metricSelection && !!dimensionSelection && !!dateSelection;
             return true;
         },
-        [valueSelection, dateSelection]
+        [metricSelection, dimensionSelection, dateSelection]
     );
 
     // --- form hook ---
@@ -112,26 +126,49 @@ const Dimensional = () => {
                 type: selectedMetric,
                 metricType: form.metricType,
                 independentVariable: dateSelection,
-                dependentVariables: valueSelection ? [valueSelection] : [],
+                dependentVariables: valueField ? [valueField] : [],
+                dimensionField: dimensionSelection,
+                sourceMetricId: metricSelection,
                 colours: form.coloursState,
                 selectedRows,
             },
         });
-    }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, submitMetric]);
+    }, [form, ds.dataSourceId, dateSelection, valueField, dimensionSelection, metricSelection, selectedRows, selectedMetric, submitMetric]);
 
     // --- continue disabled ---
     const formContinueDisabled =
-        (form.step === 0 && (!valueSelection || !dateSelection)) ||
+        (form.step === 0 && (!metricSelection || !dimensionSelection || !dateSelection)) ||
         (form.step === 1 && !form.metricName);
 
-    // --- graph data for preview ---
+    // --- graph data for preview (pivoted by dimension) ---
     const graphData = useMemo(() => {
+        if (!dateSelection || !valueField || !dimensionSelection) return [];
+
         const rows =
             selectedRows.length > 0
                 ? ds.dataSourceData.filter((row) => selectedRows.includes(row[ds.dataSourceVariableNames[0]]))
                 : ds.dataSourceData;
-        return convertToGraphData(rows);
-    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows]);
+
+        // Pivot: group by date, one column per dimension value
+        const grouped = {};
+        for (const row of rows) {
+            const dateVal = row[dateSelection];
+            const dimVal = row[dimensionSelection];
+            const numVal = parseNumeric(row[valueField]);
+
+            if (dateVal == null) continue;
+            if (!grouped[dateVal]) {
+                grouped[dateVal] = { [dateSelection]: dateVal };
+            }
+            if (dimVal != null && typeof numVal === "number" && !isNaN(numVal)) {
+                const key = String(dimVal);
+                // sum when there are duplicate date+dimension pairs
+                grouped[dateVal][key] = (grouped[dateVal][key] ?? 0) + numVal;
+            }
+        }
+
+        return Object.values(grouped);
+    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows, dateSelection, valueField, dimensionSelection]);
 
     // --- render ---
     const renderConfigStep = () => (
@@ -214,14 +251,14 @@ const Dimensional = () => {
     const renderCustomizeStep = () => (
         <CustomiseMetricStep
             form={form}
-            dependentVariables={valueSelection ? [valueSelection] : []}
+            dependentVariables={dimensionValues}
             viewShotRef={viewShotRef}
             graphPreview={({ colours }) => (
                 <GraphPreview
                     graphType={selectedMetric}
                     data={graphData}
                     xKey={dateSelection}
-                    yKeys={valueSelection ? [valueSelection] : []}
+                    yKeys={dimensionValues}
                     colours={colours}
                 />
             )}
