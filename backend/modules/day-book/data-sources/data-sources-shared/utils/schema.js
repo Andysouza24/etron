@@ -1,6 +1,8 @@
 // Author(s): Rhys Cleary
 const { getDataSchema, saveSchema } = require("../repositories/dataBucketRepository");
 const { createAthenaTable, runDDL } = require("./athenaService");
+const { detectDateFormat } = require("./dateParser");
+const { sanitiseNumberString, isNumericString } = require("./numberSanitiser");
 
 async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     const tableName = `ds_${dataSourceId}`;
@@ -37,7 +39,7 @@ function hasSchemaChanged(oldSchema, newSchema) {
 
 function normaliseSchema(schema) {
     return schema
-        .map(column => ({ name: column.name, type: column.type }))
+        .map(column => ({ name: column.name, type: column.type, category: column.category }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -69,7 +71,37 @@ function generateSchema(data) {
         if (!schema[key]) schema[key] = "string";
     }
 
-    return Object.entries(schema).map(([name, type]) => ({ name, type }));
+    const result = Object.entries(schema).map(([name, type]) => ({ name, type }));
+
+    // Second pass: check string columns for non-ISO date formats
+    for (const column of result) {
+        if (column.type === "string") {
+            const values = sampleData.map(row => row[column.name]);
+            const dateFormat = detectDateFormat(values);
+            if (dateFormat) {
+                column.type = "timestamp";
+                column.dateFormat = dateFormat;
+            }
+        }
+    }
+
+    // Add category to each column
+    for (const column of result) {
+        column.category = classifyColumn(column.type);
+    }
+
+    return result;
+}
+
+
+// Classify a column type into a category: "date", "value", or "dimension".
+function classifyColumn(type) {
+    const DATE_TYPES = ["timestamp", "date", "datetime", "time"];
+    const STRING_TYPES = ["string", "varchar", "char", "text"];
+    const t = (type ?? "").toLowerCase();
+    if (DATE_TYPES.some(dt => t.includes(dt))) return "date";
+    if (STRING_TYPES.some(st => t.includes(st))) return "dimension";
+    return "value";
 }
 
 function deduceType(value, columnName = "") {
@@ -92,9 +124,10 @@ function deduceType(value, columnName = "") {
             return "timestamp";
         }
 
-        // check for numeric
-        if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-            if (trimmed.includes(".")) {
+        // check for numeric (including comma-formatted like 1,234 or 1,234.56)
+        const sanitised = sanitiseNumberString(trimmed);
+        if (/^-?\d+(\.\d+)?$/.test(sanitised)) {
+            if (sanitised.includes(".")) {
                 return isMoneyField(columnName) ? "decimal(18,2)" : "double";
             }
             return "bigint";
@@ -112,11 +145,35 @@ function isMoneyField(columnName) {
 }
 
 
+
+// Detect the most likely numeric type for a column of values.
+// Returns "bigint", "double", "decimal(18,2)", or null if not convertible.
+function detectNumericType(values, columnName = '', numberFormat = 'dot_decimal') {
+    const valid = values.filter(v => v != null && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'nan');
+    if (valid.length === 0) return null;
+
+    const numeric = valid.filter(v => isNumericString(v, numberFormat));
+    // At least half should be numeric to consider it a numeric column
+    if (numeric.length / valid.length < 0.5) return null;
+
+    const hasDecimals = numeric.some(v => {
+        const s = sanitiseNumberString(v, numberFormat);
+        return s.includes('.');
+    });
+
+    if (hasDecimals) {
+        return isMoneyField(columnName) ? 'decimal(18,2)' : 'double';
+    }
+    return 'bigint';
+}
+
 function sanitiseIdentifier(name) {
     return name.replace(/[^A-Za-z0-9_]/g, "_");
 }
 
 module.exports = {
     generateSchema,
-    saveSchemaAndUpdateTable
+    saveSchemaAndUpdateTable,
+    classifyColumn,
+    detectNumericType
 };
