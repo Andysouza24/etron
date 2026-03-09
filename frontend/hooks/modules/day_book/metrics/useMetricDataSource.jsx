@@ -3,6 +3,7 @@ import useDataSource from "../data-sources/useDataSource";
 import { apiGet } from "../../../../utils/api/apiClient";
 import endpoints from "../../../../utils/api/endpoints";
 import { getWorkspaceId } from "../../../../storage/workspaceStorage";
+import { classifySchemaFields } from "../../../../utils/fieldClassifier";
 
 
 export default function useMetricDataSource(){
@@ -14,6 +15,7 @@ export default function useMetricDataSource(){
     const [dataSourceId, setDataSourceId] = useState(null);
     const [dataSourceData, setDataSourceData] = useState([]);
     const [dataSourceVariableNames, setDataSourceVariableNames] = useState([]);
+    const [dataSourceSchema, setDataSourceSchema] = useState([]);
     const [downloadStatus, setDownloadStatus] = useState("unstarted"); // "unstarted" | "downloading" | "downloaded"
 
     // load list of data sources on mount
@@ -50,11 +52,15 @@ export default function useMetricDataSource(){
 
                 // derive variable names from schema or first row keys
                 const dataArray = Array.isArray(raw) ? raw : raw?.data ?? [];
-                const names = raw?.schema?.map((v) => v.name) ?? 
-                    (dataArray.length > 0 ? Object.keys(dataArray[0]) : []);
+                const schema = raw?.schema ?? [];
+                const names = schema.length > 0
+                    ? schema.map((v) => v.name)
+                    : (dataArray.length > 0 ? Object.keys(dataArray[0]) : []);
                 setDataSourceVariableNames(names);
+                setDataSourceSchema(schema);
 
                 setDownloadStatus("downloaded");
+                console.log("[useMetricDataSource] Downloaded data for source ", sourceId, raw);
             } catch (err) {
                 console.error("[useMetricDataSource] Error downloading data: ", err);
                 setDownloadStatus("unstarted");
@@ -69,10 +75,18 @@ export default function useMetricDataSource(){
         [loadingMappings, dataSourceMappings]
     );
 
+    // classified fields by category
+    const classifiedFields = useMemo(
+        () => classifySchemaFields(dataSourceSchema),
+        [dataSourceSchema]
+    );
+
     return {
         dataSourceId,
         dataSourceData,
         dataSourceVariableNames,
+        dataSourceSchema,
+        classifiedFields,
         downloadStatus,
         loadingMappings,
         dropdownItems,

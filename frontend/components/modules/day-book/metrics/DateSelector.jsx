@@ -1,23 +1,26 @@
-import React from "react";
-import ValueSelector from "./ValueSelector";
-
-const DATE_KEYWORDS = ["date", "time", "day", "month", "year", "week", "period", "timestamp"];
+import React, { useMemo } from "react";
+import { Text } from "react-native-paper";
+import DropDown from "../../../common/input/DropDown";
+import { toDropdownItems } from "../../../../utils/fieldClassifier";
 
 export default function DateSelector({
-    variableNames,
+    fields = [],
     valueSelection,
     onValueSelectionChange,
     selectionTitle,
 }) {
+    const dropdownItems = useMemo(() => toDropdownItems(fields), [fields]);
+
     return (
-        <ValueSelector
-            variableNames={variableNames}
-            valueSelection={valueSelection}
-            onValueSelectionChange={onValueSelectionChange}
-            selectionTitle={selectionTitle}
-            filterKeywords={DATE_KEYWORDS}
-            suggestedLabel="Suggested"
-            dropdownTitle="All Variables"
-        />
+        <>
+            <Text variant="labelLarge">{selectionTitle}</Text>
+            <DropDown
+                title="Date Fields"
+                items={dropdownItems}
+                showRouterButton={false}
+                onSelect={onValueSelectionChange}
+                value={valueSelection}
+            />
+        </>
     );
 }

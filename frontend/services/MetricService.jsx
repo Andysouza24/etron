@@ -16,7 +16,7 @@ class MetricService {
 
     // get a single metric
     async getMetric(metricId) {
-        return apiGet(endpoints.modules.day_book.metrics.getMetric, await this.#withWorkspace({ metricId }));
+        return apiGet(endpoints.modules.day_book.metrics.getMetric(metricId), await this.#withWorkspace());
     }
 
     // list metrics

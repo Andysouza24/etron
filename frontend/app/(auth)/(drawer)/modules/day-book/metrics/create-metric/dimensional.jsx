@@ -2,7 +2,7 @@ import { Text } from "react-native-paper";
 import Header from "../../../../../../../components/layout/Header";
 import { View, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
@@ -20,6 +20,8 @@ import DateSelector from "../../../../../../../components/modules/day-book/metri
 import GraphTypes from "../graph-types";
 import DropDown from "../../../../../../../components/common/input/DropDown";
 import MetricSelector from "../../../../../../../components/modules/day-book/MetricSelector";
+import DimensionSelector from "../../../../../../../components/modules/day-book/metrics/DimensionSelector";
+import metricService from "../../../../../../../services/MetricService";
 
 
 function convertToGraphData(rows) {
@@ -49,6 +51,42 @@ const Dimensional = () => {
     const [valueSelection, setValueSelection] = useState(null);
     const [dateSelection, setDateSelection] = useState(null);
     const [metricSelection, setMetricSelection] = useState(null);
+    const [dimensionSelection, setDimensionSelection] = useState(null);
+    const [metricConfig, setMetricConfig] = useState(null);
+
+    // --- fetch selected metric config ---
+    useEffect(() => {
+        if (!metricSelection) {
+            setMetricConfig(null);
+            setDimensionSelection(null);
+            setDateSelection(null);
+            return;
+        }
+        (async () => {
+            try {
+                const result = await metricService.getMetric(metricSelection);
+                const metric = result.data ?? result;
+                const config = metric?.config ?? {};
+                setMetricConfig(config);
+                // auto-select the date from the metric
+                if (config.independentVariable) {
+                    setDateSelection(config.independentVariable);
+                }
+                console.log("[Dimensional] Fetched metric config:", config);
+            } catch (err) {
+                console.error("[Dimensional] Error fetching metric config:", err);
+                setMetricConfig(null);
+            }
+        })();
+    }, [metricSelection]);
+
+    const metricDimensions = useMemo(() => {
+        if (!metricConfig) return [];
+        return [
+            ...(metricConfig.dependentVariables ?? []),
+            ...(metricConfig.independentVariable ? [metricConfig.independentVariable] : []),
+        ];
+    }, [metricConfig]);
 
     // --- validation ---
     const validate = useCallback(
@@ -129,9 +167,29 @@ const Dimensional = () => {
                         dataSourceId={ds.dataSourceId}
                         onMetricSelect={setMetricSelection}
                         selectedMetricId={metricSelection}
-
                     />
                 </View>
+
+                {metricSelection && (
+                    <>
+                        <View style={simpleStyles.formSection}>
+                            <DimensionSelector
+                                fields={ds.classifiedFields.dimensionFields}
+                                selectedDimension={dimensionSelection}
+                                onDimensionSelect={setDimensionSelection}
+                            />
+                        </View>
+
+                        <View style={simpleStyles.formSection}>
+                            <DateSelector
+                                fields={ds.classifiedFields.dateFields}
+                                valueSelection={dateSelection}
+                                onValueSelectionChange={setDateSelection}
+                                selectionTitle="Select date variable"
+                            />
+                        </View>
+                    </>
+                )}
 
                 <DataPreviewModal
                     visible={dataVisible}

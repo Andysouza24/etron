@@ -131,7 +131,7 @@ const CreateSimpleMetric = () => {
 
                 <View style={simpleStyles.formSection}>
                     <ValueSelector
-                        variableNames={ds.dataSourceVariableNames}
+                        fields={ds.classifiedFields.valueFields}
                         valueSelection={valueSelection}
                         onValueSelectionChange={setValueSelection}
                         selectionTitle="Select value to track"
@@ -140,7 +140,7 @@ const CreateSimpleMetric = () => {
 
                 <View style={simpleStyles.formSection}>
                     <DateSelector
-                        variableNames={ds.dataSourceVariableNames}
+                        fields={ds.classifiedFields.dateFields}
                         valueSelection={dateSelection}
                         onValueSelectionChange={setDateSelection}
                         selectionTitle="Select date variable"
