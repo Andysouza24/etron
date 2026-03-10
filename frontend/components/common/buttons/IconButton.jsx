@@ -10,6 +10,8 @@ const IconButton = ({
   fullWidth = false,
   style,
   loading = false,
+  mode = "elevated",
+  backgroundColor,
 }) => {
   const theme = useTheme();
 
@@ -20,14 +22,14 @@ const IconButton = ({
             <Icon source={icon} size={24} color={theme.colors.text} />
           )}
         compact
-        mode="elevated"
+        mode={mode}
         textColor={theme.colors.text}
         loading={loading}
         style={[
           styles.button,
           fullWidth ? styles.fullWidth : styles.fixedWidth,
           style,
-          {backgroundColor: theme.colors.buttonBackgroundAlt, }
+          {backgroundColor: backgroundColor || theme.colors.buttonBackgroundAlt}
         ]}
         contentStyle={styles.content}
         labelStyle={styles.label}
