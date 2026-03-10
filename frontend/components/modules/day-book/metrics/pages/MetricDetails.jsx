@@ -5,6 +5,7 @@ import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-b
 import ColorPicker from "react-native-wheel-color-picker";
 import ViewShot from "react-native-view-shot";
 import GraphPreview from "../GraphPreview";
+import CustomiseOptions from "../CustomiseOptions";
 
 export default function MetricDetails({
     metricName,
@@ -52,7 +53,7 @@ export default function MetricDetails({
             )}
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>
-                <ColorPicker
+                {/*<ColorPicker
                     color={coloursState[wheelIndex]}
                     onColorChange={(newColor) => {
                         setColoursState((prev) => {
@@ -75,27 +76,33 @@ export default function MetricDetails({
                         theme.colors.metricsLightBlue,
                         theme.colors.metricsPurple,
                     ]}
-                />
+                />*/}
             </View>
 
-            <Card style={metricStepStyles.card}>
-                <Card.Content>
-                    <ViewShot
-                        ref={viewShotRef}
-                        options={{ format: "png", quality: 1.0, result: "tmpfile" }}
-                    >
-                        <View style={metricStepStyles.graphContainer}>
-                            <GraphPreview
-                                graphType={graphType}
-                                data={graphData}
-                                xKey={xKey}
-                                yKeys={yKeys}
-                                colours={coloursState}
-                            />
-                        </View>
-                    </ViewShot>
-                </Card.Content>
-            </Card>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>
+                <Card style={metricStepStyles.card}>
+                    <Card.Content>
+                        <ViewShot
+                            ref={viewShotRef}
+                            options={{ format: "png", quality: 1.0, result: "tmpfile" }}
+                        >
+                            <View style={metricStepStyles.graphContainer}>
+                                <GraphPreview
+                                    graphType={graphType}
+                                    data={graphData}
+                                    xKey={xKey}
+                                    yKeys={yKeys}
+                                    colours={coloursState}
+                                />
+                            </View>
+                        </ViewShot>
+                    </Card.Content>
+                </Card>
+            </View>
+
+            <View style={{ marginTop: 16 }}>
+                <CustomiseOptions />
+            </View>
         </ScrollView>
     );
 }
