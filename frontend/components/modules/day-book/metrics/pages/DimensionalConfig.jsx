@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { View, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import DataSourceSelector from "../DataSourceSelector";
-import DateSelector from "../DateSelector";
-import DimensionSelector from "../DimensionSelector";
-import DataPreviewModal from "../DataPreviewModal";
-import ExistingMetricsModal from "../ExistingMetricsModal";
-import MetricSelector from "../../MetricSelector";
+import DataSourceSelector from "../Selectors/DataSourceSelector";
+import DateSelector from "../Selectors/DateSelector";
+import DimensionSelector from "../Selectors/DimensionSelector";
+import DataPreviewModal from "../modals/DataPreviewModal";
+import ExistingMetricsModal from "../modals/ExistingMetricsModal";
+import MetricSelector from "../Selectors/MetricSelector";
 import DropDown from "../../../../common/input/DropDown";
-import GraphTypes from "../../../../../app/(auth)/(drawer)/modules/day-book/metrics/graph-types";
+import GraphTypes from "../graph-types";
 import { simpleStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 import metricService from "../../../../../services/MetricService";
 

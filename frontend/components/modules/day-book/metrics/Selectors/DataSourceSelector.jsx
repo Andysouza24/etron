@@ -1,8 +1,8 @@
 import React from "react";
 import { View } from "react-native";
 import { ActivityIndicator, Button, Text } from "react-native-paper";
-import DropDown from "../../../common/input/DropDown";
-import PermissionGate from "../../../common/PermissionGate";
+import DropDown from "../../../../common/input/DropDown";
+import PermissionGate from "../../../../common/PermissionGate";
 
 export default function DataSourceSelector({
     dropdownItems,

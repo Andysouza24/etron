@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import endpoints from "../../../../../../utils/api/endpoints.js";
-import GraphTypes from "../metrics/graph-types.jsx";
+import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage.jsx";
 import ViewShot from "react-native-view-shot";
 import * as MediaLibrary from "expo-media-library";

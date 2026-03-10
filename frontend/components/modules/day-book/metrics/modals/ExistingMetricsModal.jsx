@@ -1,11 +1,11 @@
 import { Modal, Portal, Card, Text, ActivityIndicator, useTheme } from "react-native-paper";
 import { View, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import React, { useState, useEffect } from "react";
-import { getWorkspaceId } from "../../../../storage/workspaceStorage";
-import GraphTypes from "../../../../app/(auth)/(drawer)/modules/day-book/metrics/graph-types";
-import {modalStyles} from "../../../../assets/styles/stylesheets/day-book/modules/metrics/existingMetricModal";
-import metricService from "../../../../services/MetricService";
-import BasicButton from "../../../common/buttons/BasicButton";
+import { getWorkspaceId } from "../../../../../storage/workspaceStorage";
+import GraphTypes from "../graph-types";
+import {modalStyles} from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/existingMetricModal";
+import metricService from "../../../../../services/MetricService";
+import BasicButton from "../../../../common/buttons/BasicButton";
 
 export default function ExistingMetricsModal({visible, onDismiss, dataSourceId, onMetricPress}){
     const theme = useTheme();

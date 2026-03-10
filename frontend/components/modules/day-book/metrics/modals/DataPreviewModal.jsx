@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { View, ScrollView, FlatList, StyleSheet } from "react-native";
 import { Modal, Portal, Card, DataTable, Text, ActivityIndicator } from "react-native-paper";
-import { dataPreviewStyles } from "../../../../assets/styles/stylesheets/day-book/modules/metrics/dataPreview";
+import { dataPreviewStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/dataPreview";
 
 const ROW_LOAD_AMOUNT = 20;
 

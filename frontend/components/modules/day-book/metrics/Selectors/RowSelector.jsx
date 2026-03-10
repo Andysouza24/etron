@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { Chip, IconButton, Text, useTheme } from "react-native-paper";
-import MetricCheckbox from "../../../common/buttons/MetricCheckbox";
-import { simpleStyles } from "../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
+import MetricCheckbox from "../../../../common/buttons/MetricCheckbox";
+import { simpleStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 
 export default function RowSelector({ data, idKey, selectedRows, onSelectedRowsChange }) {
     const theme = useTheme();

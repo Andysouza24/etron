@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram } from "victory-native";
 import { Text, View } from "react-native";
-import inter from "../../../../../../assets/styles/fonts/Inter_18pt-Regular.ttf";
+
+
+function formatTickValue(t) {
+    const abs = Math.abs(t);
+    if (abs >= 1e6) return `${(t / 1e6).toFixed(1)}M`;
+    if (abs >= 1e3) return `${(t / 1e3).toFixed(0)}K`;
+    return t;
+}
 
 
 // Registry of available graph types
@@ -10,7 +17,7 @@ const GraphTypes = {
     line: {
         label: "Line Chart",
         value: "line",
-        previewImage: require("../../../../../../assets/images/lineChart.png"),
+        previewImage: require("../../../../assets/images/lineChart.png"),
         render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
@@ -29,7 +36,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
-                                padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 <VictoryAxis
@@ -43,6 +50,7 @@ const GraphTypes = {
                                 />
                                 <VictoryAxis
                                     dependentAxis
+                                    tickFormat={formatTickValue}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -75,7 +83,7 @@ const GraphTypes = {
     bar: {
         label: "Bar Chart",
         value: "bar",
-        previewImage: require("../../../../../../assets/images/barChart.png"),
+        previewImage: require("../../../../assets/images/barChart.png"),
         render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
@@ -95,7 +103,7 @@ const GraphTypes = {
                                 theme={VictoryTheme.clean}
                                 domainPadding={{ x: 25, y: 10 }}
                                 scale={{ x: "linear", y: "linear" }}
-                                padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 <VictoryAxis
@@ -109,6 +117,7 @@ const GraphTypes = {
                                 />
                                 <VictoryAxis
                                     dependentAxis
+                                    tickFormat={formatTickValue}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -141,7 +150,7 @@ const GraphTypes = {
     pie: {
     label: "Pie Chart",
     value: "pie",
-    previewImage: require("../../../../../../assets/images/pieChart.png"),
+    previewImage: require("../../../../assets/images/pieChart.png"),
     render: ({ data, xKey, yKeys, colours, axisColorMode = "light", backgroundMode = "transparent" }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -192,7 +201,7 @@ const GraphTypes = {
     area: {
         label: "Area Chart",
         value: "area",
-        previewImage: require("../../../../../../assets/images/areaChart.png"),
+        previewImage: require("../../../../assets/images/areaChart.png"),
         render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -211,7 +220,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
-                                padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 {/* X Axis */}
@@ -228,6 +237,7 @@ const GraphTypes = {
                                 {/* Y Axis */}
                                 <VictoryAxis
                                     dependentAxis
+                                    tickFormat={formatTickValue}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -267,7 +277,7 @@ const GraphTypes = {
     scatter: {
         label: "Scatter Plot",
         value: "scatter",
-        previewImage: require("../../../../../../assets/images/scatterPlot.png"),
+        previewImage: require("../../../../assets/images/scatterPlot.png"),
         render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -286,7 +296,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
-                                padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 {/* X Axis */}
@@ -303,6 +313,7 @@ const GraphTypes = {
                                 {/* Y Axis */}
                                 <VictoryAxis
                                     dependentAxis
+                                    tickFormat={formatTickValue}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -337,7 +348,7 @@ const GraphTypes = {
     box: {
         label: "Box Plot",
         value: "box",
-              previewImage: require("../../../../../../assets/images/boxPlot.png"),
+              previewImage: require("../../../../assets/images/boxPlot.png"),
         render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
               const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -358,7 +369,7 @@ const GraphTypes = {
                             theme={VictoryTheme.clean}
                             domainPadding={20}
                             scale={{ x: "linear", y: "linear" }}
-                            padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                            padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                             containerComponent={<VictoryContainer responsive={false} />}
                         >
                             {/* X Axis */}
@@ -373,6 +384,7 @@ const GraphTypes = {
                             {/* Y Axis */}
                             <VictoryAxis
                                 dependentAxis
+                                tickFormat={formatTickValue}
                                 style={{
                                     axis: { stroke: axisColor },
                                     ticks: { stroke: axisColor },
@@ -408,7 +420,7 @@ const GraphTypes = {
     histogram: {
         label: "Histogram",
         value: "histogram",
-        previewImage: require("../../../../../../assets/images/histogram.png"),
+        previewImage: require("../../../../assets/images/histogram.png"),
         render: ({ data, xKey, colours, axisColorMode = "light" }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -427,7 +439,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 domainPadding={20}
-                                padding={{ top: 10, bottom: 50, left: 40, right: 30 }}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 <VictoryAxis
@@ -440,6 +452,7 @@ const GraphTypes = {
                                 />
                                 <VictoryAxis
                                     dependentAxis
+                                    tickFormat={formatTickValue}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -474,7 +487,7 @@ const GraphTypes = {
     progress: {
     label: "Progress Bar",
     value: "progress",
-        previewImage: require("../../../../../../assets/images/progressCircle.png"),
+        previewImage: require("../../../../assets/images/progressCircle.png"),
     render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -531,7 +544,7 @@ const GraphTypes = {
 progress: {
     label: "Progress Circle",
     value: "progress",
-        previewImage: require("../../../../../../assets/images/progressCircle.png"),
+        previewImage: require("../../../../assets/images/progressCircle.png"),
     render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
@@ -593,7 +606,7 @@ progress: {
     numbers: {
     label: "Numbers",
     value: "numbers",
-        previewImage: require("../../../../../../assets/images/numbers.png"),
+        previewImage: require("../../../../assets/images/numbers.png"),
     render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
         const ChartComponent = () => {
             const axisColor = axisColorMode === "dark" ? "white" : "black";

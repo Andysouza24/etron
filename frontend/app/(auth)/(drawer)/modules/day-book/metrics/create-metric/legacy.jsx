@@ -4,18 +4,18 @@ import { useRouter } from "expo-router";
 import Header from "../../../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
-import DataSourceSelector from "../../../../../../../components/modules/day-book/metrics/DataSourceSelector";
-import VariableSelector from "../../../../../../../components/modules/day-book/metrics/VariableSelector";
-import RowSelector from "../../../../../../../components/modules/day-book/metrics/RowSelector";
+import DataSourceSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/DataSourceSelector";
+import VariableSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/VariableSelector";
+import RowSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/RowSelector";
 import GraphPreview from "../../../../../../../components/modules/day-book/metrics/GraphPreview";
 import CustomiseMetricStep from "../../../../../../../components/modules/day-book/metrics/CustomiseMetricStep";
-import DataPreviewModal from "../../../../../../../components/modules/day-book/metrics/DataPreviewModal";
+import DataPreviewModal from "../../../../../../../components/modules/day-book/metrics/modals/DataPreviewModal";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
 import useMetricDataSource from "../../../../../../../hooks/modules/day_book/metrics/useMetricDataSource";
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import { legacyStyles } from "../../../../../../../assets/styles/stylesheets/day-book/modules/metrics/legacyMetric";
-import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/ExistingMetricsModal";
+import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/modals/ExistingMetricsModal";
 
 function convertToGraphData(rows) {
     return rows.map((row) => {

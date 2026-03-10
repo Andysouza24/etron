@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { View } from "react-native";
 import { useTheme, Text } from "react-native-paper";
-import metricService from "../../../services/MetricService";
-import DropDown from "../../common/input/DropDown";
+import metricService from "../../../../../services/MetricService";
+import DropDown from "../../../../common/input/DropDown";
 
 
 // TODO: update show router button in drop down component to navigate to creating a new simple metric from this data source

@@ -1,9 +1,9 @@
 import React, { useMemo } from "react";
-import { Text, useTheme } from "react-native-paper";
-import DropDown from "../../../common/input/DropDown";
-import { toDropdownItems } from "../../../../utils/fieldClassifier";
+import { Text } from "react-native-paper";
+import DropDown from "../../../../common/input/DropDown";
+import { toDropdownItems } from "../../../../../utils/fieldClassifier";
 
-export default function ValueSelector({
+export default function DateSelector({
     fields = [],
     valueSelection,
     onValueSelectionChange,
@@ -15,7 +15,7 @@ export default function ValueSelector({
         <>
             <Text variant="labelLarge">{selectionTitle}</Text>
             <DropDown
-                title="Value Fields"
+                title="Date Fields"
                 items={dropdownItems}
                 showRouterButton={false}
                 onSelect={onValueSelectionChange}

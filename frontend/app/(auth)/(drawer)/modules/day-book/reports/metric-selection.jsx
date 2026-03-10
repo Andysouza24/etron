@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { Text, useTheme, Card } from "react-native-paper";
 import { useEffect, useState, useCallback } from "react";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage.jsx";
-import GraphTypes from "../metrics/graph-types.jsx";
+import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types";
 import endpoints from "../../../../../../utils/api/endpoints.js";
 import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import { getCurrentUser } from "aws-amplify/auth";

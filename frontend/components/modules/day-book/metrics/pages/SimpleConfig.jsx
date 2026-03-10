@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { View, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import DataSourceSelector from "../DataSourceSelector";
-import ValueSelector from "../ValueSelector";
-import DateSelector from "../DateSelector";
-import AggregationSelector from "../AggregationSelector";
-import DataPreviewModal from "../DataPreviewModal";
-import ExistingMetricsModal from "../ExistingMetricsModal";
+import DataSourceSelector from "../Selectors/DataSourceSelector";
+import ValueSelector from "../Selectors/ValueSelector";
+import DateSelector from "../Selectors/DateSelector";
+import AggregationSelector from "../Selectors/AggregationSelector";
+import DataPreviewModal from "../modals/DataPreviewModal";
+import ExistingMetricsModal from "../modals/ExistingMetricsModal";
 import DropDown from "../../../../common/input/DropDown";
-import GraphTypes from "../../../../../app/(auth)/(drawer)/modules/day-book/metrics/graph-types";
+import GraphTypes from "../graph-types";
 import { simpleStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 
 export default function SimpleConfig({

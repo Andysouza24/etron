@@ -7,7 +7,7 @@ import { commonStyles } from "../../../../../../../assets/styles/stylesheets/com
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
-import GraphTypes from '../graph-types';
+import GraphTypes from '../../../../../../../components/modules/day-book/metrics/graph-types';
 import inter from "../../../../../../../assets/styles/fonts/Inter_18pt-Regular.ttf";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
 import endpoints from "../../../../../../../utils/api/endpoints";

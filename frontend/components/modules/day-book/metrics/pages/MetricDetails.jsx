@@ -1,10 +1,10 @@
 import { ScrollView, View } from "react-native";
 import { Card, Chip, useTheme } from "react-native-paper";
-import TextField from "../../../common/input/TextField";
-import { metricStepStyles } from "../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
+import TextField from "../../../../common/input/TextField";
+import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
 import ColorPicker from "react-native-wheel-color-picker";
 import ViewShot from "react-native-view-shot";
-import GraphPreview from "./GraphPreview";
+import GraphPreview from "../GraphPreview";
 
 export default function MetricDetails({
     metricName,

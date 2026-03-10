@@ -21,7 +21,7 @@ import DropDown from '../../../../../../../components/common/input/DropDown';
 import TextField from '../../../../../../../components/common/input/TextField';
 import MetricCheckbox from '../../../../../../../components/common/buttons/MetricCheckbox';
 import MetricRadioButton from '../../../../../../../components/common/buttons/MetricRadioButton';
-import GraphTypes from '../graph-types';
+import GraphTypes from '../../../../../../../components/modules/day-book/metrics/graph-types';
 
 import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
 import endpoints from '../../../../../../../utils/api/endpoints';

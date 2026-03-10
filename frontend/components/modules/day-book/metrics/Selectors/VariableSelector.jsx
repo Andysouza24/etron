@@ -1,9 +1,9 @@
 import React from "react";
 import { Text } from "react-native-paper";
-import DropDown from "../../../common/input/DropDown";
-import MetricCheckbox from "../../../common/buttons/MetricCheckbox";
-import MetricRadioButton from "../../../common/buttons/MetricRadioButton";
-import GraphTypes from "../../../../app/(auth)/(drawer)/modules/day-book/metrics/graph-types";
+import DropDown from "../../../../common/input/DropDown";
+import MetricCheckbox from "../../../../common/buttons/MetricCheckbox";
+import MetricRadioButton from "../../../../common/buttons/MetricRadioButton";
+import GraphTypes from "../graph-types";
 
 export default function VariableSelector({
     variableNames,
