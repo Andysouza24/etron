@@ -12,8 +12,10 @@
       "env": {
         "EAS_USE_CACHE": "1"
       },
-      "cache": {
-        "paths": ["./ios/Podfile.lock"]
+      "ios": {
+        "cache": {
+          "paths": ["./ios/Podfile.lock"]
+        }
       }
     },
     "development-large": {
@@ -24,8 +26,10 @@
       "env": {
         "EAS_USE_CACHE": "1"
       },
-      "cache": {
-        "paths": ["./ios/Podfile.lock"]
+      "ios": {
+        "cache": {
+          "paths": ["./ios/Podfile.lock"]
+        }
       }
     },
     "preview": {
@@ -34,8 +38,10 @@
       "env": {
         "EAS_USE_CACHE": "1"
       },
-      "cache": {
-        "paths": ["./ios/Podfile.lock"]
+      "ios": {
+        "cache": {
+          "paths": ["./ios/Podfile.lock"]
+        }
       }
     },
     "preview-apk": {
@@ -56,8 +62,10 @@
         "EAS_RESTORE_CACHE": "0",
         "EAS_SAVE_CACHE": "1"
       },
-      "cache": {
-        "paths": ["./ios/Podfile.lock"]
+      "ios": {
+        "cache": {
+          "paths": ["./ios/Podfile.lock"]
+        }
       },
       "android": {
         "buildType": "apk"
