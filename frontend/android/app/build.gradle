@@ -89,6 +89,7 @@ android {
 
     namespace 'com.insync.etron'
     defaultConfig {
+        manifestPlaceholders = [appAuthRedirectScheme: "myapp"]
         applicationId 'com.insync.etron'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
