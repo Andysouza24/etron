@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "yarn": "1.22.22",
@@ -14,11 +15,14 @@
       },
       "ios": {
         "cache": {
-          "paths": ["./ios/Podfile.lock"]
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
         }
       }
     },
     "development-large": {
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "yarn": "1.22.22",
@@ -28,11 +32,14 @@
       },
       "ios": {
         "cache": {
-          "paths": ["./ios/Podfile.lock"]
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
         }
       }
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal",
       "yarn": "1.22.22",
       "env": {
@@ -40,13 +47,17 @@
       },
       "ios": {
         "cache": {
-          "paths": ["./ios/Podfile.lock"]
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
         }
       }
     },
     "preview-apk": {
+      "channel": "preview",
       "distribution": "internal",
       "yarn": "1.22.22",
+      "resourceClass": "large",
       "env": {
         "EAS_USE_CACHE": "1"
       },
@@ -55,6 +66,7 @@
       }
     },
     "production": {
+      "channel": "production",
       "autoIncrement": true,
       "yarn": "1.22.22",
       "resourceClass": "large",
@@ -64,7 +76,9 @@
       },
       "ios": {
         "cache": {
-          "paths": ["./ios/Podfile.lock"]
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
         }
       },
       "android": {
