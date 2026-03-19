@@ -12,6 +12,13 @@
     "preview": {
       "distribution": "internal"
     },
+    "preview-apk": {
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "autoIncrement": true
     }
