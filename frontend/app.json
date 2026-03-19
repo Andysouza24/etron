@@ -59,13 +59,10 @@
       [
         "expo-build-properties",
         {
-          "android": {
-            "manifestPlaceholders": {
-              "appAuthRedirectScheme": "myapp"
-            }
-          }
+          "android": {}
         }
-      ]
+      ],
+      ["./plugins/withAppAuthRedirectScheme", { "scheme": "myapp" }]
     ],
     "experiments": {
       "typedRoutes": true
