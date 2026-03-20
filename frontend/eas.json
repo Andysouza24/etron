@@ -13,8 +13,11 @@
         "EAS_USE_CACHE": "1"
       },
       "cache": {
-        "paths": ["./ios/Podfile.lock"]
-      }
+        "paths": [
+          "./ios/Podfile.lock"
+        ]
+      },
+      "channel": "development"
     },
     "development-large": {
       "developmentClient": true,
@@ -25,8 +28,11 @@
         "EAS_USE_CACHE": "1"
       },
       "cache": {
-        "paths": ["./ios/Podfile.lock"]
-      }
+        "paths": [
+          "./ios/Podfile.lock"
+        ]
+      },
+      "channel": "development-large"
     },
     "preview": {
       "distribution": "internal",
@@ -35,8 +41,11 @@
         "EAS_USE_CACHE": "1"
       },
       "cache": {
-        "paths": ["./ios/Podfile.lock"]
-      }
+        "paths": [
+          "./ios/Podfile.lock"
+        ]
+      },
+      "channel": "preview"
     },
     "preview-apk": {
       "distribution": "internal",
@@ -44,9 +53,13 @@
       "env": {
         "EAS_USE_CACHE": "1"
       },
+      "cache": {
+        "disabled": true
+      },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "preview-apk"
     },
     "production": {
       "autoIncrement": true,
@@ -57,11 +70,14 @@
         "EAS_SAVE_CACHE": "1"
       },
       "cache": {
-        "paths": ["./ios/Podfile.lock"]
+        "paths": [
+          "./ios/Podfile.lock"
+        ]
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

@@ -1,7 +1,7 @@
 {
   "expo": {
     "scheme": "myapp",
-    "name": "frontend",
+    "name": "eTRON",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,6 +17,20 @@
     "android": {
       "package": "com.insync.etron",
       "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "myapp",
+              "host": "auth",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
         {
           "action": "VIEW",
           "data": [
@@ -77,7 +91,7 @@
     },
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/003b5c2f-3456-427b-ab80-4311639976e5"
+      "url": "https://u.expo.dev/6137eb4a-cf50-41a5-8205-e53fd149cc15"
     },
     "extra": {
       "router": {},
