@@ -1,5 +1,6 @@
 {
   "expo": {
+    "buildCacheProvider": "eas",
     "scheme": "myapp",
     "name": "eTRON",
     "slug": "frontend",
@@ -17,20 +18,6 @@
     "android": {
       "package": "com.insync.etron",
       "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "myapp",
-              "host": "auth",
-              "pathPrefix": "/"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        },
         {
           "action": "VIEW",
           "data": [

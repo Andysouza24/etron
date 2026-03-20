@@ -110,6 +110,7 @@
     "@types/react": "~19.2.10",
     "aws-cdk-lib": "^2.204.0",
     "constructs": "^10.4.2",
+    "eas-build-cache-provider": "^18.0.2",
     "esbuild": "^0.25.9",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
