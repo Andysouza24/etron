@@ -8,7 +8,6 @@
       "developmentClient": true,
       "distribution": "internal",
       "yarn": "1.22.22",
-      "resourceClass": "medium",
       "env": {
         "EAS_USE_CACHE": "1"
       },

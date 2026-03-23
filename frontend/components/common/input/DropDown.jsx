@@ -77,11 +77,6 @@ const DropDown = ({
                         style={{ maxHeight: listMaxHeight }}
                         keyboardShouldPersistTaps="always"
                         bounces
-                        onStartShouldSetResponderCapture={() => false}
-                        onMoveShouldSetResponderCapture={(e) => {
-                            const touches = e.nativeEvent?.touches;
-                            return touches && touches.length > 0;
-                        }}
                     >
                         {filteredItems.map((item, index) => (
                             <List.Item
