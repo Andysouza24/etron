@@ -1,8 +1,8 @@
 // Author(s): Rhys Cleary, Matthew Page, Noah Bradley
 
+import React, { useState } from "react";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Appbar, useTheme, Menu, Text } from "react-native-paper";
+import { Appbar, useTheme } from "react-native-paper";
 import { useNavigation } from '@react-navigation/native';
 import PermissionGate from "../common/PermissionGate";
 
@@ -13,6 +13,7 @@ import PermissionGate from "../common/PermissionGate";
 
 const Header = ({
     title,
+    subtitle,
     showBack,
     showMenu,
     showEdit,
@@ -25,7 +26,11 @@ const Header = ({
     onLeftIconPress,
     onEllipsisPress,
     onBackPress,
-    backIcon
+    backIcon,
+    rightActions = [],
+    titleAlignment = 'left',
+    titleStyle,
+    subtitleStyle
 }) => {
     const router = useRouter();
     const theme = useTheme();
@@ -33,25 +38,6 @@ const Header = ({
 
     const [noPermVisible, setNoPermVisible] = useState(false);
     
-    const RightIconAnchor = (
-        <Appbar.Action
-            icon={showPlus ? "plus"
-                : showEdit ? "pencil"
-                : showCheck ? "check"
-                : null }
-            color={rightIconPermission ? undefined : theme.colors.onSurfaceDisabled ?? theme.colors.onSurfaceVariant}  // Dims when user doesn't have permission
-            style={!rightIconPermission ? { opacity: 0.6 } : null}
-            onPress={async () => {
-                if (!rightIconPermission) {
-                    setNoPermVisible(true);
-                    setTimeout(() => setNoPermVisible(false), 1600);
-                    return;
-                }
-                if (onRightIconPress) await onRightIconPress();
-            }}
-        />
-    );
-
     return (
         <Appbar.Header mode="center-aligned"
             style={{
@@ -73,52 +59,57 @@ const Header = ({
                 ) : null
             }
             
-            <Appbar.Content title={title} />
+            <Appbar.Content
+                title={title}
+                subtitle={subtitle}
+                titleStyle={[
+                    titleAlignment === 'right' && { textAlign: 'right' },
+                    titleAlignment === 'center' && { textAlign: 'center' },
+                    titleStyle
+                ]}
+                subtitleStyle={[
+                    titleAlignment === 'right' && { textAlign: 'right' },
+                    titleAlignment === 'center' && { textAlign: 'center' },
+                    subtitleStyle
+                ]}
+            />
 
             {showEllipsis && (
                 <Appbar.Action icon="dots-vertical" onPress={onEllipsisPress} />
             )}
 
-            {/*(showPlus || showEdit || showCheck) && (
-                rightIconPermission ? (
-                    RightIconAnchor
-                ) : (
-                    <Menu
-                        visible={noPermVisible}
-                        onDismiss={() => setNoPermVisible(false)}
-                        anchor={RightIconAnchor}
-                        contentStyle={{
-                            paddingVertical: 6,
-                            paddingHorizontal: 10,
-                            borderRadius: 8,
-                        }}
+            {rightActions.length > 0
+                ? rightActions.map((action, index) => (
+                    action?.render
+                        ? (
+                            <React.Fragment key={action.key || index}>
+                                {action.render({ theme })}
+                            </React.Fragment>
+                        )
+                        : (
+                            <Appbar.Action
+                                key={action.key || index}
+                                icon={action.icon}
+                                onPress={action.onPress}
+                                disabled={action.disabled}
+                            />
+                        )
+                ))
+                : (showPlus || showEdit || showCheck) && (
+                    <PermissionGate
+                        allowed={rightIconPermission}
+                        onAllowed={onRightIconPress}
                     >
-                        <Text
-                            style={{
-                                color: theme.colors.onSurface,
-                                maxWidth: 220,
-                                lineHeight: 18
-                            }}
-                        >
-                            You don't have permission to perform this action.
-                        </Text>
-                    </Menu>
+                        <Appbar.Action
+                            icon={
+                                showPlus ? "plus" :
+                                showEdit ? "pencil" :
+                                showCheck ? "check" : "line"
+                            }
+                        />
+                    </PermissionGate>
                 )
-            )*/}
-            {(showPlus || showEdit || showCheck) && (
-                <PermissionGate
-                    allowed={rightIconPermission}
-                    onAllowed={onRightIconPress}
-                >
-                    <Appbar.Action
-                        icon={
-                            showPlus ? "plus" :
-                            showEdit ? "pencil" :
-                            showCheck ? "check" : "line"
-                        }
-                    />
-                </PermissionGate>
-            )}
+            }
         </Appbar.Header>
     );
 }

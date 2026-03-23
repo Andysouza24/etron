@@ -1,180 +1,207 @@
-// Author(s): Rhys Cleary
-
 const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
-const { deleteFolder, getUploadUrl, getDownloadUrl } = require("@etron/shared/repositories/workspaceBucketRepository");
+const {
+  deleteFolder,
+  getUploadUrl,
+  getDownloadUrl,
+} = require("@etron/shared/repositories/workspaceBucketRepository");
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const { hasPermission } = require("@etron/shared/utils/permissions");
-const {v4 : uuidv4} = require('uuid');
+const { v4: uuidv4 } = require("uuid");
 
-// Permissions for this service
 const PERMISSIONS = {
-    MANAGE_BOARDS: "app.workspace.manage_boards"
+  MANAGE_BOARDS: "app.workspace.manage_boards",
 };
 
 async function createBoardInWorkspace(authUserId, workspaceId, payload) {
-    await validateWorkspaceId(workspaceId);
+  await validateWorkspaceId(workspaceId);
 
-    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.MANAGE_BOARDS);
+  const isAuthorised = await hasPermission(
+    authUserId,
+    workspaceId,
+    PERMISSIONS.MANAGE_BOARDS
+  );
 
-    if (!isAuthorised) {
-        throw new Error("User does not have permission to perform action");
-    }
+  if (!isAuthorised) {
+    throw new Error("User does not have permission to perform action");
+  }
 
-    const { name, config, isDashboard } = payload;
+  const { name, config, isDashboard } = payload;
 
-    if (!name || typeof name !== "string") {
-        throw new Error("Please specify a name");
-    }
+  if (!name || typeof name !== "string") {
+    throw new Error("Please specify a name");
+  }
 
-    if (!config) {
-        throw new Error("Please specify the config");
-    }
+  if (!config) {
+    throw new Error("Please specify the config");
+  }
 
-    const boardId = uuidv4();
-    const date = new Date().toISOString();
+  const boardId = uuidv4();
+  const date = new Date().toISOString();
 
-    // create a new board item
-    const boardItem = {
-        workspaceId,
-        boardId,
-        name,
-        config,
-        isDashboard: isDashboard ? isDashboard : false,
-        createdBy: authUserId,
-        editedBy: [authUserId],
-        createdAt: date,
-        updatedAt: date
-    };
+  // create a new board item
+  const boardItem = {
+    workspaceId,
+    boardId,
+    name,
+    config,
+    isDashboard: isDashboard ? isDashboard : false,
+    createdBy: authUserId,
+    editedBy: [authUserId],
+    createdAt: date,
+    updatedAt: date,
+  };
 
-    const thumbnailKey = `workspaces/${workspaceId}/boards/${boardId}/thumbnail.jpeg`;
+  const thumbnailKey = `workspaces/${workspaceId}/boards/${boardId}/thumbnail.jpeg`;
 
-    boardItem.thumbnailKey = thumbnailKey;
+  boardItem.thumbnailKey = thumbnailKey;
 
-    const uploadUrl = await getUploadUrl(thumbnailKey, {
-        ContentType: "image/jpeg"
-    });
+  const uploadUrl = await getUploadUrl(thumbnailKey, {
+    ContentType: "image/jpeg",
+  });
 
-    const downloadUrl = await getDownloadUrl(thumbnailKey);
+  const downloadUrl = await getDownloadUrl(thumbnailKey);
 
-    await workspaceRepo.addBoard(boardItem);
+  await workspaceRepo.addBoard(boardItem);
 
-    return {
-        ...boardItem,
-        thumbnailUploadUrl: uploadUrl,
-        thumbnailUrl: downloadUrl
-    };
+  return {
+    ...boardItem,
+    thumbnailUploadUrl: uploadUrl,
+    thumbnailUrl: downloadUrl,
+  };
 }
 
 async function deleteBoardInWorkspace(authUserId, workspaceId, boardId) {
-    await validateWorkspaceId(workspaceId);
+  await validateWorkspaceId(workspaceId);
 
-    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.MANAGE_BOARDS);
+  const isAuthorised = await hasPermission(
+    authUserId,
+    workspaceId,
+    PERMISSIONS.MANAGE_BOARDS
+  );
 
-    if (!isAuthorised) {
-        throw new Error("User does not have permission to perform action");
-    }
+  if (!isAuthorised) {
+    throw new Error("User does not have permission to perform action");
+  }
 
-    // get board details
-    const board = await workspaceRepo.getBoardById(workspaceId, boardId);
+  // get board details
+  const board = await workspaceRepo.getBoardById(workspaceId, boardId);
 
-    if (!board) {
-        throw new Error("Board not found");
-    }
+  if (!board) {
+    throw new Error("Board not found");
+  }
 
-    const folderPrefix = `workspaces/${workspaceId}/boards/${boardId}/`;
-    await deleteFolder(folderPrefix);
+  const folderPrefix = `workspaces/${workspaceId}/boards/${boardId}/`;
+  await deleteFolder(folderPrefix);
 
-    await workspaceRepo.removeBoard(workspaceId, boardId);
+  await workspaceRepo.removeBoard(workspaceId, boardId);
 
-    return {message: "Board successfully removed"};
+  return { message: "Board successfully removed" };
 }
 
 async function getBoardInWorkspace(authUserId, workspaceId, boardId) {
-    await validateWorkspaceId(workspaceId);
+  await validateWorkspaceId(workspaceId);
 
-    return workspaceRepo.getBoardById(workspaceId, boardId);
+  return workspaceRepo.getBoardById(workspaceId, boardId);
 }
 
 async function getBoardsInWorkspace(authUserId, workspaceId) {
-    await validateWorkspaceId(workspaceId);
+  await validateWorkspaceId(workspaceId);
 
-    // get all boards in a workspace
-    const boards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
+  // get all boards in a workspace
+  const boards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
 
-    if (!boards || boards.length === 0) return [];
+  if (!boards || boards.length === 0) return [];
 
-    const results = await Promise.all(
-        boards.map(async board => {
-            const thumbnailUrl = board.thumbnailKey
-                ? await getDownloadUrl(board.thumbnailKey)
-                : null;
+  const results = await Promise.all(
+    boards.map(async (board) => {
+      const thumbnailUrl = board.thumbnailKey
+        ? await getDownloadUrl(board.thumbnailKey)
+        : null;
 
-            return {
-                ...board,
-                thumbnailUrl
-            };
-        })
-    );
+      return {
+        ...board,
+        thumbnailUrl,
+      };
+    })
+  );
 
-    return results;
+  return results;
 }
 
-async function updateBoardInWorkspace(authUserId, workspaceId, boardId, payload) {
-    await validateWorkspaceId(workspaceId);
+async function updateBoardInWorkspace(
+  authUserId,
+  workspaceId,
+  boardId,
+  payload
+) {
+  await validateWorkspaceId(workspaceId);
 
-    const board = await workspaceRepo.getBoardById(workspaceId, boardId);
+  const board = await workspaceRepo.getBoardById(workspaceId, boardId);
 
-    if (!board) {
-        throw new Error("Board not found");
-    }
+  if (!board) {
+    throw new Error("Board not found");
+  }
 
-    const { name, config, isDashboard, isThumbnailUpdated } = payload;
-    const currentDate = new Date().toISOString();
+  const { name, config, isDashboard, isThumbnailUpdated, ownerId } = payload;
+  const currentDate = new Date().toISOString();
 
-    // ensure only unique users are added to editedBy
-    const editedBySet = new Set([...(board.editedBy || []), authUserId]);
+  // ensure only unique users are added to editedBy
+  const editedBySet = new Set([...(board.editedBy || []), authUserId]);
+  if (ownerId) {
+    editedBySet.add(ownerId);
+  }
 
-    // create board item and update repo
-    const boardUpdateItem = {
-        updatedAt: currentDate,
-        editedBy: Array.from(editedBySet),
-    };
+  // create board item and update repo
+  const boardUpdateItem = {
+    updatedAt: currentDate,
+    editedBy: Array.from(editedBySet),
+  };
 
-    let thumbnailUploadUrl = null;
+  if (ownerId) {
+    boardUpdateItem.createdBy = ownerId;
+  }
 
-    if (name) {
-        boardUpdateItem.name = name;
-    }
+  let thumbnailUploadUrl = null;
 
-    if (config) {
-        boardUpdateItem.config = config;
-    }
+  if (name) {
+    boardUpdateItem.name = name;
+  }
 
-    if (typeof isDashboard === "boolean") {
-        boardUpdateItem.isDashboard = isDashboard;
-    }
+  if (config) {
+    boardUpdateItem.config = config;
+  }
 
-    if (isThumbnailUpdated) {
-        thumbnailUploadUrl = await getUploadUrl(board.thumbnailKey, {
-            ContentType: `image/jpeg`
-        });
-    }
+  if (typeof isDashboard === "boolean") {
+    boardUpdateItem.isDashboard = isDashboard;
+  }
 
-    const updatedBoard = await workspaceRepo.updateBoard(workspaceId, boardId, boardUpdateItem);
+  if (isThumbnailUpdated) {
+    thumbnailUploadUrl = await getUploadUrl(board.thumbnailKey, {
+      ContentType: `image/jpeg`,
+    });
+  }
 
-    const thumbnailUrl = board.thumbnailKey ? await getDownloadUrl(board.thumbnailKey) : null;  
+  const updatedBoard = await workspaceRepo.updateBoard(
+    workspaceId,
+    boardId,
+    boardUpdateItem
+  );
 
-    return {
-        ...updatedBoard,
-        thumbnailUrl,
-        thumbnailUploadUrl
-    }
+  const thumbnailUrl = board.thumbnailKey
+    ? await getDownloadUrl(board.thumbnailKey)
+    : null;
+
+  return {
+    ...updatedBoard,
+    thumbnailUrl,
+    thumbnailUploadUrl,
+  };
 }
 
 module.exports = {
-    createBoardInWorkspace,
-    deleteBoardInWorkspace,
-    getBoardInWorkspace,
-    getBoardsInWorkspace,
-    updateBoardInWorkspace
+  createBoardInWorkspace,
+  deleteBoardInWorkspace,
+  getBoardInWorkspace,
+  getBoardsInWorkspace,
+  updateBoardInWorkspace,
 };

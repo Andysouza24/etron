@@ -25,9 +25,10 @@ const Roles = () => {
         try {
             const workspaceId = await getWorkspaceId();
             const result = await apiGet(endpoints.workspace.roles.getRoles(workspaceId));
-            setRoles(result.data);
+            setRoles(Array.isArray(result?.data) ? result.data : []);
         } catch (error) {
             console.error("Error fetching roles:", error);
+            setRoles([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -60,6 +61,7 @@ const Roles = () => {
 
     const renderItem = ({ item, index }) => {
         const isLast = index === filtered.length - 1;
+        const permissionCount = Array.isArray(item?.permissions) ? item.permissions.length : 0;
 
         return (<>
             <TouchableRipple
@@ -83,7 +85,7 @@ const Roles = () => {
                     </Text>
                     {!item.owner && (
                         <Text variant="labelMedium" style={{ opacity: 0.6 }}>
-                            {item.permissions.length ?? 0} perms
+                            {permissionCount} perms
                         </Text>
                     )}
                 </View>

@@ -14,6 +14,8 @@ const DescriptiveButton = ({
     noBorder = true,
     showChevron = true,
     iconColor,
+    fullWidth = true,
+    style,
 }) => {
     const theme = useTheme();
 
@@ -42,7 +44,9 @@ const DescriptiveButton = ({
             onPress={onPress}
             style={[
                 styles.descriptiveButton,
+                fullWidth ? styles.fullWidth : styles.autoWidth,
                 { backgroundColor, borderColor, borderWidth },
+                style,
             ]}
         >
             <View style={styles.innerContainer}>
@@ -52,18 +56,29 @@ const DescriptiveButton = ({
                     <Icon source={icon} size={28} color={iconColor ?? textColor} />
                 ) : null}
 
-                <View style={styles.textContainer}>
+                <View
+                    style={[
+                        styles.textContainer,
+                        fullWidth ? styles.textContainerFull : styles.textContainerAuto,
+                    ]}
+                >
                     <Text
                         style={[
                             styles.labelText,
                             { color: textColor },
                             !boldLabel && { fontWeight: 'normal' },
                         ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
                     >
                         {label}
                     </Text>
                     {description ? (
-                        <Text style={[styles.descriptionText, { color: textColor }]}>
+                        <Text
+                            style={[styles.descriptionText, { color: textColor }]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
                             {description}
                         </Text>
                     ) : null}
@@ -80,13 +95,20 @@ const DescriptiveButton = ({
 const styles = StyleSheet.create({
     descriptiveButton: {
         borderRadius: 10,
+        minHeight: 48,
+    },
+    fullWidth: {
         width: '100%',
+    },
+    autoWidth: {
+        alignSelf: 'flex-start',
     },
     innerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 8,
         paddingHorizontal: 10,
+        flexShrink: 1,
     },
     imageIcon: {
         width: 28,
@@ -94,10 +116,17 @@ const styles = StyleSheet.create({
         resizeMode: 'contain',
     },
     textContainer: {
-        flex: 1,
-        flexShrink: 1,
         marginLeft: 14,
         marginRight: 14,
+    },
+    textContainerFull: {
+        flex: 1,
+        flexShrink: 1,
+    },
+    textContainerAuto: {
+        flexShrink: 1,
+        flexGrow: 0,
+        flexBasis: 'auto',
     },
     labelText: {
         fontWeight: 'bold',

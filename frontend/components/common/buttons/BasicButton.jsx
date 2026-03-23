@@ -12,35 +12,64 @@ const BasicButton = ({
     fullWidth = false,
     style,
     disabled = false,
+    icon,
+    loading = false,
+    mode = 'contained',
+    contentStyle,
+    ...rest
 }) => {
     const theme = useTheme();
     
-    let buttonColor;
-    if (danger) {
-        buttonColor = theme.colors.error;
-    } else if (altBackground) {
-        buttonColor = theme.colors.buttonBackground;
-    } else {
-        buttonColor = theme.colors.primary;
-    }
+    const isContained = mode === 'contained';
 
-    let textColor = altText
-        ? theme.colors.textAlt
-        : theme.colors.text;
+    const resolveButtonColor = () => {
+        if (!isContained) return undefined;
+        if (danger) {
+            return theme.colors.error;
+        }
+        if (altBackground) {
+            return theme.colors.buttonBackground;
+        }
+        return theme.colors.primary;
+    };
+
+    const resolveTextColor = () => {
+        if (isContained) {
+            if (altText) {
+                return theme.colors.textAlt;
+            }
+            return theme.colors.onPrimary ?? theme.colors.text;
+        }
+
+        if (danger) {
+            return theme.colors.error;
+        }
+        if (altText) {
+            return theme.colors.textAlt;
+        }
+        return theme.colors.primary;
+    };
+
+    const buttonColor = resolveButtonColor();
+    const textColor = resolveTextColor();
 
     return (
         <Button 
             compact  
-            mode="contained" 
+            mode={mode} 
             textColor={textColor}  
             buttonColor={buttonColor}
             disabled={disabled}
             style={[
                 styles.button,
-                fullWidth ? styles.fullWidth : styles.fixedWidth
+                fullWidth ? styles.fullWidth : styles.fixedWidth,
+                style
             ]}
             onPress={onPress}
-            //disabled={disabled}
+            icon={icon}
+            loading={loading}
+            contentStyle={contentStyle}
+            {...rest}
         >
             {label}
         </Button>

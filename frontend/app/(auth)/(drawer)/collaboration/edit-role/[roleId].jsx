@@ -16,6 +16,23 @@ import StackLayout from "../../../../../components/layout/StackLayout";
 
 const MANAGE_ROLES = "app.collaboration.manage_roles";
 
+const normalizePermissionKeys = (list) => {
+	if (!Array.isArray(list)) return [];
+	const keys = list
+		.map((entry) => {
+			if (!entry) return null;
+			if (typeof entry === "string") return entry;
+			if (typeof entry === "object") {
+				if (typeof entry.key === "string") return entry.key;
+				if (typeof entry.permission === "string") return entry.permission;
+			}
+			return null;
+		})
+		.filter(Boolean);
+
+	return Array.from(new Set(keys));
+};
+
 function buildPermissionGroups(tree) {
 	const permissionGroups = [];
 
@@ -118,7 +135,7 @@ export default function EditRole() {
 			}
 
 			let result = await apiGet(endpoints.workspace.roles.getRole(workspaceId, roleId));
-			const role = result.data;
+			const role = result?.data || null;
 			if (!role) {
 				setNotFound(true);
 				return;
@@ -127,11 +144,11 @@ export default function EditRole() {
 			console.log("Role:", role);
 
 			result = await apiGet(endpoints.workspace.core.getDefaultPermissions);
-			const allCategories = buildPermissionGroups(result.data);
+			const allCategories = buildPermissionGroups(result?.data || {});
 			setPermissions(allCategories);
 			
 			result = await apiGet(endpoints.workspace.boards.getBoards(workspaceId));
-			setBoards(result.data);
+			setBoards(Array.isArray(result?.data) ? result.data : []);
 
 			try {
 				result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
@@ -140,9 +157,10 @@ export default function EditRole() {
 				console.warn("Could not determine current user's role:", error);
 			}
 
-			const initialName = role.name;
-			const initialPerms = role.permissions;
-			const initialBoards = role.hasAccess.boards;
+			const initialName = role.name || "";
+			const initialPerms = normalizePermissionKeys(role.permissions);
+			const initialBoardsRaw = Array.isArray(role.hasAccess?.boards) ? role.hasAccess.boards : [];
+			const initialBoards = Array.from(new Set(initialBoardsRaw.map((board) => String(board))));
 
 			setName(initialName);
 			setSelectedPerms(initialPerms);
@@ -169,14 +187,20 @@ export default function EditRole() {
 	}, [load]);
 
 	const togglePerm = (permission) => {
-		setSelectedPerms((selected) =>
-			selected.includes(permission) ? selected.filter((prevPermission) => prevPermission !== permission) : [...selected, permission]
-		);
+		setSelectedPerms((selected) => {
+			const permissionKey = typeof permission === "string" ? permission : permission?.key;
+			if (!permissionKey) return selected;
+
+			return selected.includes(permissionKey)
+				? selected.filter((prevPermission) => prevPermission !== permissionKey)
+				: [...selected, permissionKey];
+		});
 	};
 
 	const toggleBoard = (boardId) => {
+		const boardKey = String(boardId);
 		setSelectedBoards((selected) =>
-			selected.includes(boardId) ? selected.filter((prevBoard) => prevBoard !== boardId) : [...selected, boardId]
+			selected.includes(boardKey) ? selected.filter((prevBoard) => prevBoard !== boardKey) : [...selected, boardKey]
 		);
 	};
 
@@ -197,17 +221,20 @@ export default function EditRole() {
 			}
 			
 			setSaving(true);
+			const uniquePermissions = normalizePermissionKeys(selectedPerms);
+			const uniqueBoards = Array.from(new Set((selectedBoards || []).map((board) => String(board))));
+
 			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
 				name: name.trim(),
-				permissions: selectedPerms,
-				hasAccess: { boards: selectedBoards },
+				permissions: uniquePermissions,
+				hasAccess: { boards: uniqueBoards },
 			});
 
 			// Update initial values
 			initialRef.current = {
 				name: name.trim(),
-				perms: selectedPerms,
-				boards: selectedBoards,
+				perms: normalizePermissionKeys(selectedPerms),
+				boards: Array.from(new Set((selectedBoards || []).map((board) => String(board)))),
 			};
 
 			setSnack({ visible: true, text: "Role updated" });
@@ -224,12 +251,15 @@ export default function EditRole() {
 		await (async () => {
 		try {
 			setSaving(true);
+			const uniquePermissions = normalizePermissionKeys(selectedPerms);
+			const uniqueBoards = Array.from(new Set((selectedBoards || []).map((board) => String(board))));
+
 			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
 				name: name.trim(),
-				permissions: selectedPerms,
-				hasAccess: { boards: selectedBoards },
+				permissions: uniquePermissions,
+				hasAccess: { boards: uniqueBoards },
 			});
-			initialRef.current = { name: name.trim(), perms: selectedPerms, boards: selectedBoards };
+			initialRef.current = { name: name.trim(), perms: uniquePermissions, boards: uniqueBoards };
 			setSnack({ visible: true, text: "Role updated" });
 		} catch (error) {
 			console.error("Error saving role (confirmed):", error);
@@ -304,13 +334,14 @@ export default function EditRole() {
 						{boards.length > 0 ? (
 							<View style={styles.chipsWrap}>
 								{boards.map((board) => {
-									const active = selectedBoards.includes(board.boardId);
+									const boardKey = String(board.boardId ?? board.id);
+									const active = selectedBoards.includes(boardKey);
 									return (
 										<Chip
-											key={board.boardId}
+											key={boardKey}
 											mode={active ? "flat" : "outlined"}
 											selected={active}
-											onPress={() => toggleBoard(board.boardId)}
+											onPress={() => toggleBoard(boardKey)}
 											style={styles.chip}
 										>
 											{board.name}

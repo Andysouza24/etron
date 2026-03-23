@@ -8,49 +8,14 @@ import Footer from './footer';
 import Background from './background';
 import Handle from './handle';
 import Contents from './contents';
-
-const DEFAULT_COLLAPSED_SNAP_POINT = '30%';
-const MAX_HEIGHT_PERCENT = 80;
-
-// Helper functions
-const calculateMaxSheetHeight = (windowHeight, topInset = 0) => {
-  const availableHeight = windowHeight - topInset;
-  return Math.floor(availableHeight * (MAX_HEIGHT_PERCENT / 100));
-};
-
-const getMaxIndex = (enableDynamicSizing, snapPointsLength) => 
-  enableDynamicSizing ? 1 : snapPointsLength - 1;
-
-const getSnapPoints = (enableDynamicSizing, customSnapPoints) => {
-  const collapsedPoint = (Array.isArray(customSnapPoints) && customSnapPoints.length > 0)
-    ? customSnapPoints[0]
-    : DEFAULT_COLLAPSED_SNAP_POINT;
-  
-  return enableDynamicSizing 
-    ? [collapsedPoint]
-    : (Array.isArray(customSnapPoints) && customSnapPoints.length > 0 
-        ? customSnapPoints 
-        : [DEFAULT_COLLAPSED_SNAP_POINT, '80%']);
-};
-
-const getInitialIndex = (enableDynamicSizing, customInitialIndex, snapPointsLength) => {
-  if (enableDynamicSizing) {
-    return customInitialIndex === 0 ? 0 : 1;
-  }
-  
-  if (typeof customInitialIndex === 'number' && customInitialIndex >= 0) {
-    return Math.min(customInitialIndex, snapPointsLength - 1);
-  }
-  return snapPointsLength - 1;
-};
-
-const calculateAdjustedMaxContentSize = (keyboardHeight, maxDynamicContentSize, topInset, bottomInset) => {
-  if (keyboardHeight <= 0) return maxDynamicContentSize;
-  
-  const windowHeight = Dimensions.get('window').height;
-  const availableSpace = windowHeight - keyboardHeight - topInset - bottomInset;
-  return Math.floor(availableSpace * 0.9);
-};
+import {
+  calculateMaxSheetHeight,
+  getMaxIndex,
+  getSnapPoints,
+  getInitialIndex,
+  calculateAdjustedMaxContentSize
+} from './utils';
+import { ScrollView } from 'react-native-gesture-handler';
 
 const CustomBottomSheetInner = (props, ref) => {
   const {
@@ -73,8 +38,8 @@ const CustomBottomSheetInner = (props, ref) => {
     // Footer configuration
     footer = {},
     
-    // List configuration
-    data = [1, 2, 3],
+  // List configuration
+    data = [],
     renderItem,
     keyExtractor,
     getItem,
@@ -85,6 +50,7 @@ const CustomBottomSheetInner = (props, ref) => {
     
     // Custom content (alternative to list)
     customContent,
+    children,
     
     ...restProps
   } = props;
@@ -119,6 +85,7 @@ const CustomBottomSheetInner = (props, ref) => {
   const insets = useSafeAreaInsets();
   const topInset = insets?.top ?? 0;
   const bottomInset = insets?.bottom ?? 0;
+  const windowHeight = useMemo(() => Dimensions.get('window').height, []);
   
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,8 +96,8 @@ const CustomBottomSheetInner = (props, ref) => {
   const currentIndexRef = useRef(null);
 
   const maxSheetHeight = useMemo(() => 
-    calculateMaxSheetHeight(Dimensions.get('window').height, topInset),
-    [topInset]
+    calculateMaxSheetHeight(windowHeight, topInset),
+    [windowHeight, topInset]
   );
 
   const enableDynamicSizing = enableDynamicSizingProp;
@@ -153,8 +120,8 @@ const CustomBottomSheetInner = (props, ref) => {
   );
 
   const adjustedMaxContentSize = useMemo(() => 
-    calculateAdjustedMaxContentSize(keyboardHeight, maxDynamicContentSize, topInset, bottomInset),
-    [keyboardHeight, maxDynamicContentSize, topInset, bottomInset]
+    calculateAdjustedMaxContentSize(keyboardHeight, maxDynamicContentSize, topInset, bottomInset, windowHeight),
+    [keyboardHeight, maxDynamicContentSize, topInset, bottomInset, windowHeight]
   );
 
   const lastIndex = useMemo(() => 
@@ -333,6 +300,9 @@ const CustomBottomSheetInner = (props, ref) => {
     return overrideContainerStyle ? [...base, overrideContainerStyle] : base;
   }, [theme.colors?.shadow, overrideContainerStyle]);
 
+  const resolvedCustomContent = customContent ?? children;
+  const hasCustomContent = resolvedCustomContent !== undefined && resolvedCustomContent !== null;
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -355,11 +325,13 @@ const CustomBottomSheetInner = (props, ref) => {
       containerStyle={combinedContainerStyle}
       {...restProps}
     >
-      {customContent ? (
+      {hasCustomContent ? (
         <BottomSheetView
-          style={{ flex: 1, paddingHorizontal: 16, paddingBottom: bottomPadding, paddingTop: 12 }}
+          style={{ flex: 1, paddingHorizontal: 16, paddingBottom: bottomPadding + 40, paddingTop: 12 }}
         >
-          {customContent}
+          <ScrollView style={{}}>
+          {resolvedCustomContent}
+          </ScrollView>
         </BottomSheetView>
       ) : (
         <Contents
@@ -372,7 +344,7 @@ const CustomBottomSheetInner = (props, ref) => {
           itemTitleExtractor={itemTitleExtractor}
           theme={theme}
           emptyComponent={emptyComponent}
-          extraBottomPadding={bottomPadding}
+          extraBottomPadding={bottomPadding + 40}
           enableSearch={enableSearch}
           searchQuery={searchQuery}
           textColor={headerTextColor}

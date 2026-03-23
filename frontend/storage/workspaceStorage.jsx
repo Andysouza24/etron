@@ -159,14 +159,21 @@ export async function removeWorkspaceInfo() {
 // get values from the information stored
 export async function getWorkspaceId() {
     const workspace = await getWorkspaceInfo();
-    const id = workspace.workspaceId;
-    //const id = extractWorkspaceId(workspace);
-    // Auto-heal stored value to include id/workspaceId for future fast access
-    /*if (workspace && id && (!workspace.id || !workspace.workspaceId)) {
-        try { await saveWorkspaceInfo(workspace); } catch {}
-    }*/
-    //console.log('[workspaceStorage] getWorkspaceId ->', id);
-    return id;
+    if (!workspace) {
+        return null;
+    }
+
+    const id = extractWorkspaceId(workspace);
+
+    if (id && (!workspace.id || !workspace.workspaceId)) {
+        try {
+            await saveWorkspaceInfo(workspace);
+        } catch (error) {
+            console.warn('[workspaceStorage] Failed to normalize workspace info:', error);
+        }
+    }
+
+    return id || null;
 }
 
 // TESTING
