@@ -4,10 +4,85 @@ import { Text, View } from "react-native";
 
 
 function formatTickValue(t) {
+    if (typeof t === "string") return t;
     const abs = Math.abs(t);
     if (abs >= 1e6) return `${(t / 1e6).toFixed(1)}M`;
     if (abs >= 1e3) return `${(t / 1e3).toFixed(0)}K`;
     return t;
+}
+
+function parseNumericValue(value) {
+    if (value == null || value === "") return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    const cleaned = String(value).replace(/[$,\s]/g, "");
+    const num = Number(cleaned);
+    return Number.isFinite(num) ? num : null;
+}
+
+function formatTimestamp(value) {
+    if (value == null) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function toDate(value) {
+    if (value == null) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getTimePeriodLabel(date, timePeriod) {
+    const year = date.getFullYear();
+    if (timePeriod === "year") return `${year}`;
+    if (timePeriod === "quarter") return `Q${Math.floor(date.getMonth() / 3) + 1} ${year}`;
+    return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+
+function getBoxPlotData({ data, xKey, yKeys, boxGrouping = "yKey", boxTimePeriod = "month" }) {
+    const safeYKeys = Array.isArray(yKeys) ? yKeys : yKeys ? [yKeys] : [];
+
+    if (boxGrouping === "xValue") {
+        const grouped = new Map();
+        data.forEach((row) => {
+            const label = row?.[xKey];
+            if (label == null) return;
+            if (!grouped.has(label)) grouped.set(label, []);
+            safeYKeys.forEach((yKey) => {
+                const num = parseNumericValue(row?.[yKey]);
+                if (num != null) grouped.get(label).push(num);
+            });
+        });
+        return [...grouped.entries()]
+            .filter(([, values]) => values.length > 0)
+            .map(([label, values]) => ({ x: String(label), y: values }));
+    }
+
+    if (boxGrouping === "timePeriod") {
+        const grouped = new Map();
+        data.forEach((row) => {
+            const date = toDate(row?.[xKey]);
+            if (!date) return;
+            const label = getTimePeriodLabel(date, boxTimePeriod);
+            if (!grouped.has(label)) grouped.set(label, []);
+            safeYKeys.forEach((yKey) => {
+                const num = parseNumericValue(row?.[yKey]);
+                if (num != null) grouped.get(label).push(num);
+            });
+        });
+        return [...grouped.entries()]
+            .filter(([, values]) => values.length > 0)
+            .map(([label, values]) => ({ x: label, y: values }));
+    }
+
+    return safeYKeys
+        .map((yKey) => ({
+            x: yKey,
+            y: data
+                .map((row) => parseNumericValue(row?.[yKey]))
+                .filter((num) => num != null),
+        }))
+        .filter((entry) => entry.y.length > 0);
 }
 
 
@@ -159,8 +234,8 @@ const GraphTypes = {
 
             const chartData = data.map((d) => ({
                 x: d[xKey], // label
-                y: d[yKey], // value
-            }));
+                y: parseNumericValue(d[yKey]), // value
+            })).filter((d) => d.y != null);
 
             return (
                 <View
@@ -177,7 +252,7 @@ const GraphTypes = {
                             theme={VictoryTheme.clean}
                             data={chartData}
                             colorScale={colours && colours.length > 0 ? colours : "qualitative"}
-                            labels={({ datum }) => `${datum.x}\n${datum.y}`} // value on new line
+                            labels={({ datum }) => `${formatTimestamp(datum.x)}\n${formatTickValue(datum.y)}`} // value on new line
                             style={{
                                 labels: {
                                     fontSize: 12,
@@ -349,11 +424,11 @@ const GraphTypes = {
         label: "Box Plot",
         value: "box",
               previewImage: require("../../../../assets/images/boxPlot.png"),
-        render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
+                render: ({ data, xKey, yKeys, colours, axisColorMode = "light", boxGrouping = "yKey", boxTimePeriod = "month" }) => {
             const ChartComponent = () => {
               const [size, setSize] = React.useState({ width: 0, height: 0 });
-              const yKey = Array.isArray(yKeys) ? yKeys[0] : yKeys; // boxplot usually uses a single dependent variable
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                                const boxData = getBoxPlotData({ data, xKey, yKeys, boxGrouping, boxTimePeriod });
               return (
                 <View
                     style={{ flex: 1 }}
@@ -368,7 +443,6 @@ const GraphTypes = {
                             height={size.height}
                             theme={VictoryTheme.clean}
                             domainPadding={20}
-                            scale={{ x: "linear", y: "linear" }}
                             padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                             containerComponent={<VictoryContainer responsive={false} />}
                         >
@@ -394,17 +468,7 @@ const GraphTypes = {
                             />
 
                             <VictoryBoxPlot
-                                data={Object.entries(
-                                    data.reduce((acc, d) => {
-                                        const key = d[xKey];
-                                        if (!acc[key]) acc[key] = [];
-                                        acc[key].push(d[yKey]);
-                                        return acc;
-                                    }, {})
-                                ).map(([key, values]) => ({
-                                    x: key,
-                                    y: values,
-                                }))}
+                                data={boxData}
                                 style={{
                                     min: { stroke: colours[0] || "blue" },
                                     max: { stroke: colours[0] || "blue" },
@@ -432,6 +496,9 @@ const GraphTypes = {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const histogramData = data
+                    .map((d) => ({ x: toDate(d[xKey]) }))
+                    .filter((d) => d.x != null);
                 return (
                     <View
                         style={{ flex: 1 }}
@@ -450,6 +517,7 @@ const GraphTypes = {
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
                                 <VictoryAxis
+                                    tickFormat={(tick) => formatTimestamp(tick)}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -469,10 +537,8 @@ const GraphTypes = {
                                 />
 
                                 <VictoryHistogram
-                                    data={data.map((d) => ({
-                                        x: d[xKey],
-                                    }))}
-                                    bins={5}
+                                    data={histogramData}
+                                    bins={8}
                                     style={{
                                         data: {
                                             fill: colours[0] || "#4f83cc",
@@ -495,13 +561,14 @@ const GraphTypes = {
     label: "Progress Bar",
     value: "progressBar",
         previewImage: require("../../../../assets/images/progressCircle.png"),
-    render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
+    render: ({ data, yKeys, colours, axisColorMode = "light", maxValue = 100 }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
             const axisColor = axisColorMode === "dark" ? "white" : "black";
             // Assume single value in data[0][yKeys[0]] for progress
-            const progressValue = data.length > 0 ? data[0][yKeys[0]] : 0;
-            const maxValue = 100; // adjust if dynamic range is needed
+            const yKey = Array.isArray(yKeys) ? yKeys[0] : yKeys;
+            const progressValue = data.length > 0 ? (parseNumericValue(data[0][yKey]) ?? 0) : 0;
+            const safeMaxValue = Number(maxValue) > 0 ? Number(maxValue) : 100;
 
             return (
                 <View
@@ -516,7 +583,7 @@ const GraphTypes = {
                             width={size.width}
                             height={size.height}
                             theme={VictoryTheme.clean}
-                            domain={{ x: [0, maxValue], y: [0, 1] }}
+                            domain={{ x: [0, safeMaxValue], y: [0, 1] }}
                             padding={{ top: 20, bottom: 20, left: 40, right: 20 }}
                             containerComponent={<VictoryContainer responsive={false} />}
                         >
@@ -552,13 +619,15 @@ progressCircle: {
     label: "Progress Circle",
     value: "progressCircle",
         previewImage: require("../../../../assets/images/progressCircle.png"),
-    render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
+    render: ({ data, yKeys, colours, axisColorMode = "light", maxValue = 100 }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
             const axisColor = axisColorMode === "dark" ? "white" : "black";
             // take first yKey value from first row of data
-            const progressValue = data.length > 0 && yKeys.length > 0 ? data[0][yKeys[0]] : 0;
-            const percent = Math.min(Math.max(progressValue, 0), 100); // clamp 0–100
+            const yKey = Array.isArray(yKeys) ? yKeys[0] : yKeys;
+            const progressValue = data.length > 0 && yKey ? (parseNumericValue(data[0][yKey]) ?? 0) : 0;
+            const safeMaxValue = Number(maxValue) > 0 ? Number(maxValue) : 100;
+            const percent = Math.min(Math.max((progressValue / safeMaxValue) * 100, 0), 100); // clamp 0-100
 
             const chartData = [
                 { x: "Complete", y: percent },
