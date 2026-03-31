@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
+    "buildCacheProvider": "eas",
     "platforms": [
       "ios",
       "android"
@@ -55,7 +56,8 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withAppAuthRedirectScheme"
     ],
     "experiments": {
       "typedRoutes": true
