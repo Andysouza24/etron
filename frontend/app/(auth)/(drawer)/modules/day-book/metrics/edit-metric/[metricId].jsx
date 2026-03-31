@@ -57,6 +57,12 @@ const EditMetric = () => {
 	const [selectedRows, setSelectedRows] = useState([]);
 	const [coloursState, setColoursState] = useState(['#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522']);
 	const [wheelIndex, setWheelIndex] = useState(0);
+    const [maxValue, setMaxValue] = useState(100);
+    const [boxGrouping, setBoxGrouping] = useState("yKey");
+    const [boxTimePeriod, setBoxTimePeriod] = useState("month");
+
+    const isProgressType = selectedMetric === "progressBar" || selectedMetric === "progressCircle";
+    const isBoxType = selectedMetric === "box";
 
 	const rowLoadAmount = 5;
 	const [rowLimit, setRowLimit] = useState(rowLoadAmount);
@@ -111,6 +117,9 @@ const EditMetric = () => {
 				setChosenDependentVariables(metric.config?.dependentVariables || []);
 				setColoursState(metric.config?.colours?.length ? metric.config.colours : coloursState);
 				setSelectedRows(Array.isArray(metric.config?.selectedRows) ? metric.config.selectedRows : []);
+                setMaxValue(metric.config?.maxValue ?? 100);
+                setBoxGrouping(metric.config?.boxGrouping || "yKey");
+                setBoxTimePeriod(metric.config?.boxTimePeriod || "month");
 			} catch (e) {
 				console.error("Error loading metric:", e);
 			} finally {
@@ -197,6 +206,9 @@ const EditMetric = () => {
 					dependentVariables: dependentArray,
 					colours: coloursState,
 					selectedRows,
+                    maxValue,
+                    boxGrouping,
+                    boxTimePeriod,
 				},
             });
 			setSnack({ visible: true, text: "Metric updated" });
@@ -290,6 +302,48 @@ const EditMetric = () => {
                 onSelect={setSelectedMetric}
                 value={selectedMetric}
             />
+
+            {isProgressType && (
+                <TextField
+                    label="Value Required For 100%"
+                    placeholder="100"
+                    value={String(maxValue ?? 100)}
+                    onChangeText={(text) => {
+                        const parsed = Number(text);
+                        setMaxValue(Number.isFinite(parsed) && parsed > 0 ? parsed : 100);
+                    }}
+                />
+            )}
+
+            {isBoxType && (
+                <>
+                    <DropDown
+                        title="Box Plot Grouping"
+                        items={[
+                            { value: "yKey", label: "Per value field" },
+                            { value: "xValue", label: "Per X value" },
+                            { value: "timePeriod", label: "Per time period" },
+                        ]}
+                        showRouterButton={false}
+                        onSelect={setBoxGrouping}
+                        value={boxGrouping}
+                    />
+
+                    {boxGrouping === "timePeriod" && (
+                        <DropDown
+                            title="Time Period"
+                            items={[
+                                { value: "month", label: "Month" },
+                                { value: "quarter", label: "Quarter" },
+                                { value: "year", label: "Year" },
+                            ]}
+                            showRouterButton={false}
+                            onSelect={setBoxTimePeriod}
+                            value={boxTimePeriod}
+                        />
+                    )}
+                </>
+            )}
 
             <Text style={{ marginTop: 8 }}>Independent Variable (X-Axis)</Text>
             <MetricRadioButton
@@ -405,6 +459,9 @@ const EditMetric = () => {
                                     xKey: chosenIndependentVariable,
                                     yKeys: dependentArray,
                                     colours: coloursState,
+									maxValue,
+									boxGrouping,
+									boxTimePeriod,
                                 })}
                             </View>
                         </Card.Content>

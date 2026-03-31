@@ -7,15 +7,11 @@ import DateSelector from "../Selectors/DateSelector";
 import AggregationSelector from "../Selectors/AggregationSelector";
 import DataPreviewModal from "../modals/DataPreviewModal";
 import ExistingMetricsModal from "../modals/ExistingMetricsModal";
-import DropDown from "../../../../common/input/DropDown";
-import GraphTypes from "../graph-types";
 import { simpleStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 
 export default function SimpleConfig({
     ds,
     viewDataPermission,
-    selectedMetric,
-    setSelectedMetric,
     valueSelection,
     setValueSelection,
     dateSelection,
@@ -45,19 +41,6 @@ export default function SimpleConfig({
                 onViewExistingMetrics={() => setExistingMetricsVisible(true)}
                 dataSourceId={ds.dataSourceId}
             >
-                <View style={simpleStyles.formSection}>
-                    <DropDown
-                        title="Select Display Type"
-                        items={Object.values(GraphTypes).map((g) => ({
-                            value: g.value,
-                            label: g.label,
-                        }))}
-                        showRouterButton={false}
-                        onSelect={setSelectedMetric}
-                        value={selectedMetric}
-                    />
-                </View>
-
                 <View style={simpleStyles.formSection}>
                     <ValueSelector
                         fields={ds.classifiedFields.valueFields}

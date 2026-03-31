@@ -32,12 +32,15 @@ const CreateSimpleMetric = () => {
     const form = useMetricForm();
     const { submitMetric, viewShotRef } = useMetricSubmission();
 
-    const [selectedMetric, setSelectedMetric] = useState(null);
+    const [selectedMetric, setSelectedMetric] = useState("line");
     const [selectedRows, setSelectedRows] = useState([]);
     const [valueSelection, setValueSelection] = useState(null);
     const [dateSelection, setDateSelection] = useState(null);
     const [aggregationSelection, setAggregationSelection] = useState("sum");
     const [aggChecked, setAggChecked] = useState(false);
+    const [maxValue, setMaxValue] = useState(100);
+    const [boxGrouping, setBoxGrouping] = useState("yKey");
+    const [boxTimePeriod, setBoxTimePeriod] = useState("month");
 
     const hasDuplicateDates = useMemo(
         () => hasDuplicateValues(ds.dataSourceData, dateSelection),
@@ -73,9 +76,12 @@ const CreateSimpleMetric = () => {
                 aggregation: aggChecked ? aggregationSelection : null,
                 colours: form.coloursState,
                 selectedRows,
+                maxValue,
+                boxGrouping,
+                boxTimePeriod,
             },
         });
-    }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric]);
+    }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric, maxValue, boxGrouping, boxTimePeriod]);
 
     const pages = useMemo(() => [
         {
@@ -83,8 +89,6 @@ const CreateSimpleMetric = () => {
                 <SimpleConfig
                     ds={ds}
                     viewDataPermission={viewDataPermission}
-                    selectedMetric={selectedMetric}
-                    setSelectedMetric={setSelectedMetric}
                     valueSelection={valueSelection}
                     setValueSelection={setValueSelection}
                     dateSelection={dateSelection}
@@ -112,6 +116,14 @@ const CreateSimpleMetric = () => {
                     graphData={graphData}
                     xKey={dateSelection}
                     yKeys={valueSelection ? [valueSelection] : []}
+                    selectedMetric={selectedMetric}
+                    setSelectedMetric={setSelectedMetric}
+                    maxValue={maxValue}
+                    setMaxValue={setMaxValue}
+                    boxGrouping={boxGrouping}
+                    setBoxGrouping={setBoxGrouping}
+                    boxTimePeriod={boxTimePeriod}
+                    setBoxTimePeriod={setBoxTimePeriod}
                 />
             ),
             validate: () => !!form.metricName.trim(),

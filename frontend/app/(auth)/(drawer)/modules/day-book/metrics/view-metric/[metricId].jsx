@@ -199,6 +199,9 @@ const ViewMetric = () => {
                                 yKeys: metricSettings.config.dependentVariables,
                                 colours: metricSettings.config.colours || coloursState,
                                 axisColorMode: theme.dark ? "dark" : "light",
+                                maxValue: metricSettings.config.maxValue,
+                                boxGrouping: metricSettings.config.boxGrouping,
+                                boxTimePeriod: metricSettings.config.boxTimePeriod,
                             })}
                         </View>
                     </Card.Content>
@@ -266,6 +269,9 @@ const ViewMetric = () => {
                                                 yKeys: metricSettings.config.dependentVariables,
                                                 colours: metricSettings.config.colours || coloursState,
                                                 axisColorMode: axisColorModeState,
+                                                maxValue: metricSettings.config.maxValue,
+                                                boxGrouping: metricSettings.config.boxGrouping,
+                                                boxTimePeriod: metricSettings.config.boxTimePeriod,
                                             })}
                                         </View>
                                     </ViewShot>

@@ -20,6 +20,14 @@ export default function MetricDetails({
     graphData,
     xKey,
     yKeys,
+    selectedMetric,
+    setSelectedMetric,
+    maxValue,
+    setMaxValue,
+    boxGrouping,
+    setBoxGrouping,
+    boxTimePeriod,
+    setBoxTimePeriod,
 }) {
     const theme = useTheme();
 
@@ -93,6 +101,9 @@ export default function MetricDetails({
                                     xKey={xKey}
                                     yKeys={yKeys}
                                     colours={coloursState}
+                                    maxValue={maxValue}
+                                    boxGrouping={boxGrouping}
+                                    boxTimePeriod={boxTimePeriod}
                                 />
                             </View>
                         </ViewShot>
@@ -101,7 +112,16 @@ export default function MetricDetails({
             </View>
 
             <View style={{ marginTop: 16 }}>
-                <CustomiseOptions />
+                <CustomiseOptions
+                    selectedMetric={selectedMetric}
+                    setSelectedMetric={setSelectedMetric}
+                    maxValue={maxValue}
+                    setMaxValue={setMaxValue}
+                    boxGrouping={boxGrouping}
+                    setBoxGrouping={setBoxGrouping}
+                    boxTimePeriod={boxTimePeriod}
+                    setBoxTimePeriod={setBoxTimePeriod}
+                />
             </View>
         </ScrollView>
     );
