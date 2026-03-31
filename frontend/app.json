@@ -6,7 +6,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "buildCacheProvider": "eas",
     "platforms": [
       "ios",
       "android"
@@ -60,7 +59,8 @@
       "./plugins/withAppAuthRedirectScheme"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "buildCacheProvider": "eas"
     },
     "runtimeVersion": "1.0.0",
     "updates": {
