@@ -394,9 +394,16 @@ const GraphTypes = {
                             />
 
                             <VictoryBoxPlot
-                                data={data.map((d) => ({
-                                    x: d[xKey],
-                                    y: d[yKey],
+                                data={Object.entries(
+                                    data.reduce((acc, d) => {
+                                        const key = d[xKey];
+                                        if (!acc[key]) acc[key] = [];
+                                        acc[key].push(d[yKey]);
+                                        return acc;
+                                    }, {})
+                                ).map(([key, values]) => ({
+                                    x: key,
+                                    y: values,
                                 }))}
                                 style={{
                                     min: { stroke: colours[0] || "blue" },
@@ -484,9 +491,9 @@ const GraphTypes = {
     },
 
 
-    progress: {
+    progressBar: {
     label: "Progress Bar",
-    value: "progress",
+    value: "progressBar",
         previewImage: require("../../../../assets/images/progressCircle.png"),
     render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
         const ChartComponent = () => {
@@ -541,9 +548,9 @@ const GraphTypes = {
     },
 },
 
-progress: {
+progressCircle: {
     label: "Progress Circle",
-    value: "progress",
+    value: "progressCircle",
         previewImage: require("../../../../assets/images/progressCircle.png"),
     render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
         const ChartComponent = () => {
@@ -554,8 +561,8 @@ progress: {
             const percent = Math.min(Math.max(progressValue, 0), 100); // clamp 0–100
 
             const chartData = [
-                { x: 1, y: percent },
-                { x: 2, y: 100 - percent }
+                { x: "Complete", y: percent },
+                { x: "Remaining", y: 100 - percent }
             ];
 
             return (
@@ -567,33 +574,23 @@ progress: {
                     }}
                 >
                     {size.width > 0 && size.height > 0 && (
-                        <Svg viewBox={`0 0 ${size.width} ${size.height}`} width="100%" height="100%">
+                        <View style={{ position: "relative" }}>
                             <VictoryPie
-                                standalone={false}
                                 width={size.width}
                                 height={size.height}
                                 data={chartData}
-                                innerRadius={size.width / 4} // makes it a donut
-                                cornerRadius={size.width / 20}
+                                innerRadius={Math.min(size.width, size.height) / 4}
+                                cornerRadius={5}
                                 labels={() => null}
-                                style={{
-                                    data: {
-                                        fill: ({ datum }) =>
-                                            datum.x === 1
-                                                ? (colours[0] || "#4caf50")
-                                                : "transparent"
-                                    }
-                                }}
+                                colorScale={[colours[0] || "#4caf50", "transparent"]}
+                                containerComponent={<VictoryContainer responsive={false} />}
                             />
-                            <VictoryLabel
-                                textAnchor="middle"
-                                verticalAnchor="middle"
-                                x={size.width / 2}
-                                y={size.height / 2}
-                                text={`${Math.round(percent)}%`}
-                                style={{ fontSize: 24, fill: axisColor }}
-                            />
-                        </Svg>
+                            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
+                                <Text style={{ fontSize: 24, fontWeight: "bold", color: axisColor }}>
+                                    {Math.round(percent)}%
+                                </Text>
+                            </View>
+                        </View>
                     )}
                 </View>
             );
