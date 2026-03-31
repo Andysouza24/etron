@@ -55,6 +55,14 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["x86_64"]
+          }
+        }
+      ],
       "expo-web-browser",
       "./plugins/withAppAuthRedirectScheme"
     ],
