@@ -4,7 +4,7 @@ import axios from 'axios';
 async function getHeaders() {
     const session = await fetchAuthSession();
     const idToken = session.tokens.idToken.toString();
-    console.log(idToken);
+    //console.log(idToken);
     
     return {
         'Content-Type': 'application/json',

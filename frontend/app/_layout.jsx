@@ -9,8 +9,11 @@ import { Authenticator } from '@aws-amplify/ui-react-native';
 import { VerificationProvider } from '../contexts/VerificationContext'; // temp until backend
 import { AppProvider } from '../contexts/AppContext';
 import { Amplify } from 'aws-amplify';
+import amplifyOutputs from '../amplify_outputs.json';
 
 import * as Linking from 'expo-linking';
+
+Amplify.configure(amplifyOutputs);
 
 Linking.addEventListener('url', (event) => { //deep linking; used for microsoft/google sign in redirects
     console.log('App was opened with URL:', event.url);

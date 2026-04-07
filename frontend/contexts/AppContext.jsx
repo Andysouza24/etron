@@ -65,21 +65,25 @@ export function AppProvider({ children }) {
 
     // real time data source updates
     useDataSourceSubscription((updatedDataSource) => {
+        // strip null/undefined fields so they don't overwrite existing data
+        const cleaned = Object.fromEntries(
+            Object.entries(updatedDataSource).filter(([_, v]) => v != null)
+        );
         setDataSources(prev => {
             const newList = prev.list.map(ds =>
-                ds.dataSourceId === updatedDataSource.dataSourceId
-                    ? { ...ds, ...updatedDataSource }
+                ds.dataSourceId === cleaned.dataSourceId
+                    ? { ...ds, ...cleaned }
                     : ds
             );
-            const exists = prev.list.some(ds => ds.dataSourceId === updatedDataSource.dataSourceId);
-            const list = exists ? newList : [...prev.list, updatedDataSource];
+            const exists = prev.list.some(ds => ds.dataSourceId === cleaned.dataSourceId);
+            const list = exists ? newList : [...prev.list, cleaned];
             return {
                 ...prev,
                 ...recomputeDataSources(list),
                 updateTrigger: prev.updateTrigger + 1,
             };
         });
-        console.log("[AppContext] Real-time data source update:", updatedDataSource);
+        console.log("[AppContext] Real-time data source update:", cleaned);
     });
 
     return (

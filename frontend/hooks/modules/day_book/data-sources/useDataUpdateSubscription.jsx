@@ -1,17 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { generateClient } from "aws-amplify/api";
 import { onDataUpdate } from "../../graphql/subscriptions";
 import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 
-const client = generateClient();
-
 export default function useDataUpdateSubscription(onUpdate) {
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
   useEffect(() => {
     let subscription;
     let retryTimeout;
 
     const subscribe = async () => {
       try {
+        const client = generateClient();
         const workspaceId = await getWorkspaceId();
 
         if (!workspaceId) {
@@ -25,7 +27,7 @@ export default function useDataUpdateSubscription(onUpdate) {
         }).subscribe({
           next: ({ data }) => {
             const updated = data.onDataUpdate;
-            onUpdate(updated);
+            onUpdateRef.current(updated);
           },
           error: (err) => console.error("DataUpdate subscription error:", err),
         });
@@ -40,5 +42,5 @@ export default function useDataUpdateSubscription(onUpdate) {
       if (subscription) subscription.unsubscribe();
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [onUpdate]);
+  }, []);
 }

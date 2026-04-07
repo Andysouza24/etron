@@ -1,21 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { generateClient } from "aws-amplify/api";
 import { onMetricUpdate } from "../../graphql/subscriptions";
 import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 
-const client = generateClient();
-
 export default function useMetricSubscription(onUpdate) {
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
   useEffect(() => {
     let subscription;
     let retryTimeout;
 
     const subscribe = async () => {
       try {
+        const client = generateClient();
         const workspaceId = await getWorkspaceId();
 
         if (!workspaceId) {
-          // workspace not loaded yet — retry shortly
           retryTimeout = setTimeout(subscribe, 2000);
           return;
         }
@@ -27,7 +28,7 @@ export default function useMetricSubscription(onUpdate) {
         }).subscribe({
           next: ({ data }) => {
             const updatedMetric = data.onMetricUpdate;
-            onUpdate(updatedMetric);
+            onUpdateRef.current(updatedMetric);
           },
           error: (err) => console.error("Subscription error:", err),
         });
@@ -42,5 +43,5 @@ export default function useMetricSubscription(onUpdate) {
       if (subscription) subscription.unsubscribe();
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [onUpdate]);
+  }, []);
 }

@@ -104,17 +104,18 @@ export function MetricProvider({ children }) {
     // TODO: wire up useMetricSubscription to auto-update list on real-time events
     // the hook provides a single onUpdate callback for all metric changes
     useMetricSubscription((updatedMetric) => {
+        const cleaned = Object.fromEntries(
+            Object.entries(updatedMetric).filter(([_, v]) => v != null)
+        );
         setMetrics(prev => {
-            const exists = prev.find(m => m.metricId === updatedMetric.metricId);
+            const exists = prev.find(m => m.metricId === cleaned.metricId);
             if (exists) {
-                // update existing metric
-                return prev.map(m => m.metricId === updatedMetric.metricId ? { ...m, ...updatedMetric } : m);
+                return prev.map(m => m.metricId === cleaned.metricId ? { ...m, ...cleaned } : m);
             } else {
-                // new metric — append
-                return [...prev, updatedMetric];
+                return [...prev, cleaned];
             }
         });
-        console.log("[MetricContext] Real-time metric update: ", updatedMetric);
+        console.log("[MetricContext] Real-time metric update: ", cleaned);
     });
 
     useDataUpdateSubscription((dataUpdate) => {
