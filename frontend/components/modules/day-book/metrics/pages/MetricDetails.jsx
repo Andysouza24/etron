@@ -1,4 +1,4 @@
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { Card, Chip, useTheme } from "react-native-paper";
 import TextField from "../../../../common/input/TextField";
 import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
@@ -32,7 +32,7 @@ export default function MetricDetails({
     const theme = useTheme();
 
     return (
-        <ScrollView>
+        <View>
             <TextField
                 label="Metric Name"
                 placeholder="Metric Name"
@@ -123,6 +123,6 @@ export default function MetricDetails({
                     setBoxTimePeriod={setBoxTimePeriod}
                 />
             </View>
-        </ScrollView>
+        </View>
     );
 }
