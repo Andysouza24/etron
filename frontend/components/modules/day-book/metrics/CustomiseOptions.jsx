@@ -9,10 +9,25 @@ export default function CustomiseOptions({
     setSelectedMetric,
     maxValue,
     setMaxValue,
+    capPercentAt100,
+    setCapPercentAt100,
     boxGrouping,
     setBoxGrouping,
     boxTimePeriod,
     setBoxTimePeriod,
+    pieLabelPlacement,
+    setPieLabelPlacement,
+    rounding,
+    setRounding,
+    numberFormat,
+    setNumberFormat,
+    percentRounding,
+    setPercentRounding,
+    axisNumberFormat,
+    setAxisNumberFormat,
+    rawGraphData,
+    boxUseRawData,
+    setBoxUseRawData,
 }) {
     const [view, setView] = useState("menu");
 
@@ -26,10 +41,25 @@ export default function CustomiseOptions({
                     setSelectedMetric={setSelectedMetric}
                     maxValue={maxValue}
                     setMaxValue={setMaxValue}
+                    capPercentAt100={capPercentAt100}
+                    setCapPercentAt100={setCapPercentAt100}
                     boxGrouping={boxGrouping}
                     setBoxGrouping={setBoxGrouping}
                     boxTimePeriod={boxTimePeriod}
                     setBoxTimePeriod={setBoxTimePeriod}
+                    pieLabelPlacement={pieLabelPlacement}
+                    setPieLabelPlacement={setPieLabelPlacement}
+                    rounding={rounding}
+                    setRounding={setRounding}
+                    numberFormat={numberFormat}
+                    setNumberFormat={setNumberFormat}
+                    percentRounding={percentRounding}
+                    setPercentRounding={setPercentRounding}
+                    axisNumberFormat={axisNumberFormat}
+                    setAxisNumberFormat={setAxisNumberFormat}
+                    rawGraphData={rawGraphData}
+                    boxUseRawData={boxUseRawData}
+                    setBoxUseRawData={setBoxUseRawData}
                 />
             );
         }

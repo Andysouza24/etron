@@ -1,5 +1,6 @@
-import { View } from "react-native";
-import { Card, Chip, useTheme } from "react-native-paper";
+import { useState } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { Card, Chip, IconButton, useTheme } from "react-native-paper";
 import TextField from "../../../../common/input/TextField";
 import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
 import ColorPicker from "react-native-wheel-color-picker";
@@ -24,21 +25,56 @@ export default function MetricDetails({
     setSelectedMetric,
     maxValue,
     setMaxValue,
+    capPercentAt100,
+    setCapPercentAt100,
     boxGrouping,
     setBoxGrouping,
     boxTimePeriod,
     setBoxTimePeriod,
+    pieLabelPlacement,
+    setPieLabelPlacement,
+    rounding,
+    setRounding,
+    numberFormat,
+    setNumberFormat,
+    percentRounding,
+    setPercentRounding,
+    axisNumberFormat,
+    setAxisNumberFormat,
+    rawGraphData,
+    boxUseRawData,
+    setBoxUseRawData,
 }) {
     const theme = useTheme();
+    const [isNameSaved, setIsNameSaved] = useState(false);
+
+    const handleSaveName = () => {
+        if (metricName.trim()) {
+            setIsNameSaved(true);
+        }
+    };
 
     return (
         <View>
-            <TextField
-                label="Metric Name"
-                placeholder="Metric Name"
-                onChangeText={setMetricName}
-                value={metricName}
-            />
+            {isNameSaved ? (
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "bold", color: theme.colors.text, flex: 1 }}>
+                        {metricName}
+                    </Text>
+                    <IconButton icon="pencil" size={20} onPress={() => setIsNameSaved(false)} />
+                </View>
+            ) : (
+                <TextField
+                    label="Metric Name"
+                    placeholder="Metric Name"
+                    onChangeText={setMetricName}
+                    value={metricName}
+                    customRightButton={!!metricName.trim()}
+                    rightButtonIcon="check"
+                    rightButtonPress={handleSaveName}
+                    onBlur={handleSaveName}
+                />
+            )}
 
             {dependentVariables.length > 0 && (
                 <View style={metricStepStyles.chipRow}>
@@ -102,8 +138,16 @@ export default function MetricDetails({
                                     yKeys={yKeys}
                                     colours={coloursState}
                                     maxValue={maxValue}
+                                    capPercentAt100={capPercentAt100}
                                     boxGrouping={boxGrouping}
                                     boxTimePeriod={boxTimePeriod}
+                                    pieLabelPlacement={pieLabelPlacement}
+                                    rounding={rounding}
+                                    numberFormat={numberFormat}
+                                    percentRounding={percentRounding}
+                                    axisNumberFormat={axisNumberFormat}
+                                    rawGraphData={rawGraphData}
+                                    boxUseRawData={boxUseRawData}
                                 />
                             </View>
                         </ViewShot>
@@ -117,10 +161,25 @@ export default function MetricDetails({
                     setSelectedMetric={setSelectedMetric}
                     maxValue={maxValue}
                     setMaxValue={setMaxValue}
+                    capPercentAt100={capPercentAt100}
+                    setCapPercentAt100={setCapPercentAt100}
                     boxGrouping={boxGrouping}
                     setBoxGrouping={setBoxGrouping}
                     boxTimePeriod={boxTimePeriod}
                     setBoxTimePeriod={setBoxTimePeriod}
+                    pieLabelPlacement={pieLabelPlacement}
+                    setPieLabelPlacement={setPieLabelPlacement}
+                    rounding={rounding}
+                    setRounding={setRounding}
+                    numberFormat={numberFormat}
+                    setNumberFormat={setNumberFormat}
+                    percentRounding={percentRounding}
+                    setPercentRounding={setPercentRounding}
+                    axisNumberFormat={axisNumberFormat}
+                    setAxisNumberFormat={setAxisNumberFormat}
+                    rawGraphData={rawGraphData}
+                    boxUseRawData={boxUseRawData}
+                    setBoxUseRawData={setBoxUseRawData}
                 />
             </View>
         </View>
