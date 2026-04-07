@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { API, graphqlOperation } from "aws-amplify";
-import { onMetricUpdated } from "../../graphql/subscriptions";
+import { onMetricUpdate } from "../../graphql/subscriptions";
 import { getWorkspaceId } from "../../../../storage/workspaceStorage";
+import { generateClient } from "aws-amplify/api";
 
-export default function useMetricsSubscription(onUpdate) {
+const client = generateClient();
+
+export default function useMetricSubscription(onUpdate) {
   useEffect(() => {
     let subscription;
 
@@ -11,11 +13,12 @@ export default function useMetricsSubscription(onUpdate) {
       try {
         const workspaceId = await getWorkspaceId();
 
-        subscription = API.graphql(
-          graphqlOperation(onMetricUpdated, { workspaceId })
-        ).subscribe({
-          next: ({ value }) => {
-            const updatedMetric = value.data.onMetricUpdated;
+        subscription = client.graphql({
+          query: onMetricUpdate,
+          variables: { workspaceId },
+        }).subscribe({
+          next: ({ data }) => {
+            const updatedMetric = data.onMetricUpdate;
             onUpdate(updatedMetric);
           },
           error: (err) => console.error("Subscription error:", err),

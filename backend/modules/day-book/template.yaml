@@ -699,5 +699,38 @@ Resources:
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
-
-  
+  DataUpdateNotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./data-sources/functions/data-update-notifier
+      Handler: dataUpdateHandler.handler
+      Timeout: 30
+      Environment:
+        Variables:
+          APPSYNC_URL: !Ref AppSyncUrl
+          APPSYNC_API_KEY: !Ref AppSyncApiKey
+          WORKSPACE_BUCKET: !Ref WorkspaceBucketName
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: DataSources
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub arn:aws:s3:::${WorkspaceBucketName}/*
+      Events:
+        S3DataUpdate:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - "Object Created"
+              detail:
+                bucket:
+                  name:
+                    - !Ref WorkspaceBucketName
+                object:
+                  key:
+                    - prefix: "workspaces/"

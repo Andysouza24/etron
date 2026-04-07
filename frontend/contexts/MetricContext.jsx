@@ -1,6 +1,6 @@
 import metricService from "../services/MetricService";
 import { useRef, useCallback, useMemo, createContext, useContext, useState } from "react";
-// import useMetricSubscription from "../hooks/modules/day_book/useMetricSubscription";
+import useMetricSubscription from "../hooks/modules/day_book/metrics/useMetricSubscription";
 
 const MetricContext = createContext(null);
 
@@ -102,7 +102,7 @@ export function MetricProvider({ children }) {
 
     // TODO: wire up useMetricSubscription to auto-update list on real-time events
     // the hook provides a single onUpdate callback for all metric changes
-    /*useMetricSubscription((updatedMetric) => {
+    useMetricSubscription((updatedMetric) => {
         setMetrics(prev => {
             const exists = prev.find(m => m.metricId === updatedMetric.metricId);
             if (exists) {
@@ -114,7 +114,7 @@ export function MetricProvider({ children }) {
             }
         });
         console.log("[MetricContext] Real-time metric update: ", updatedMetric);
-    });*/
+    });
 
     // filter metrics by type
     const filteredMetrics = useMemo(() => {
