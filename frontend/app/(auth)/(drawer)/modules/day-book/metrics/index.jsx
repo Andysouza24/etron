@@ -7,47 +7,37 @@ import Header from "../../../../../../components/layout/Header.jsx";
 import { useRouter } from "expo-router";
 import { Text, useTheme, Card } from "react-native-paper";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { getWorkspaceId } from "../../../../../../storage/workspaceStorage.jsx";
 import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types.jsx";
-import endpoints from "../../../../../../utils/api/endpoints.js";
-import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import { getCurrentUser } from "aws-amplify/auth";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen.jsx";
 import { hasPermission } from "../../../../../../utils/permissions.js";
 import { FlatList } from "react-native-gesture-handler";
+import { useMetricContext } from "../../../../../../contexts/MetricContext";
 
 const MetricManagement = () => {
     const router = useRouter();
     const theme = useTheme();
-    const [metricsUser, setMetricsUser] = useState([]);
-    const [metricsOther, setMetricsOther] = useState([]);
-    const [loadingMetrics, setLoadingMetrics] = useState(true);
+    const { metrics, loading, ensureMetrics, refresh } = useMetricContext();
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [refreshing, setRefreshing] = useState(false);
     const [manageMetricsPermission, setManageMetricsPermission] = useState(false);
 
-    const getWorkspaceMetrics = useCallback(async () => {
-        const workspaceId = await getWorkspaceId();
-
-        let metricData;
-        try {
-            const metricDataResult = await apiGet(
-                endpoints.modules.day_book.metrics.getMetrics,
-                { workspaceId }
-            );
-            metricData = metricDataResult.data;
-        } catch (error) {
-            console.error("Error getting workspace metrics:", error);
-            return;
-        }
-
-        const { userId } = await getCurrentUser();
-        setMetricsUser(metricData.filter(metric => metric.createdBy == userId))
-        setMetricsOther(metricData.filter(metric => metric.createdBy != userId))
-
-        setLoadingMetrics(false);
-        setRefreshing(false);
+    useEffect(() => {
+        loadPermission();
+        ensureMetrics();
+        getCurrentUser().then(({ userId }) => setCurrentUserId(userId)).catch(() => {});
     }, []);
+
+    const metricsUser = useMemo(() => {
+        if (!currentUserId) return [];
+        return metrics.filter(metric => metric.createdBy == currentUserId);
+    }, [metrics, currentUserId]);
+
+    const metricsOther = useMemo(() => {
+        if (!currentUserId) return [];
+        return metrics.filter(metric => metric.createdBy != currentUserId);
+    }, [metrics, currentUserId]);
 
     const filteredUser = useMemo(() => {
         const query = (searchQuery || "").trim().toLowerCase();
@@ -61,20 +51,16 @@ const MetricManagement = () => {
         return metricsOther.filter(metric => (metric.name ?? "").toLowerCase().includes(query));
     }, [metricsOther, searchQuery]);
 
-    useEffect(() => {
-        loadPermission();
-        getWorkspaceMetrics();
-    }, [])
-
     async function loadPermission() {
         const manageMetricsPermission = await hasPermission("modules.daybook.metrics.manage_metrics");
         setManageMetricsPermission(manageMetricsPermission);
     }
 
-    const onRefresh = useCallback(() => {
+    const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        getWorkspaceMetrics();
-    }, [getWorkspaceMetrics]);
+        await refresh();
+        setRefreshing(false);
+    }, [refresh]);
 
     return (
         <ResponsiveScreen
@@ -105,7 +91,7 @@ const MetricManagement = () => {
                     alwaysBounceVertical = {true}
                     overScrollMode = "always"
                 >
-                    {loadingMetrics ? <ActivityIndicator size={"large"}/> :
+                    {loading ? <ActivityIndicator size={"large"}/> :
                         <View style={{ paddingHorizontal: 20, gap: 30 }}>
                             <Text style={{ fontSize: 16, color: theme.colors.placeholderText}}>
                                 Created by you

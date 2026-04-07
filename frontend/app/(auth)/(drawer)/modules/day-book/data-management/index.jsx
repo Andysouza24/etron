@@ -11,6 +11,7 @@ import endpoints from "../../../../../../utils/api/endpoints";
 import { apiGet, apiPut, apiDelete, apiPost } from "../../../../../../utils/api/apiClient";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
+import { useDataSourceContext } from "../../../../../../contexts/DataSourceContext";
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import PermissionGate from "../../../../../../components/common/PermissionGate";
@@ -99,10 +100,11 @@ const DataConnectionCard = ({
 };
 
 const DataManagement = () => {
-	const [dataSourcesList, setDataSourcesList] = useState([]);
-	const [loading, setLoading] = useState(true);
-	const [hasError, setHasError] = useState(false);
-	const [error, setError] = useState("");
+	const { dataSources: ctxDataSources, system, refreshDataSources: ctxRefresh } = useDataSourceContext();
+	const dataSourcesList = ctxDataSources.list;
+	const loading = system.isLoading && dataSourcesList.length === 0;
+	const hasError = system.hasError;
+	const error = system.error || "";
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [lastManualRefresh, setLastManualRefresh] = useState(0);
 	const [uploadingMap, setUploadingMap] = useState({});
@@ -130,25 +132,15 @@ const DataManagement = () => {
 	const MODAL_MAX_H = Math.min(height * 0.8, 520);
 
 	const fetchDataSources = useCallback(async () => {
-		setHasError(false);
-		setError("");
 		try {
-			const workspaceId = await getWorkspaceId();
-			setWorkspaceId(workspaceId);
-
-			const result = await apiGet(endpoints.modules.day_book.data_sources.getDataSources, {workspaceId});
-
-			setDataSourcesList(result.data);
-			console.log("Fetched data sources:", result.data);
-			prevCountRef.current = result.data.length;
+			const wid = await getWorkspaceId();
+			setWorkspaceId(wid);
+			await ctxRefresh();
+			prevCountRef.current = dataSourcesList.length;
 		} catch (error) {
 			console.error("Error fetching data sources", error);
-			setHasError(true);
-			setError(error);
-		} finally {
-			setLoading(false);
 		}
-  	}, [workspaceId]);
+  	}, [ctxRefresh, dataSourcesList.length]);
 
 	useFocusEffect(
 		useCallback(() => {

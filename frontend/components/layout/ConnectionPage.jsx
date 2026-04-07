@@ -13,7 +13,7 @@ import CollapsibleList from "./CollapsibleList";
 import Divider from "./Divider";
 
 import { commonStyles } from "../../assets/styles/stylesheets/common";
-import { useApp } from "../../contexts/AppContext";
+import { useDataSourceContext } from "../../contexts/DataSourceContext";
 import { createDataAdapter } from "../../adapters/day-book/data-sources";
 import { apiPost } from "../../utils/api/apiClient";
 import endpoints from "../../utils/api/endpoints";
@@ -66,8 +66,8 @@ const ConnectionPage = ({
   const theme = useTheme();
   const {
   dataSources: { list: dataSources },
-  actions: { connectDataSource, testConnection: testDataSourceConnection },
-  } = useApp();
+  connectDataSource, testConnection: testDataSourceConnection,
+  } = useDataSourceContext();
 
   // State
   const [formData, setFormData] = useState({});
