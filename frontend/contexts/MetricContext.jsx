@@ -1,6 +1,7 @@
 import metricService from "../services/MetricService";
 import { useRef, useCallback, useMemo, createContext, useContext, useState } from "react";
 import useMetricSubscription from "../hooks/modules/day_book/metrics/useMetricSubscription";
+import useDataUpdateSubscription from "../hooks/modules/day_book/data-sources/useDataUpdateSubscription";
 
 const MetricContext = createContext(null);
 
@@ -21,7 +22,7 @@ export function MetricProvider({ children }) {
             setError(null);
             const result = await serviceRef.current.getMetrics();
             setMetrics(result.data ?? result ?? []);
-            console.log("[MetricContext] Metrics loaded successfully: ", result);
+            console.log("[MetricContext] Metrics loaded successfully:", result.data?.length ?? 0, "metrics");
         } catch (err) {
             console.error("[MetricContext] Error loading metrics: ", err);
             setError(err);
@@ -114,6 +115,12 @@ export function MetricProvider({ children }) {
             }
         });
         console.log("[MetricContext] Real-time metric update: ", updatedMetric);
+    });
+
+    useDataUpdateSubscription((dataUpdate) => {
+        // trigger silent refresh to pick up new metric data
+        loadMetrics(false);
+        console.log("[MetricContext] Data update for data source:", dataUpdate.dataSourceId, "affecting metrics:", dataUpdate.metrics);
     });
 
     // filter metrics by type
