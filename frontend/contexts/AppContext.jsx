@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import DataSourceService from "../services/DataSourceService";
 import apiClient from "../utils/api/apiClient";
+import useDataSourceSubscription from '../hooks/modules/day_book/data-sources/useDataSourceSubscription';
 
 const AppContext = createContext({});
 
@@ -61,6 +62,25 @@ export function AppProvider({ children }) {
     /*useEffect(() => {
         refreshDataSources();
     }, [refreshDataSources]);*/
+
+    // real time data source updates
+    useDataSourceSubscription((updatedDataSource) => {
+        setDataSources(prev => {
+            const newList = prev.list.map(ds =>
+                ds.dataSourceId === updatedDataSource.dataSourceId
+                    ? { ...ds, ...updatedDataSource }
+                    : ds
+            );
+            const exists = prev.list.some(ds => ds.dataSourceId === updatedDataSource.dataSourceId);
+            const list = exists ? newList : [...prev.list, updatedDataSource];
+            return {
+                ...prev,
+                ...recomputeDataSources(list),
+                updateTrigger: prev.updateTrigger + 1,
+            };
+        });
+        console.log("[AppContext] Real-time data source update:", updatedDataSource);
+    });
 
     return (
         <AppContext.Provider value={{
