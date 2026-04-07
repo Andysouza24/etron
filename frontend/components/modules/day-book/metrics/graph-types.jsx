@@ -1,14 +1,51 @@
 import React, { useState } from "react";
-import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram } from "victory-native";
+import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram, VictoryLabel } from "victory-native";
 import { Text, View } from "react-native";
 
+//TODO: move formatting functions into a separate utils file
+//TODO: consider moving graphs into separate files for better organization and maintainability
+//TODO: fix box plot grouping logic
 
-function formatTickValue(t) {
+function formatTickValue(t, numberFormat) {
     if (typeof t === "string") return t;
+    if (typeof t !== "number" || !Number.isFinite(t)) return t;
+    const prefix = numberFormat?.currencySymbol ?? "";
     const abs = Math.abs(t);
-    if (abs >= 1e6) return `${(t / 1e6).toFixed(1)}M`;
-    if (abs >= 1e3) return `${(t / 1e3).toFixed(0)}K`;
-    return t;
+    if (abs >= 1e9) {
+        const val = t / 1e9;
+        return `${prefix}${parseFloat(val.toPrecision(3))}B`;
+    }
+    if (abs >= 1e6) {
+        const val = t / 1e6;
+        return `${prefix}${parseFloat(val.toPrecision(3))}M`;
+    }
+    if (abs >= 1e4) {
+        const val = t / 1e3;
+        return `${prefix}${parseFloat(val.toPrecision(3))}K`;
+    }
+    if (abs >= 1e3) {
+        return prefix + parseFloat(t.toPrecision(4)).toLocaleString();
+    }
+    if (Number.isInteger(t)) return prefix + t;
+    return prefix + parseFloat(t.toPrecision(3));
+}
+
+function formatValueWithRounding(value, rounding, numberFormat) {
+    const num = typeof value === "number" ? value : parseNumericValue(value);
+    if (num == null || !Number.isFinite(num)) return String(value ?? "");
+    const mode = rounding?.mode ?? "none";
+    if (mode === "bestFit") {
+        return formatTickValue(num, numberFormat);
+    }
+    const dp = mode === "round" ? (rounding?.decimalPlaces ?? 2) : null;
+    if (numberFormat) {
+        return formatNumberDisplay(num, { ...numberFormat, decimalPlaces: dp });
+    }
+    if (mode === "round") {
+        return num.toFixed(dp);
+    }
+    // "none" — full value
+    return String(num);
 }
 
 function parseNumericValue(value) {
@@ -26,6 +63,92 @@ function formatTimestamp(value) {
     return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function formatNumberDisplay(value, format = {}) {
+    const {
+        currencySymbol = "",
+        thousandsSeparator = ",",
+        decimalSeparator = ".",
+        decimalPlaces = null,
+    } = format;
+
+    const num = parseNumericValue(value);
+    if (num == null) return String(value ?? "");
+
+    let str;
+    if (decimalPlaces != null) {
+        str = Math.abs(num).toFixed(decimalPlaces);
+    } else {
+        str = String(Math.abs(num));
+    }
+
+    const [intPart, decPart] = str.split(".");
+    let formattedInt = intPart;
+    if (thousandsSeparator) {
+        formattedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+    }
+
+    let result = formattedInt;
+    if (decPart !== undefined) {
+        result += decimalSeparator + decPart;
+    }
+
+    return (num < 0 ? "-" : "") + currencySymbol + result;
+}
+
+function formatPercentDisplay(percent, percentRounding) {
+    if (percent == null || !Number.isFinite(percent)) return "0%";
+    const mode = percentRounding?.mode ?? "none";
+    if (mode === "round") {
+        const dp = percentRounding?.decimalPlaces ?? 1;
+        return `${percent.toFixed(dp)}%`;
+    }
+    if (mode === "bestFit") {
+        return `${formatTickValue(percent)}%`;
+    }
+    // "none" — strip trailing zeros
+    const str = String(parseFloat(percent.toPrecision(10)));
+    return `${str}%`;
+}
+
+function computeBoxStats(values) {
+    if (!values || values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const len = sorted.length;
+    const percentile = (p) => {
+        const idx = (p / 100) * (len - 1);
+        const lower = Math.floor(idx);
+        const upper = Math.ceil(idx);
+        if (lower === upper) return sorted[lower];
+        return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
+    };
+    return {
+        min: sorted[0],
+        q1: percentile(25),
+        median: percentile(50),
+        q3: percentile(75),
+        max: sorted[len - 1],
+    };
+}
+
+function computeYDomain(data, yKeys) {
+    const safeYKeys = Array.isArray(yKeys) ? yKeys : yKeys ? [yKeys] : [];
+    let maxVal = -Infinity;
+    let minVal = Infinity;
+    data.forEach((row) => {
+        safeYKeys.forEach((yKey) => {
+            const num = parseNumericValue(row?.[yKey]);
+            if (num != null) {
+                if (num > maxVal) maxVal = num;
+                if (num < minVal) minVal = num;
+            }
+        });
+    });
+    if (!Number.isFinite(maxVal)) return undefined;
+    const yMin = Math.min(0, minVal);
+    const yMax = maxVal * 1.05;
+    return [yMin, yMax];
+}
+
 function toDate(value) {
     if (value == null) return null;
     const date = new Date(value);
@@ -34,28 +157,38 @@ function toDate(value) {
 
 function getTimePeriodLabel(date, timePeriod) {
     const year = date.getFullYear();
+    if (timePeriod === "date") return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
     if (timePeriod === "year") return `${year}`;
     if (timePeriod === "quarter") return `Q${Math.floor(date.getMonth() / 3) + 1} ${year}`;
     return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
-function getBoxPlotData({ data, xKey, yKeys, boxGrouping = "yKey", boxTimePeriod = "month" }) {
+function getBoxPlotData({ data, xKey, yKeys, boxGrouping = "all", boxTimePeriod = "date" }) {
     const safeYKeys = Array.isArray(yKeys) ? yKeys : yKeys ? [yKeys] : [];
 
-    if (boxGrouping === "xValue") {
-        const grouped = new Map();
+    if (boxGrouping === "all") {
+        const allValues = [];
         data.forEach((row) => {
-            const label = row?.[xKey];
-            if (label == null) return;
-            if (!grouped.has(label)) grouped.set(label, []);
             safeYKeys.forEach((yKey) => {
                 const num = parseNumericValue(row?.[yKey]);
-                if (num != null) grouped.get(label).push(num);
+                if (num != null) allValues.push(num);
             });
         });
-        return [...grouped.entries()]
-            .filter(([, values]) => values.length > 0)
-            .map(([label, values]) => ({ x: String(label), y: values }));
+        const stats = computeBoxStats(allValues);
+        if (!stats) return [];
+        return [{ x: "All", ...stats }];
+    }
+
+    if (boxGrouping === "individual") {
+        const points = [];
+        data.forEach((row) => {
+            const xVal = row?.[xKey];
+            safeYKeys.forEach((yKey) => {
+                const num = parseNumericValue(row?.[yKey]);
+                if (num != null) points.push({ x: String(xVal ?? ""), y: num });
+            });
+        });
+        return points;
     }
 
     if (boxGrouping === "timePeriod") {
@@ -72,17 +205,23 @@ function getBoxPlotData({ data, xKey, yKeys, boxGrouping = "yKey", boxTimePeriod
         });
         return [...grouped.entries()]
             .filter(([, values]) => values.length > 0)
-            .map(([label, values]) => ({ x: label, y: values }));
+            .map(([label, values]) => {
+                const stats = computeBoxStats(values);
+                return { x: label, ...stats };
+            });
     }
 
+    // fallback: per yKey
     return safeYKeys
-        .map((yKey) => ({
-            x: yKey,
-            y: data
+        .map((yKey) => {
+            const values = data
                 .map((row) => parseNumericValue(row?.[yKey]))
-                .filter((num) => num != null),
-        }))
-        .filter((entry) => entry.y.length > 0);
+                .filter((num) => num != null);
+            const stats = computeBoxStats(values);
+            if (!stats) return null;
+            return { x: yKey, ...stats };
+        })
+        .filter(Boolean);
 }
 
 
@@ -93,10 +232,12 @@ const GraphTypes = {
         label: "Line Chart",
         value: "line",
         previewImage: require("../../../../assets/images/lineChart.png"),
-        render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
+        render: ({ data, xKey, yKeys, colours, axisColorMode = "light", rounding, numberFormat, axisNumberFormat }) => {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const yDomain = computeYDomain(data, yKeys);
+                const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
                         style={{ flex: 1 }}
@@ -111,6 +252,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
+                                domain={yDomain ? { y: yDomain } : undefined}
                                 padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
@@ -125,7 +267,7 @@ const GraphTypes = {
                                 />
                                 <VictoryAxis
                                     dependentAxis
-                                    tickFormat={formatTickValue}
+                                    tickFormat={(t) => formatTickValue(t, axisFormat)}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -159,10 +301,12 @@ const GraphTypes = {
         label: "Bar Chart",
         value: "bar",
         previewImage: require("../../../../assets/images/barChart.png"),
-        render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
+        render: ({ data, xKey, yKeys, colours, axisColorMode = "light", rounding, numberFormat, axisNumberFormat }) => {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const yDomain = computeYDomain(data, yKeys);
+                const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
                         style={{ flex: 1 }}
@@ -178,6 +322,7 @@ const GraphTypes = {
                                 theme={VictoryTheme.clean}
                                 domainPadding={{ x: 25, y: 10 }}
                                 scale={{ x: "linear", y: "linear" }}
+                                domain={yDomain ? { y: yDomain } : undefined}
                                 padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
@@ -192,7 +337,7 @@ const GraphTypes = {
                                 />
                                 <VictoryAxis
                                     dependentAxis
-                                    tickFormat={formatTickValue}
+                                    tickFormat={(t) => formatTickValue(t, axisFormat)}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -226,7 +371,7 @@ const GraphTypes = {
     label: "Pie Chart",
     value: "pie",
     previewImage: require("../../../../assets/images/pieChart.png"),
-    render: ({ data, xKey, yKeys, colours, axisColorMode = "light", backgroundMode = "transparent" }) => {
+    render: ({ data, xKey, yKeys, colours, axisColorMode = "light", backgroundMode = "transparent", pieLabelPlacement = "outside", rounding, numberFormat }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
             const axisColor = axisColorMode === "dark" ? "white" : "black";
@@ -237,6 +382,8 @@ const GraphTypes = {
                 y: parseNumericValue(d[yKey]), // value
             })).filter((d) => d.y != null);
 
+            const isInside = pieLabelPlacement === "inside";
+
             return (
                 <View
                     style={{ flex: 1, backgroundColor: backgroundMode === "transparent" ? "transparent" : backgroundMode }}
@@ -246,25 +393,79 @@ const GraphTypes = {
                     }}
                 >
                     {size.width > 0 && size.height > 0 && (
-                        <VictoryPie
-                            width={size.width}
-                            height={size.height}
-                            theme={VictoryTheme.clean}
-                            data={chartData}
-                            colorScale={colours && colours.length > 0 ? colours : "qualitative"}
-                            labels={({ datum }) => `${formatTimestamp(datum.x)}\n${formatTickValue(datum.y)}`} // value on new line
-                            style={{
-                                labels: {
-                                    fontSize: 12,
-                                    fill: axisColor,
-                                    textAnchor: "middle",
-                                },
-                                parent: {
-                                    backgroundColor: "transparent", // ensures pie chart itself has no white background
-                                },
-                            }}
-                            padding={{ top: 30, bottom: 40, left: 40, right: 40 }}
-                        />
+                        <>
+                            {isInside ? (
+                                <>
+                                    {/* date labels - always outside */}
+                                    <VictoryPie
+                                        width={size.width}
+                                        height={size.height}
+                                        theme={VictoryTheme.clean}
+                                        data={chartData}
+                                        colorScale={colours && colours.length > 0 ? colours : "qualitative"}
+                                        labels={({ datum }) => formatTimestamp(datum.x)}
+                                        style={{
+                                            labels: {
+                                                fontSize: 11,
+                                                fill: axisColor,
+                                                fontWeight: "normal",
+                                                textAnchor: "middle",
+                                            },
+                                            parent: { backgroundColor: "transparent" },
+                                        }}
+                                        padding={{ top: 30, bottom: 40, left: 40, right: 40 }}
+                                        containerComponent={<VictoryContainer responsive={false} />}
+                                    />
+                                    {/* value labels - inside slices */}
+                                    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+                                        <VictoryPie
+                                            width={size.width}
+                                            height={size.height}
+                                            theme={VictoryTheme.clean}
+                                            data={chartData}
+                                            colorScale={colours && colours.length > 0 ? colours : "qualitative"}
+                                            labels={({ datum }) => formatValueWithRounding(datum.y, rounding, numberFormat)}
+                                            labelRadius={Math.min(size.width, size.height) * 0.22}
+                                            style={{
+                                                data: { fill: "transparent", stroke: "transparent" },
+                                                labels: {
+                                                    fontSize: 10,
+                                                    fill: axisColor,
+                                                    fontWeight: "bold",
+                                                    textAnchor: "middle",
+                                                },
+                                                parent: { backgroundColor: "transparent" },
+                                            }}
+                                            padding={{ top: 30, bottom: 40, left: 40, right: 40 }}
+                                            containerComponent={<VictoryContainer responsive={false} />}
+                                        />
+                                    </View>
+                                </>
+                            ) : (
+                                /* outside mode: single VictoryPie with stacked date + value labels */
+                                <VictoryPie
+                                    width={size.width}
+                                    height={size.height}
+                                    theme={VictoryTheme.clean}
+                                    data={chartData}
+                                    colorScale={colours && colours.length > 0 ? colours : "qualitative"}
+                                    labels={({ datum }) => [formatTimestamp(datum.x), formatValueWithRounding(datum.y, rounding, numberFormat)]}
+                                    labelComponent={
+                                        <VictoryLabel
+                                            style={[
+                                                { fontSize: 11, fill: axisColor, fontWeight: "normal" },
+                                                { fontSize: 12, fill: axisColor, fontWeight: "bold" },
+                                            ]}
+                                        />
+                                    }
+                                    style={{
+                                        parent: { backgroundColor: "transparent" },
+                                    }}
+                                    padding={{ top: 30, bottom: 40, left: 40, right: 40 }}
+                                    containerComponent={<VictoryContainer responsive={false} />}
+                                />
+                            )}
+                        </>
                     )}
                 </View>
             );
@@ -277,10 +478,12 @@ const GraphTypes = {
         label: "Area Chart",
         value: "area",
         previewImage: require("../../../../assets/images/areaChart.png"),
-        render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
+        render: ({ data, xKey, yKeys, colours, axisColorMode = "light", rounding, numberFormat, axisNumberFormat }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const yDomain = computeYDomain(data, yKeys);
+                const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
                         style={{ flex: 1 }}
@@ -295,6 +498,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
+                                domain={yDomain ? { y: yDomain } : undefined}
                                 padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
@@ -312,7 +516,7 @@ const GraphTypes = {
                                 {/* Y Axis */}
                                 <VictoryAxis
                                     dependentAxis
-                                    tickFormat={formatTickValue}
+                                    tickFormat={(t) => formatTickValue(t, axisFormat)}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -353,10 +557,12 @@ const GraphTypes = {
         label: "Scatter Plot",
         value: "scatter",
         previewImage: require("../../../../assets/images/scatterPlot.png"),
-        render: ({ data, xKey, yKeys, colours, axisColorMode = "light" }) => {
+        render: ({ data, xKey, yKeys, colours, axisColorMode = "light", rounding, numberFormat, axisNumberFormat }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const yDomain = computeYDomain(data, yKeys);
+                const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
                     style={{ flex: 1 }}
@@ -371,6 +577,7 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 scale={{ x: "linear", y: "linear" }}
+                                domain={yDomain ? { y: yDomain } : undefined}
                                 padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
@@ -388,7 +595,7 @@ const GraphTypes = {
                                 {/* Y Axis */}
                                 <VictoryAxis
                                     dependentAxis
-                                    tickFormat={formatTickValue}
+                                    tickFormat={(t) => formatTickValue(t, axisFormat)}
                                     style={{
                                         axis: { stroke: axisColor },
                                         ticks: { stroke: axisColor },
@@ -423,82 +630,74 @@ const GraphTypes = {
     box: {
         label: "Box Plot",
         value: "box",
-              previewImage: require("../../../../assets/images/boxPlot.png"),
-                render: ({ data, xKey, yKeys, colours, axisColorMode = "light", boxGrouping = "yKey", boxTimePeriod = "month" }) => {
-            const ChartComponent = () => {
-              const [size, setSize] = React.useState({ width: 0, height: 0 });
-                const axisColor = axisColorMode === "dark" ? "white" : "black";
-                                const boxData = getBoxPlotData({ data, xKey, yKeys, boxGrouping, boxTimePeriod });
-              return (
-                <View
-                    style={{ flex: 1 }}
-                    onLayout={(event) => {
-                        const { width, height } = event.nativeEvent.layout;
-                        setSize({ width, height });
-                    }}
-                >
-                    {size.width > 0 && size.height > 0 && (
-                        <VictoryChart
-                            width={size.width}
-                            height={size.height}
-                            theme={VictoryTheme.clean}
-                            domainPadding={20}
-                            padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
-                            containerComponent={<VictoryContainer responsive={false} />}
-                        >
-                            {/* X Axis */}
-                            <VictoryAxis
-                                style={{
-                                    axis: { stroke: axisColor },
-                                    ticks: { stroke: axisColor },
-                                    tickLabels: { fill: axisColor, fontSize: 10, padding: 5, angle: 45, textAnchor: "start" },
-                                    axisLabel: { fill: axisColor, fontSize: 12, padding: 30 },
-                                }}
-                            />
-                            {/* Y Axis */}
-                            <VictoryAxis
-                                dependentAxis
-                                tickFormat={formatTickValue}
-                                style={{
-                                    axis: { stroke: axisColor },
-                                    ticks: { stroke: axisColor },
-                                    tickLabels: { fill: axisColor, fontSize: 10, padding: 5 },
-                                    axisLabel: { fill: axisColor, fontSize: 12, padding: 40 },
-                                }}
-                            />
-
-                            <VictoryBoxPlot
-                                data={boxData}
-                                style={{
-                                    min: { stroke: colours[0] || "blue" },
-                                    max: { stroke: colours[0] || "blue" },
-                                    q1: { fill: colours[0] || "blue", fillOpacity: 0.3 },
-                                    q3: { fill: colours[0] || "blue", fillOpacity: 0.3 },
-                                    median: { stroke: colours[0] || "blue", strokeWidth: 2 },
-                                }}
-                            />
-                        </VictoryChart>
-                    )}
-                </View>
-              );
-            };
-          
-            return <ChartComponent />;
-        },
-    },
-
-    //NEEDS TO BE FIXED
-    histogram: {
-        label: "Histogram",
-        value: "histogram",
-        previewImage: require("../../../../assets/images/histogram.png"),
-        render: ({ data, xKey, colours, axisColorMode = "light" }) => {
+        previewImage: require("../../../../assets/images/boxPlot.png"),
+        render: ({ data, xKey, yKeys, colours, axisColorMode = "light", boxGrouping = "all", boxTimePeriod = "date", rounding, numberFormat, axisNumberFormat, rawGraphData, boxUseRawData }) => {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
-                const histogramData = data
-                    .map((d) => ({ x: toDate(d[xKey]) }))
-                    .filter((d) => d.x != null);
+                const axisFormat = axisNumberFormat ?? numberFormat;
+                const effectiveData = boxUseRawData && rawGraphData ? rawGraphData : data;
+                const boxData = getBoxPlotData({ data: effectiveData, xKey, yKeys, boxGrouping, boxTimePeriod });
+
+                if (!boxData || boxData.length === 0) {
+                    return (
+                        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                            <Text style={{ color: axisColor, textAlign: "center" }}>
+                                No data available for box plot.{"\n"}Ensure a numeric value field is selected.
+                            </Text>
+                        </View>
+                    );
+                }
+
+                if (boxGrouping === "individual") {
+                    return (
+                        <View
+                            style={{ flex: 1 }}
+                            onLayout={(event) => {
+                                const { width, height } = event.nativeEvent.layout;
+                                setSize({ width, height });
+                            }}
+                        >
+                            {size.width > 0 && size.height > 0 && (
+                                <VictoryChart
+                                    width={size.width}
+                                    height={size.height}
+                                    theme={VictoryTheme.clean}
+                                    domainPadding={20}
+                                    padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
+                                    containerComponent={<VictoryContainer responsive={false} />}
+                                >
+                                    <VictoryAxis
+                                        style={{
+                                            axis: { stroke: axisColor },
+                                            ticks: { stroke: axisColor },
+                                            tickLabels: { fill: axisColor, fontSize: 10, padding: 5, angle: 45, textAnchor: "start" },
+                                            axisLabel: { fill: axisColor, fontSize: 12, padding: 30 },
+                                        }}
+                                    />
+                                    <VictoryAxis
+                                        dependentAxis
+                                        tickFormat={(t) => formatTickValue(t, axisFormat)}
+                                        style={{
+                                            axis: { stroke: axisColor },
+                                            ticks: { stroke: axisColor },
+                                            tickLabels: { fill: axisColor, fontSize: 10, padding: 5 },
+                                            axisLabel: { fill: axisColor, fontSize: 12, padding: 40 },
+                                        }}
+                                    />
+                                    <VictoryScatter
+                                        data={boxData}
+                                        size={4}
+                                        style={{
+                                            data: { fill: colours[0] || "blue" },
+                                        }}
+                                    />
+                                </VictoryChart>
+                            )}
+                        </View>
+                    );
+                }
+
                 return (
                     <View
                         style={{ flex: 1 }}
@@ -513,6 +712,87 @@ const GraphTypes = {
                                 height={size.height}
                                 theme={VictoryTheme.clean}
                                 domainPadding={20}
+                                padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
+                                containerComponent={<VictoryContainer responsive={false} />}
+                            >
+                                <VictoryAxis
+                                    style={{
+                                        axis: { stroke: axisColor },
+                                        ticks: { stroke: axisColor },
+                                        tickLabels: { fill: axisColor, fontSize: 10, padding: 5, angle: 45, textAnchor: "start" },
+                                        axisLabel: { fill: axisColor, fontSize: 12, padding: 30 },
+                                    }}
+                                />
+                                <VictoryAxis
+                                    dependentAxis
+                                    tickFormat={(t) => formatTickValue(t, axisFormat)}
+                                    style={{
+                                        axis: { stroke: axisColor },
+                                        ticks: { stroke: axisColor },
+                                        tickLabels: { fill: axisColor, fontSize: 10, padding: 5 },
+                                        axisLabel: { fill: axisColor, fontSize: 12, padding: 40 },
+                                    }}
+                                />
+                                <VictoryBoxPlot
+                                    data={boxData}
+                                    style={{
+                                        min: { stroke: colours[0] || "blue" },
+                                        max: { stroke: colours[0] || "blue" },
+                                        q1: { fill: colours[0] || "blue", fillOpacity: 0.3 },
+                                        q3: { fill: colours[0] || "blue", fillOpacity: 0.3 },
+                                        median: { stroke: colours[0] || "blue", strokeWidth: 2 },
+                                    }}
+                                />
+                            </VictoryChart>
+                        )}
+                    </View>
+                );
+            };
+
+            return <ChartComponent />;
+        },
+    },
+
+    histogram: {
+        label: "Histogram",
+        value: "histogram",
+        previewImage: require("../../../../assets/images/histogram.png"),
+        render: ({ data, xKey, colours, axisColorMode = "light" }) => {
+            const ChartComponent = () => {
+                const [size, setSize] = React.useState({ width: 0, height: 0 });
+                const axisColor = axisColorMode === "dark" ? "white" : "black";
+                const histogramData = data
+                    .map((d) => ({ x: toDate(d[xKey]) }))
+                    .filter((d) => d.x != null);
+
+                // compute explicit equal-width bin boundaries
+                //TODO: fix, test with better data
+                const binCount = 8;
+                let bins = binCount;
+                if (histogramData.length > 1) {
+                    const timestamps = histogramData.map((d) => d.x.getTime()).sort((a, b) => a - b);
+                    const minT = timestamps[0];
+                    const maxT = timestamps[timestamps.length - 1];
+                    if (maxT > minT) {
+                        const step = (maxT - minT) / binCount;
+                        bins = Array.from({ length: binCount + 1 }, (_, i) => new Date(minT + step * i));
+                    }
+                }
+
+                return (
+                    <View
+                        style={{ flex: 1 }}
+                        onLayout={(event) => {
+                            const { width, height } = event.nativeEvent.layout;
+                            setSize({ width, height });
+                        }}
+                    >
+                        {size.width > 0 && size.height > 0 && (
+                            <VictoryChart
+                                width={size.width}
+                                height={size.height}
+                                theme={VictoryTheme.clean}
+                                scale={{ x: "time" }}
                                 padding={{ top: 10, bottom: 50, left: 60, right: 30 }}
                                 containerComponent={<VictoryContainer responsive={false} />}
                             >
@@ -538,7 +818,8 @@ const GraphTypes = {
 
                                 <VictoryHistogram
                                     data={histogramData}
-                                    bins={8}
+                                    bins={bins}
+                                    cornerRadius={0}
                                     style={{
                                         data: {
                                             fill: colours[0] || "#4f83cc",
@@ -561,53 +842,58 @@ const GraphTypes = {
     label: "Progress Bar",
     value: "progressBar",
         previewImage: require("../../../../assets/images/progressCircle.png"),
-    render: ({ data, yKeys, colours, axisColorMode = "light", maxValue = 100 }) => {
+    render: ({ data, xKey, yKeys, colours, axisColorMode = "light", maxValue, capPercentAt100, rounding, percentRounding, numberFormat }) => {
         const ChartComponent = () => {
-            const [size, setSize] = React.useState({ width: 0, height: 0 });
             const axisColor = axisColorMode === "dark" ? "white" : "black";
-            // Assume single value in data[0][yKeys[0]] for progress
             const yKey = Array.isArray(yKeys) ? yKeys[0] : yKeys;
-            const progressValue = data.length > 0 ? (parseNumericValue(data[0][yKey]) ?? 0) : 0;
-            const safeMaxValue = Number(maxValue) > 0 ? Number(maxValue) : 100;
+
+            // find value from latest date row
+            let latestValue = 0;
+            if (data.length > 0 && yKey) {
+                let latestRow = data[0];
+                if (xKey) {
+                    latestRow = data.reduce((best, row) => {
+                        const bestDate = toDate(best[xKey]);
+                        const rowDate = toDate(row[xKey]);
+                        return rowDate && bestDate && rowDate > bestDate ? row : best;
+                    }, data[0]);
+                }
+                latestValue = parseNumericValue(latestRow[yKey]) ?? 0;
+            }
+
+            const progressValue = latestValue;
+            const safeMaxValue = maxValue != null && Number(maxValue) > 0 ? Number(maxValue) : (latestValue > 0 ? latestValue : 100);
+            const rawPercent = Math.max((progressValue / safeMaxValue) * 100, 0);
+            const displayPercent = capPercentAt100 ? Math.min(rawPercent, 100) : rawPercent;
+            const barPercent = Math.min(rawPercent, 100);
 
             return (
-                <View
-                    style={{ flex: 1 }}
-                    onLayout={(event) => {
-                        const { width, height } = event.nativeEvent.layout;
-                        setSize({ width, height });
-                    }}
-                >
-                    {size.width > 0 && size.height > 0 && (
-                        <VictoryChart
-                            width={size.width}
-                            height={size.height}
-                            theme={VictoryTheme.clean}
-                            domain={{ x: [0, safeMaxValue], y: [0, 1] }}
-                            padding={{ top: 20, bottom: 20, left: 40, right: 20 }}
-                            containerComponent={<VictoryContainer responsive={false} />}
-                        >
-                            <VictoryAxis
-                                style={{
-                                    axis: { stroke: axisColor },
-                                    ticks: { stroke: axisColor },
-                                    tickLabels: { fill: axisColor, fontSize: 10, padding: 5 },
-                                }}
-                            />
-                            {/* No dependent axis needed (progress is just a bar) */}
-
-                            <VictoryBar
-                                horizontal
-                                barWidth={size.height / 2}
-                                data={[{ x: progressValue, y: 1 }]}
-                                style={{
-                                    data: {
-                                        fill: colours[0] || "#4caf50",
-                                    },
-                                }}
-                            />
-                        </VictoryChart>
-                    )}
+                <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 16 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                        <Text style={{ color: axisColor, fontWeight: "bold", fontSize: 16 }}>
+                            {formatValueWithRounding(progressValue, rounding, numberFormat)}
+                        </Text>
+                        <Text style={{ color: axisColor, fontSize: 14 }}>
+                            {formatPercentDisplay(displayPercent, percentRounding)}
+                        </Text>
+                    </View>
+                    <View style={{
+                        width: "100%",
+                        height: 24,
+                        backgroundColor: "#e0e0e0",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                    }}>
+                        <View style={{
+                            width: `${barPercent}%`,
+                            height: "100%",
+                            backgroundColor: colours[0] || "#4caf50",
+                            borderRadius: 12,
+                        }} />
+                    </View>
+                    <Text style={{ color: axisColor, fontSize: 12, marginTop: 4, textAlign: "right" }}>
+                        Target: {formatValueWithRounding(safeMaxValue, rounding, numberFormat)}
+                    </Text>
                 </View>
             );
         };
@@ -619,19 +905,35 @@ progressCircle: {
     label: "Progress Circle",
     value: "progressCircle",
         previewImage: require("../../../../assets/images/progressCircle.png"),
-    render: ({ data, yKeys, colours, axisColorMode = "light", maxValue = 100 }) => {
+    render: ({ data, xKey, yKeys, colours, axisColorMode = "light", maxValue, capPercentAt100, rounding, percentRounding, numberFormat }) => {
         const ChartComponent = () => {
             const [size, setSize] = React.useState({ width: 0, height: 0 });
             const axisColor = axisColorMode === "dark" ? "white" : "black";
-            // take first yKey value from first row of data
             const yKey = Array.isArray(yKeys) ? yKeys[0] : yKeys;
-            const progressValue = data.length > 0 && yKey ? (parseNumericValue(data[0][yKey]) ?? 0) : 0;
-            const safeMaxValue = Number(maxValue) > 0 ? Number(maxValue) : 100;
-            const percent = Math.min(Math.max((progressValue / safeMaxValue) * 100, 0), 100); // clamp 0-100
+
+            // find value from latest date row
+            let latestValue = 0;
+            if (data.length > 0 && yKey) {
+                let latestRow = data[0];
+                if (xKey) {
+                    latestRow = data.reduce((best, row) => {
+                        const bestDate = toDate(best[xKey]);
+                        const rowDate = toDate(row[xKey]);
+                        return rowDate && bestDate && rowDate > bestDate ? row : best;
+                    }, data[0]);
+                }
+                latestValue = parseNumericValue(latestRow[yKey]) ?? 0;
+            }
+
+            const progressValue = latestValue;
+            const safeMaxValue = maxValue != null && Number(maxValue) > 0 ? Number(maxValue) : (latestValue > 0 ? latestValue : 100);
+            const rawPercent = Math.max((progressValue / safeMaxValue) * 100, 0);
+            const displayPercent = capPercentAt100 ? Math.min(rawPercent, 100) : rawPercent;
+            const piePercent = Math.min(rawPercent, 100);
 
             const chartData = [
-                { x: "Complete", y: percent },
-                { x: "Remaining", y: 100 - percent }
+                { x: "Complete", y: piePercent },
+                { x: "Remaining", y: 100 - piePercent }
             ];
 
             return (
@@ -656,7 +958,10 @@ progressCircle: {
                             />
                             <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
                                 <Text style={{ fontSize: 24, fontWeight: "bold", color: axisColor }}>
-                                    {Math.round(percent)}%
+                                    {formatPercentDisplay(displayPercent, percentRounding)}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: axisColor, marginTop: 2 }}>
+                                    {formatValueWithRounding(progressValue, rounding, numberFormat)} / {formatValueWithRounding(safeMaxValue, rounding, numberFormat)}
                                 </Text>
                             </View>
                         </View>
@@ -673,7 +978,7 @@ progressCircle: {
     label: "Numbers",
     value: "numbers",
         previewImage: require("../../../../assets/images/numbers.png"),
-    render: ({ data, yKeys, colours, axisColorMode = "light" }) => {
+    render: ({ data, yKeys, colours, axisColorMode = "light", numberFormat = {}, rounding }) => {
         const ChartComponent = () => {
             const axisColor = axisColorMode === "dark" ? "white" : "black";
 
@@ -688,6 +993,14 @@ progressCircle: {
             // For simplicity, take the first row of data
             const firstRow = data[0];
 
+            // merge rounding into numberFormat for display
+            const effectiveFormat = { ...numberFormat };
+            if (rounding?.mode === "round") {
+                effectiveFormat.decimalPlaces = rounding.decimalPlaces ?? 2;
+            } else if (rounding?.mode === "none") {
+                effectiveFormat.decimalPlaces = null;
+            }
+
             return (
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
                     {yKeys.map((yKey, index) => (
@@ -700,7 +1013,9 @@ progressCircle: {
                                 marginVertical: 4,
                             }}
                         >
-                            {yKey}: {firstRow[yKey]}
+                            {yKey}: {rounding?.mode === "bestFit"
+                                ? formatTickValue(parseNumericValue(firstRow[yKey]))
+                                : formatNumberDisplay(firstRow[yKey], effectiveFormat)}
                         </Text>
                     ))}
                 </View>
