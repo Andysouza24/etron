@@ -1,5 +1,5 @@
 // Author(s): Noah Bradley
-import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { View, StyleSheet, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import React, { useState, useEffect, useMemo, useCallback, use } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../../../../../../../components/layout/Header";
@@ -15,6 +15,7 @@ import {
 	IconButton,
 	Snackbar,
     Button,
+    Checkbox,
 } from "react-native-paper";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
 import DropDown from '../../../../../../../components/common/input/DropDown';
@@ -57,9 +58,10 @@ const EditMetric = () => {
 	const [selectedRows, setSelectedRows] = useState([]);
 	const [coloursState, setColoursState] = useState(['#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522']);
 	const [wheelIndex, setWheelIndex] = useState(0);
-    const [maxValue, setMaxValue] = useState(100);
+    const [maxValue, setMaxValue] = useState(null);
+    const [capPercentAt100, setCapPercentAt100] = useState(false);
     const [boxGrouping, setBoxGrouping] = useState("yKey");
-    const [boxTimePeriod, setBoxTimePeriod] = useState("month");
+    const [boxTimePeriod, setBoxTimePeriod] = useState("date");
 
     const isProgressType = selectedMetric === "progressBar" || selectedMetric === "progressCircle";
     const isBoxType = selectedMetric === "box";
@@ -118,6 +120,7 @@ const EditMetric = () => {
 				setColoursState(metric.config?.colours?.length ? metric.config.colours : coloursState);
 				setSelectedRows(Array.isArray(metric.config?.selectedRows) ? metric.config.selectedRows : []);
                 setMaxValue(metric.config?.maxValue ?? 100);
+                setCapPercentAt100(metric.config?.capPercentAt100 ?? false);
                 setBoxGrouping(metric.config?.boxGrouping || "yKey");
                 setBoxTimePeriod(metric.config?.boxTimePeriod || "month");
 			} catch (e) {
@@ -207,6 +210,7 @@ const EditMetric = () => {
 					colours: coloursState,
 					selectedRows,
                     maxValue,
+                    capPercentAt100,
                     boxGrouping,
                     boxTimePeriod,
 				},
@@ -315,6 +319,19 @@ const EditMetric = () => {
                 />
             )}
 
+            {isProgressType && (
+                <TouchableOpacity
+                    onPress={() => setCapPercentAt100(!capPercentAt100)}
+                    style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
+                >
+                    <Checkbox
+                        status={capPercentAt100 ? "checked" : "unchecked"}
+                        onPress={() => setCapPercentAt100(!capPercentAt100)}
+                    />
+                    <Text style={{ fontSize: 14 }}>Cap percentage at 100%</Text>
+                </TouchableOpacity>
+            )}
+
             {isBoxType && (
                 <>
                     <DropDown
@@ -333,6 +350,7 @@ const EditMetric = () => {
                         <DropDown
                             title="Time Period"
                             items={[
+                                { value: "date", label: "Per date" },
                                 { value: "month", label: "Month" },
                                 { value: "quarter", label: "Quarter" },
                                 { value: "year", label: "Year" },
@@ -460,6 +478,7 @@ const EditMetric = () => {
                                     yKeys: dependentArray,
                                     colours: coloursState,
 									maxValue,
+									capPercentAt100,
 									boxGrouping,
 									boxTimePeriod,
                                 })}
