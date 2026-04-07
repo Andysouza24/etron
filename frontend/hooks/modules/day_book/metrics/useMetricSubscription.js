@@ -1,47 +1,36 @@
 import { useEffect, useRef } from "react";
 import { generateClient } from "aws-amplify/api";
 import { onMetricUpdate } from "../../graphql/subscriptions";
-import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 
-export default function useMetricSubscription(onUpdate) {
+export default function useMetricSubscription(onUpdate, workspaceId) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
   useEffect(() => {
+    if (!workspaceId) return;
+
     let subscription;
-    let retryTimeout;
 
-    const subscribe = async () => {
-      try {
-        const client = generateClient();
-        const workspaceId = await getWorkspaceId();
+    try {
+      const client = generateClient();
+      console.log("Subscribing to metric updates for workspace:", workspaceId);
 
-        if (!workspaceId) {
-          retryTimeout = setTimeout(subscribe, 2000);
-          return;
-        }
-        console.log("Subscribing to metric updates for workspace:", workspaceId);
-
-        subscription = client.graphql({
-          query: onMetricUpdate,
-          variables: { workspaceId },
-        }).subscribe({
-          next: ({ data }) => {
-            const updatedMetric = data.onMetricUpdate;
-            onUpdateRef.current(updatedMetric);
-          },
-          error: (err) => console.error("Subscription error:", err),
-        });
-      } catch (error) {
-        console.error("Failed to start subscription:", error);
-      }
-    };
-
-    subscribe();
+      subscription = client.graphql({
+        query: onMetricUpdate,
+        variables: { workspaceId },
+      }).subscribe({
+        next: ({ data }) => {
+          const updatedMetric = data.onMetricUpdate;
+          onUpdateRef.current(updatedMetric);
+        },
+        error: (err) => console.error("Subscription error:", err),
+      });
+    } catch (error) {
+      console.error("Failed to start subscription:", error);
+    }
 
     return () => {
       if (subscription) subscription.unsubscribe();
-      if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, []);
+  }, [workspaceId]);
 }

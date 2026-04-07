@@ -1,5 +1,5 @@
 import { Slot, router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react-native';
 import { fetchUserAttributes, signOut, updateUserAttributes } from 'aws-amplify/auth';
 import { useVerification } from '../../contexts/VerificationContext';
@@ -9,10 +9,13 @@ import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
 import workspaceService from '../../services/WorkspaceService';
 import { MetricProvider } from '../../contexts/MetricContext';
+import { useAppContext } from '../../contexts/AppContext';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
     const { verifyingPassword } = useVerification();
+    const { setWorkspaceId } = useAppContext();
+    const [workspaceId, setLocalWorkspaceId] = useState(null);
 
     const setHasWorkspaceAttribute = async (value) => {
         try {
@@ -105,6 +108,11 @@ export default function AuthLayout() {
             const userAttributes = await fetchUserAttributes();
             const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
             await workspaceService.setupWorkspaceStorage(result.data, userAttributes.sub);
+            const wsId = result.data?.workspaceId || result.data?.id;
+            if (wsId) {
+                setWorkspaceId(wsId);
+                setLocalWorkspaceId(wsId);
+            }
             console.log("[_layout.jsx] Workspace storage setup completed");
         } catch (error) {
             console.error("[_layout.jsx] Error saving workspace info into storage:", error);
@@ -150,7 +158,7 @@ export default function AuthLayout() {
 
 
     return (         
-        <MetricProvider>
+        <MetricProvider workspaceId={workspaceId}>
             <Slot />
         </MetricProvider> 
     );

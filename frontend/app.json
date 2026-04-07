@@ -67,8 +67,7 @@
       "./plugins/withAppAuthRedirectScheme"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "buildCacheProvider": "eas"
+      "typedRoutes": true
     },
     "runtimeVersion": "1.0.0",
     "updates": {

@@ -125,7 +125,7 @@ class WorkspaceService {
 
 		if (workspaceId && userId) {
 			try {
-				const userResult = await this.apiClient.get(endpoints.workspace.core.getUser(workspaceId, userId));
+				const userResult = await this.apiClient.get(endpoints.workspace.users.getUser(workspaceId, userId));
 				await saveUserInfo(userResult.data);
 			} catch (error) {
 				console.warn("[WorkspaceService] Failed to save user info into storage:", error?.message);

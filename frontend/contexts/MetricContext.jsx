@@ -5,10 +5,12 @@ import useDataUpdateSubscription from "../hooks/modules/day_book/data-sources/us
 
 const MetricContext = createContext(null);
 
-export function MetricProvider({ children }) {
+export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
     // use the singleton metric service instance via useRef
     const serviceRef = useRef(metricService);
     const hasFetchedRef = useRef(false);
+
+    const workspaceId = workspaceIdProp || null;
 
     // store metrics[], loading, error, in state
     const [metrics, setMetrics] = useState([]);
@@ -116,13 +118,13 @@ export function MetricProvider({ children }) {
             }
         });
         console.log("[MetricContext] Real-time metric update: ", cleaned);
-    });
+    }, workspaceId);
 
     useDataUpdateSubscription((dataUpdate) => {
         // trigger silent refresh to pick up new metric data
         loadMetrics(false);
         console.log("[MetricContext] Data update for data source:", dataUpdate.dataSourceId, "affecting metrics:", dataUpdate.metrics);
-    });
+    }, workspaceId);
 
     // filter metrics by type
     const filteredMetrics = useMemo(() => {

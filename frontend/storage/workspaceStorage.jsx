@@ -130,7 +130,7 @@ export async function getWorkspaceInfo() {
         const value = await AsyncStorage.getItem(workspaceKey);
         const parsed = value ? JSON.parse(value) : null;
         //const id = extractWorkspaceId(parsed);
-        const id = parsed.workspaceId;
+        const id = parsed?.workspaceId;
         //console.log('[workspaceStorage] getWorkspaceInfo (legacy)', { exists: !!parsed, workspaceId: id });
         return parsed;
     } catch (error) {
@@ -159,7 +159,7 @@ export async function removeWorkspaceInfo() {
 // get values from the information stored
 export async function getWorkspaceId() {
     const workspace = await getWorkspaceInfo();
-    const id = workspace.workspaceId;
+    const id = workspace?.workspaceId;
     //const id = extractWorkspaceId(workspace);
     // Auto-heal stored value to include id/workspaceId for future fast access
     /*if (workspace && id && (!workspace.id || !workspace.workspaceId)) {

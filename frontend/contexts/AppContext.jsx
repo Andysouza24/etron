@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import DataSourceService from "../services/DataSourceService";
 import apiClient from "../utils/api/apiClient";
 import useDataSourceSubscription from '../hooks/modules/day_book/data-sources/useDataSourceSubscription';
@@ -12,6 +12,9 @@ export function AppProvider({ children }) {
     if (!serviceRef.current) {
         serviceRef.current = new DataSourceService(apiClient);
     }
+
+    // subscriptions only fire when ready
+    const [workspaceId, setWorkspaceId] = useState(null);
 
     // Local app state
     const [dataSources, setDataSources] = useState({
@@ -84,12 +87,13 @@ export function AppProvider({ children }) {
             };
         });
         console.log("[AppContext] Real-time data source update:", cleaned);
-    });
+    }, workspaceId);
 
     return (
         <AppContext.Provider value={{
             dataSources,
             system,
+            setWorkspaceId,
             actions: {
                 login: () => {},
                 logout: () => {},
