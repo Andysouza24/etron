@@ -9,6 +9,7 @@ import { apiGet } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
 import workspaceService from '../../services/WorkspaceService';
 import { MetricProvider } from '../../contexts/MetricContext';
+import { DataSourceProvider } from '../../contexts/DataSourceContext';
 import { useAppContext } from '../../contexts/AppContext';
 
 export default function AuthLayout() {
@@ -158,8 +159,10 @@ export default function AuthLayout() {
 
 
     return (         
-        <MetricProvider workspaceId={workspaceId}>
-            <Slot />
-        </MetricProvider> 
+        <DataSourceProvider>
+            <MetricProvider workspaceId={workspaceId}>
+                <Slot />
+            </MetricProvider>
+        </DataSourceProvider>
     );
 }
