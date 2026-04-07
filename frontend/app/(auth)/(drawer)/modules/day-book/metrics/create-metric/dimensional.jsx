@@ -29,6 +29,21 @@ const Dimensional = () => {
     const [metricSelection, setMetricSelection] = useState(null);
     const [dimensionSelection, setDimensionSelection] = useState(null);
     const [metricConfig, setMetricConfig] = useState(null);
+    const [maxValue, setMaxValue] = useState(null);
+    const [capPercentAt100, setCapPercentAt100] = useState(false);
+    const [boxGrouping, setBoxGrouping] = useState("all");
+    const [boxTimePeriod, setBoxTimePeriod] = useState("date");
+    const [pieLabelPlacement, setPieLabelPlacement] = useState("outside");
+    const [rounding, setRounding] = useState({ mode: "none", decimalPlaces: 2 });
+    const [percentRounding, setPercentRounding] = useState({ mode: "none", decimalPlaces: 1 });
+    const [axisNumberFormat, setAxisNumberFormat] = useState(null);
+    const [boxUseRawData, setBoxUseRawData] = useState(false);
+    const [numberFormat, setNumberFormat] = useState({
+        currencySymbol: "",
+        thousandsSeparator: ",",
+        decimalSeparator: ".",
+        decimalPlaces: null,
+    });
 
     const valueField = useMemo(() => {
         if (!metricConfig?.dependentVariables?.length) return null;
@@ -40,6 +55,21 @@ const Dimensional = () => {
         const unique = [...new Set(ds.dataSourceData.map((row) => row[dimensionSelection]))];
         return unique.filter((v) => v != null).map(String);
     }, [dimensionSelection, ds.dataSourceData]);
+
+    const rawGraphData = useMemo(() => {
+        if (!dateSelection || !valueField || !dimensionSelection) return null;
+        const rows =
+            selectedRows.length > 0
+                ? ds.dataSourceData.filter((row) => selectedRows.includes(row[ds.dataSourceVariableNames[0]]))
+                : ds.dataSourceData;
+        return rows.map((row) => {
+            const newRow = {};
+            for (const [key, value] of Object.entries(row)) {
+                newRow[key] = parseNumeric(value);
+            }
+            return newRow;
+        });
+    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows, dateSelection, valueField, dimensionSelection]);
 
     const graphData = useMemo(() => {
         if (!dateSelection || !valueField || !dimensionSelection) return [];
@@ -82,6 +112,15 @@ const Dimensional = () => {
                 sourceMetricId: metricSelection,
                 colours: form.coloursState,
                 selectedRows,
+                maxValue,
+                boxGrouping,
+                boxTimePeriod,
+                pieLabelPlacement,
+                rounding,
+                numberFormat,
+                percentRounding,
+                axisNumberFormat,
+                boxUseRawData,
             },
         });
     }, [form, ds.dataSourceId, dateSelection, valueField, dimensionSelection, metricSelection, selectedRows, selectedMetric, submitMetric]);
@@ -121,11 +160,34 @@ const Dimensional = () => {
                     graphData={graphData}
                     xKey={dateSelection}
                     yKeys={dimensionValues}
+                    selectedMetric={selectedMetric}
+                    setSelectedMetric={setSelectedMetric}
+                    maxValue={maxValue}
+                    setMaxValue={setMaxValue}
+                    capPercentAt100={capPercentAt100}
+                    setCapPercentAt100={setCapPercentAt100}
+                    boxGrouping={boxGrouping}
+                    setBoxGrouping={setBoxGrouping}
+                    boxTimePeriod={boxTimePeriod}
+                    setBoxTimePeriod={setBoxTimePeriod}
+                    pieLabelPlacement={pieLabelPlacement}
+                    setPieLabelPlacement={setPieLabelPlacement}
+                    rounding={rounding}
+                    setRounding={setRounding}
+                    numberFormat={numberFormat}
+                    setNumberFormat={setNumberFormat}
+                    percentRounding={percentRounding}
+                    setPercentRounding={setPercentRounding}
+                    axisNumberFormat={axisNumberFormat}
+                    setAxisNumberFormat={setAxisNumberFormat}
+                    rawGraphData={rawGraphData}
+                    boxUseRawData={boxUseRawData}
+                    setBoxUseRawData={setBoxUseRawData}
                 />
             ),
             validate: () => !!form.metricName.trim(),
         },
-    ], [ds, viewDataPermission, selectedMetric, dateSelection, metricSelection, dimensionSelection, metricConfig, dimensionValues, form, viewShotRef, graphData]);
+    ], [ds, viewDataPermission, selectedMetric, dateSelection, metricSelection, dimensionSelection, metricConfig, dimensionValues, form, viewShotRef, graphData, rawGraphData]);
 
     return (
         <MetricWizard
