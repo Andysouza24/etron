@@ -40,7 +40,7 @@ const Header = ({
     
     return (
         <Appbar.Header mode="center-aligned"
-            //statusBarHeight={0}
+            statusBarHeight={0}
             style={{
                 backgroundColor: theme.colors.background,
                 marginBottom: 12
