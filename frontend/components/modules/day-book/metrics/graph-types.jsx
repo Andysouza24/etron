@@ -157,8 +157,10 @@ function computeYDomain(data, yKeys) {
         });
     });
     if (!Number.isFinite(maxVal)) return undefined;
-    const yMin = Math.min(0, minVal);
-    const yMax = maxVal * 1.05;
+    const range = maxVal - minVal;
+    const padding = range > 0 ? range * 0.05 : Math.abs(maxVal) * 0.05 || 1;
+    const yMin = minVal - padding;
+    const yMax = maxVal + padding;
     return [yMin, yMax];
 }
 
