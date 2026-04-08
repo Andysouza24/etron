@@ -19,6 +19,9 @@ import TextItemEditor from '../../../../../components/boards/TextItemEditor';
 import { createGridItemBuilder, createAddItemOptions } from '../../../../../components/boards/boardItemRegistry';
 import { createMetricItem, createButtonItem, createTextItem, mapItemsToLayout, calculateButtonGridWidth } from '../../../../../utils/boards/itemHandlers';
 import { sanitizeColourValue } from '../../../../../utils/boards/boardUtils';
+import { useHasPermission } from '../../../../../hooks/useHasPermission';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const GRID_COLS = 12;
 const GRID_HORIZONTAL_PADDING = 16;
@@ -40,6 +43,7 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
     const routeBoardId = params?.id;
     const id = overrideBoardId ?? routeBoardId;
     const theme = useTheme();
+    const { allowed: canManageBoards } = useHasPermission(MANAGE_BOARDS_PERM);
     const navigationHeaderProps = overrideBoardId ? { showMenu: true } : { showBack: true };
 
     const { 
@@ -522,11 +526,11 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
             {...navigationHeaderProps}
             titleAlignment="right"
             rightActions={[
-                {
+                ...(canManageBoards ? [{
                     key: 'toggle-edit',
                     icon: editingActive ? 'check' : 'pencil',
                     onPress: () => setIsEditing(!isEditing)
-                },
+                }] : []),
                 {
                     key: 'menu',
                     render: () => (
@@ -541,14 +545,16 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                             }
                             anchorPosition="bottom"
                         >
-                            <Menu.Item
-                                leadingIcon="cog"
-                                title="Settings"
-                                onPress={() => {
-                                    setMenuVisible(false);
-                                    router.navigate(`/boards/${id}/settings`);
-                                }}
-                            />
+                            {canManageBoards && (
+                                <Menu.Item
+                                    leadingIcon="cog"
+                                    title="Settings"
+                                    onPress={() => {
+                                        setMenuVisible(false);
+                                        router.navigate(`/boards/${id}/settings`);
+                                    }}
+                                />
+                            )}
                         </Menu>
                     )
                 }

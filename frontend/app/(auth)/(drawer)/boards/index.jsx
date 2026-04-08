@@ -9,9 +9,13 @@ import SearchBar from '../../../../components/common/input/SearchBar';
 import BasicButton from '../../../../components/common/buttons/BasicButton';
 import BoardCard from './components/BoardCard';
 import { formatTimeAgo } from '../../../../utils/boards/dateUtils';
+import { useHasPermission } from '../../../../hooks/useHasPermission';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const BoardsManagement = () => {
     const theme = useTheme();
+    const { allowed: canManageBoards } = useHasPermission(MANAGE_BOARDS_PERM);
     const [boards, setBoards] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
@@ -139,6 +143,7 @@ const BoardsManagement = () => {
                     title="Boards"
                     showMenu
                     showPlus
+                    rightIconPermission={canManageBoards}
                     onRightIconPress={handleCreateBoard}
                 />
             )}
@@ -168,7 +173,7 @@ const BoardsManagement = () => {
                                     ? 'Try a different search term'
                                     : 'Create your first board to get started'}
                             </Text>
-                            {!searchQuery && (
+                            {!searchQuery && canManageBoards && (
                                 <BasicButton
                                     label="Create Board"
                                     onPress={handleCreateBoard}
@@ -194,6 +199,7 @@ const BoardsManagement = () => {
                                         lastUpdated={formatTimeAgo(board.metadata?.updatedAt)}
                                         owner={owner}
                                         isShared={isShared}
+                                        canManage={canManageBoards}
                                         onView={handleViewBoard}
                                         onEdit={handleEditBoard}
                                         onSetAsDashboard={handleSetAsActive}

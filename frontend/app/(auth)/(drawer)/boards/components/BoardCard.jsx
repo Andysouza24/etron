@@ -8,6 +8,7 @@ const BoardCard = ({
     lastUpdated,
     owner,
     isShared,
+    canManage = false,
     onView,
     onEdit,
     onSetAsDashboard,
@@ -108,29 +109,35 @@ const BoardCard = ({
                                 onPress={handleMenuAction(() => onView?.(board.id))}
                                 title="View"
                             />
-                            {!isActive && (
+                            {canManage && !isActive && (
                                 <Menu.Item
                                     leadingIcon="view-dashboard"
                                     onPress={handleMenuAction(onSetAsDashboard)}
                                     title="Set as Dashboard"
                                 />
                             )}
-                            <Menu.Item
-                                leadingIcon="content-copy"
-                                onPress={handleMenuAction(onDuplicate)}
-                                title="Duplicate"
-                            />
-                            <Menu.Item
-                                leadingIcon="cog"
-                                onPress={handleMenuAction(onSettings)}
-                                title="Settings"
-                            />
-                            <Menu.Item
-                                leadingIcon="delete"
-                                onPress={handleMenuAction(onDelete)}
-                                title="Delete"
-                                titleStyle={{ color: theme.colors.error }}
-                            />
+                            {canManage && (
+                                <Menu.Item
+                                    leadingIcon="content-copy"
+                                    onPress={handleMenuAction(onDuplicate)}
+                                    title="Duplicate"
+                                />
+                            )}
+                            {canManage && (
+                                <Menu.Item
+                                    leadingIcon="cog"
+                                    onPress={handleMenuAction(onSettings)}
+                                    title="Settings"
+                                />
+                            )}
+                            {canManage && (
+                                <Menu.Item
+                                    leadingIcon="delete"
+                                    onPress={handleMenuAction(onDelete)}
+                                    title="Delete"
+                                    titleStyle={{ color: theme.colors.error }}
+                                />
+                            )}
                         </Menu>
                     </View>
                 </View>

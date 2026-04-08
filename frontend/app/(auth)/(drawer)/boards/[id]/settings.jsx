@@ -9,6 +9,9 @@ import BasicButton from '../../../../../components/common/buttons/BasicButton';
 import apiClient from '../../../../../utils/api/apiClient';
 import endpoints from '../../../../../utils/api/endpoints';
 import { getWorkspaceId } from '../../../../../storage/workspaceStorage';
+import { useHasPermission } from '../../../../../hooks/useHasPermission';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const toSafeLower = (value) => (value ? String(value).toLowerCase() : '');
 
@@ -28,6 +31,7 @@ const buildInitials = (label) => {
 
 const BoardSettings = () => {
     const { id } = useLocalSearchParams();
+    const { allowed: canManageBoards, loading: permLoading } = useHasPermission(MANAGE_BOARDS_PERM);
     const [board, setBoard] = useState(null);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -37,6 +41,12 @@ const BoardSettings = () => {
     const [collaborationError, setCollaborationError] = useState(null);
     const [ownerId, setOwnerId] = useState(null);
     const [collaborators, setCollaborators] = useState({});
+
+    useEffect(() => {
+        if (!permLoading && !canManageBoards) {
+            router.back();
+        }
+    }, [permLoading, canManageBoards]);
 
     useEffect(() => {
         loadBoard();
