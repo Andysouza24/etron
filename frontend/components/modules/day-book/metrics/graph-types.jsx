@@ -130,6 +130,19 @@ function computeBoxStats(values) {
     };
 }
 
+function sortDataByDateKey(data, xKey) {
+    if (!data || data.length === 0) return data;
+    const firstVal = data[0]?.[xKey];
+    if (firstVal == null) return data;
+    const parsed = toDate(firstVal);
+    if (parsed == null) return data;
+    return [...data].sort((a, b) => {
+        const da = new Date(a[xKey]);
+        const db = new Date(b[xKey]);
+        return da - db;
+    });
+}
+
 function computeYDomain(data, yKeys) {
     const safeYKeys = Array.isArray(yKeys) ? yKeys : yKeys ? [yKeys] : [];
     let maxVal = -Infinity;
@@ -236,7 +249,8 @@ const GraphTypes = {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
-                const yDomain = computeYDomain(data, yKeys);
+                const sortedData = sortDataByDateKey(data, xKey);
+                const yDomain = computeYDomain(sortedData, yKeys);
                 const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
@@ -279,7 +293,7 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryLine
                                         key={yKey}
-                                        data={data.map((d) => ({
+                                        data={sortedData.map((d) => ({
                                             x: d[xKey],
                                             y: d[yKey],
                                         }))}
@@ -305,7 +319,8 @@ const GraphTypes = {
             const ChartComponent = () => {
                 const [size, setSize] = useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
-                const yDomain = computeYDomain(data, yKeys);
+                const sortedData = sortDataByDateKey(data, xKey);
+                const yDomain = computeYDomain(sortedData, yKeys);
                 const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
@@ -349,7 +364,7 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryBar
                                         key={yKey}
-                                        data={data.map((d) => ({
+                                        data={sortedData.map((d) => ({
                                             x: d[xKey],
                                             y: d[yKey],
                                         }))}
@@ -482,7 +497,8 @@ const GraphTypes = {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
-                const yDomain = computeYDomain(data, yKeys);
+                const sortedData = sortDataByDateKey(data, xKey);
+                const yDomain = computeYDomain(sortedData, yKeys);
                 const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
@@ -529,7 +545,7 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryArea
                                         key={yKey}
-                                        data={data.map((d) => ({
+                                        data={sortedData.map((d) => ({
                                             x: d[xKey],
                                             y: d[yKey],
                                         }))}
@@ -561,7 +577,8 @@ const GraphTypes = {
             const ChartComponent = () => {
                 const [size, setSize] = React.useState({ width: 0, height: 0 });
                 const axisColor = axisColorMode === "dark" ? "white" : "black";
-                const yDomain = computeYDomain(data, yKeys);
+                const sortedData = sortDataByDateKey(data, xKey);
+                const yDomain = computeYDomain(sortedData, yKeys);
                 const axisFormat = axisNumberFormat ?? numberFormat;
                 return (
                     <View
@@ -609,7 +626,7 @@ const GraphTypes = {
                                     <VictoryScatter
                                         key={yKey}
                                         size={4}
-                                        data={data.map((d) => ({
+                                        data={sortedData.map((d) => ({
                                             x: d[xKey],
                                             y: d[yKey],
                                         }))}
