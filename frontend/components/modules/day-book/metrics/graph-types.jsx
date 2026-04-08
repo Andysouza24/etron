@@ -5,6 +5,7 @@ import { Text, View } from "react-native";
 //TODO: move formatting functions into a separate utils file
 //TODO: consider moving graphs into separate files for better organization and maintainability
 //TODO: fix box plot grouping logic
+//TODO: consider moving to a shared folder
 
 function formatTickValue(t, numberFormat) {
     if (typeof t === "string") return t;

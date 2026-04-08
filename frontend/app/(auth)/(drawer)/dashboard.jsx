@@ -1,167 +1,106 @@
-import { View, ScrollView, StyleSheet, Image } from "react-native";
-import { useState, useCallback, useMemo } from "react";
-import Header from "../../../components/layout/Header";
-import { commonStyles } from "../../../assets/styles/stylesheets/common";
-import { router } from "expo-router";
-import StackLayout from "../../../components/layout/StackLayout";
-import DescriptiveButton from "../../../components/common/buttons/DescriptiveButton";
-import { useTheme, Avatar, List, Divider, TextInput, Button, HelperText } from "react-native-paper";
-import CustomBottomSheet from "../../../components/BottomSheet";
-import ResponsiveScreen from "../../../components/layout/ResponsiveScreen";
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
+import { router, useFocusEffect } from 'expo-router';
+import ResponsiveScreen from '../../../components/layout/ResponsiveScreen';
+import Header from '../../../components/layout/Header';
+import BoardService from '../../../services/BoardService';
+import BoardView from './boards/[id]/index';
 
-const Profile = () => {
-    const theme = useTheme();
-    const [showSheet, setShowSheet] = useState(false); // standard bottom sheet (existing example)
-    const [showCompactSheet, setShowCompactSheet] = useState(false); // compact bottom sheet (existing example)
-    // new example sheets
-    const [showProfileActionsSheet, setShowProfileActionsSheet] = useState(false); // custom header + search + icons
-    const [showQuickIconSheet, setShowQuickIconSheet] = useState(false); // compact style with custom renderItem (icon grid style list)
-    const [showQuickNoteSheet, setShowQuickNoteSheet] = useState(false); // NEW: custom content (no list) example
-    const [showSearchFooterSheet, setShowSearchFooterSheet] = useState(false); // NEW: search footer variant
+const Dashboard = () => {
+    const [boardId, setBoardId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // quick note form state
-    const [noteTitle, setNoteTitle] = useState("");
-    const [noteBody, setNoteBody] = useState("");
+    const loadDashboard = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const boards = await BoardService.getAllBoards();
+            const activeId = await BoardService.getActiveDashboardId(boards);
+            setBoardId(activeId ?? null);
+        } catch (err) {
+            console.error('[Dashboard] Failed to load dashboard board:', err);
+            setError('Unable to load your dashboard right now.');
+            setBoardId(null);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    // example data for new sheets
-    const profileActionItems = useMemo(() => ([
-        { icon: 'account-edit', label: 'Account Details', onPress: () => router.navigate('/settings/account/account') },
-        { icon: 'image-edit', label: 'Personal Details', onPress: () => router.navigate('/settings/account/personal-details') },
-        { icon: 'bell-ring', label: 'Notification Settings', onPress: () => router.navigate('/modules/day-book/notifications/notifications') },
-        { icon: 'shield-account', label: 'Password & Security', onPress: () => router.navigate('/settings/account/password-security') },
-        { icon: 'logout-variant', label: 'Sign Out', onPress: () => { /* does nothing */ } },
-    ]), [router]);
+    useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
 
-    const quickIconActions = useMemo(() => ([
-        { icon: 'plus-box', label: 'New Entry', onPress: () => router.navigate('/modules/day-book/data-management/new-entry') },
-        { icon: 'chart-timeline-variant', label: 'View Metrics', onPress: () => router.navigate('/modules/day-book/metrics/metric-management') },
-        { icon: 'file-chart', label: 'Reports', onPress: () => router.navigate('/modules/day-book/reports/report-management') },
-        { icon: 'bell', label: 'Alerts', onPress: () => router.navigate('/modules/day-book/notifications/notifications') },
-        { icon: 'account-multiple-plus', label: 'Invite User', onPress: () => router.navigate('/collaboration') },
-    ]), [router]);
-
-    const settingOptionButtons = [
-    // testing bottom sheet
-        { icon: "tray-arrow-up", label: "Testing - Example Bottom Sheet", onPress: () => { setShowSheet(true); setShowCompactSheet(false);} }, // standard style
-        { icon: "view-compact", label: "Testing - Compact Bottom Sheet", onPress: () => { setShowCompactSheet(true); setShowSheet(false);} }, // compact style
-        { icon: "account-box", label: "Testing - Profile Actions Sheet", onPress: () => { setShowProfileActionsSheet(true); } },
-        { icon: "flash", label: "Testing - Quick Icon Actions Sheet", onPress: () => { setShowQuickIconSheet(true); } },
-        { icon: "note-plus", label: "Testing - Quick Note Sheet (Custom)", onPress: () => { 
-            // close others to avoid multiple mounted sheets
-            setShowSheet(false);
-            setShowCompactSheet(false);
-            setShowProfileActionsSheet(false);
-            setShowQuickIconSheet(false);
-            setShowQuickNoteSheet(true); 
-        } },
-        { icon: "magnify", label: "Testing - Search Footer Sheet", onPress: () => { setShowSearchFooterSheet(true); } },
-    ];
-    // custom content for quick note sheet with no list rendering
-    const quickNoteContent = (
-        <View style={{ flex: 1 }}>
-            <TextInput
-                mode="outlined"
-                label="Title"
-                value={noteTitle}
-                onChangeText={setNoteTitle}
-                style={{ marginBottom: 12 }}
-            />
-            <TextInput
-                mode="outlined"
-                label="Details"
-                value={noteBody}
-                onChangeText={setNoteBody}
-                multiline
-                numberOfLines={5}
-                style={{ marginBottom: 8 }}
-            />
-            <HelperText type={noteTitle.length ? "info" : "error"} visible>
-                {noteTitle.length ? `${noteTitle.length} chars in title` : 'Title is recommended'}
-            </HelperText>
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                <Button onPress={() => { setShowQuickNoteSheet(false); setNoteTitle(''); setNoteBody(''); }} style={{ marginRight: 8 }}>Cancel</Button>
-                <Button
-                    mode="contained"
-                    disabled={!noteTitle.trim() && !noteBody.trim()}
-                    onPress={() => {
-                        // does nothing
-                        setShowQuickNoteSheet(false);
-                        setNoteTitle('');
-                        setNoteBody('');
-                    }}
-                >
-                    Save
-                </Button>
-            </View>
-        </View>
+    useFocusEffect(
+        useCallback(() => {
+            loadDashboard();
+        }, [loadDashboard])
     );
 
-    // custom renderers for new sheets
-    const renderProfileActionItem = useCallback(({ item }) => (
-        <List.Item
-            title={item.label}
-            left={(props) => <List.Icon {...props} icon={item.icon} />}
-            onPress={() => { setShowProfileActionsSheet(false); item.onPress?.(); }}
-        />
-    ), []);
+    const handleOpenBoards = useCallback(() => {
+        router.push('/boards');
+    }, []);
 
-    const renderQuickIconItem = useCallback(({ item }) => (
-        <List.Item
-            title={item.label}
-            left={(props) => <List.Icon {...props} icon={item.icon} />}
-            style={{ paddingVertical: 4 }}
-            onPress={() => { setShowQuickIconSheet(false); item.onPress?.(); }}
-        />
-    ), []);
+    if (loading) {
+        return (
+            <ResponsiveScreen
+                header={false}    
+                scroll={false}
+                padded={false}
+                center={true}
+            >
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" />
+                    <Text style={styles.message}>Loading dashboard…</Text>
+                </View>
+            </ResponsiveScreen>
+        );
+    }
 
-    const profileHeaderChildren = (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Avatar.Text size={36} label="ON" style={{ marginRight: 12 }} />
-            <View>
-                <List.Subheader style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 }}>Onion</List.Subheader>
-            </View>
-        </View>
-    );
-    
+    if (error || !boardId) {
+        return (
+            <ResponsiveScreen
+                header={<Header title="Dashboard" showMenu />}
+                center={true}
+            >
+                <View style={styles.centered}>
+                    <Text style={styles.message}>
+                        {error ?? 'No dashboard board has been created yet.'}
+                    </Text>
+                    <Button mode="contained" onPress={handleOpenBoards} style={styles.actionButton}>
+                        Manage Boards
+                    </Button>
+                </View>
+            </ResponsiveScreen>
+        );
+    }
+
     return (
         <ResponsiveScreen
-            header={
-                <Header title="Dashboard" showMenu />
-            }
-            center={false}
-            padded={false}
-            // prevent nesting virtualizedlists inside a scrollview to avoid the warning
+            header={<Header title="Dashboard" showMenu />}
             scroll={false}
-        >         
-            <View style={styles.header}>
-                <Image
-                    source={require('../../../assets/images/eTRON_logo.png')}
-                    style={styles.logo}
-                />
-            </View>
-
+            padded={false}
+        >
+            <BoardView boardId={boardId} showHeader={false} />
         </ResponsiveScreen>
-    )
-}
+    );
+};
 
 const styles = StyleSheet.create({
-    background: {
+    centered: {
         flex: 1,
-    },
-    container: {
-        flex: 1,
-        padding: 20,
-    },
-    header: {
-        width: '100%',
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 140,
+        paddingHorizontal: 24
     },
-    logo: {
-        width: '100%',
-        height: 100,
-        resizeMode: 'contain',
+    message: {
+        textAlign: 'center',
+        marginTop: 16
     },
-})
+    actionButton: {
+        marginTop: 24
+    }
+});
 
-export default Profile;
+export default Dashboard;

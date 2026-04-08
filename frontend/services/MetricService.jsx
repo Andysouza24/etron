@@ -33,12 +33,12 @@ class MetricService {
     async deleteMetric(metricId){
         return apiDelete(endpoints.modules.day_book.metrics.removeMetric(metricId), await this.#withWorkspace());
     }
-
+    
     // fetch metric data
     async getMetricData(dataSourceId, metricId){
         return apiGet(endpoints.modules.day_book.data_sources.viewDataForMetric(dataSourceId, metricId), await this.#withWorkspace());
     }
-
+    
     // get metrics by data source
     async getMetricsByDataSource(dataSourceId){
         return apiGet(endpoints.modules.day_book.metrics.getMetricsByDataSource(dataSourceId), await this.#withWorkspace());

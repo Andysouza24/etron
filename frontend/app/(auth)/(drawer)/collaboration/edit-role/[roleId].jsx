@@ -16,6 +16,23 @@ import StackLayout from "../../../../../components/layout/StackLayout";
 
 const MANAGE_ROLES = "app.collaboration.manage_roles";
 
+const normalizePermissionKeys = (list) => {
+	if (!Array.isArray(list)) return [];
+	const keys = list
+		.map((entry) => {
+			if (!entry) return null;
+			if (typeof entry === "string") return entry;
+			if (typeof entry === "object") {
+				if (typeof entry.key === "string") return entry.key;
+				if (typeof entry.permission === "string") return entry.permission;
+			}
+			return null;
+		})
+		.filter(Boolean);
+
+	return Array.from(new Set(keys));
+};
+
 function buildPermissionGroups(tree) {
 	const permissionGroups = [];
 
@@ -74,16 +91,14 @@ export default function EditRole() {
 	const [role, setRole] = useState(null);
 	const [name, setName] = useState("");
 	const [selectedPerms, setSelectedPerms] = useState([]);
-	const [selectedBoards, setSelectedBoards] = useState([]);
 
 	const [permissions, setPermissions] = useState([]);
-	const [boards, setBoards] = useState([]);
 
 	const [openAccordions, setOpenAccordions] = useState({});
 	const [currentUserRoleId, setCurrentUserRoleId] = useState(null);
 	const [confirmSelfLock, setConfirmSelfLock] = useState(false);
 
-	const initialRef = useRef({ name: "", perms: [], boards: [] });
+	const initialRef = useRef({ name: "", perms: [] });
 
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -95,11 +110,6 @@ export default function EditRole() {
 		const initPerms = new Set(initial.perms || []);
 		if (selPerms.size !== initPerms.size) return true;
 		for (const permission of selPerms) if (!initPerms.has(permission)) return true;
-
-		const selBoards = new Set(selectedBoards);
-		const initBoards = new Set(initial.boards || []);
-		if (selBoards.size !== initBoards.size) return true;
-		for (const board of selBoards) if (!initBoards.has(board)) return true;
 
 		return false;
 	})();
@@ -118,7 +128,7 @@ export default function EditRole() {
 			}
 
 			let result = await apiGet(endpoints.workspace.roles.getRole(workspaceId, roleId));
-			const role = result.data;
+			const role = result?.data || null;
 			if (!role) {
 				setNotFound(true);
 				return;
@@ -127,12 +137,9 @@ export default function EditRole() {
 			console.log("Role:", role);
 
 			result = await apiGet(endpoints.workspace.core.getDefaultPermissions);
-			const allCategories = buildPermissionGroups(result.data);
+			const allCategories = buildPermissionGroups(result?.data || {});
 			setPermissions(allCategories);
 			
-			result = await apiGet(endpoints.workspace.boards.getBoards(workspaceId));
-			setBoards(result.data);
-
 			try {
 				result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
 				setCurrentUserRoleId(result.data.roleId);
@@ -140,18 +147,15 @@ export default function EditRole() {
 				console.warn("Could not determine current user's role:", error);
 			}
 
-			const initialName = role.name;
-			const initialPerms = role.permissions;
-			const initialBoards = role.hasAccess.boards;
+			const initialName = role.name || "";
+			const initialPerms = normalizePermissionKeys(role.permissions);
 
 			setName(initialName);
 			setSelectedPerms(initialPerms);
-			setSelectedBoards(initialBoards);
 
 			initialRef.current = {
 				name: initialName,
 				perms: initialPerms,
-				boards: initialBoards,
 			};
 
 			setNotFound(false);
@@ -169,15 +173,14 @@ export default function EditRole() {
 	}, [load]);
 
 	const togglePerm = (permission) => {
-		setSelectedPerms((selected) =>
-			selected.includes(permission) ? selected.filter((prevPermission) => prevPermission !== permission) : [...selected, permission]
-		);
-	};
+		setSelectedPerms((selected) => {
+			const permissionKey = typeof permission === "string" ? permission : permission?.key;
+			if (!permissionKey) return selected;
 
-	const toggleBoard = (boardId) => {
-		setSelectedBoards((selected) =>
-			selected.includes(boardId) ? selected.filter((prevBoard) => prevBoard !== boardId) : [...selected, boardId]
-		);
+			return selected.includes(permissionKey)
+				? selected.filter((prevPermission) => prevPermission !== permissionKey)
+				: [...selected, permissionKey];
+		});
 	};
 
 	const willSelfLoseManageRoles = useMemo(() => {
@@ -197,17 +200,17 @@ export default function EditRole() {
 			}
 			
 			setSaving(true);
+			const uniquePermissions = normalizePermissionKeys(selectedPerms);
+
 			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
 				name: name.trim(),
-				permissions: selectedPerms,
-				hasAccess: { boards: selectedBoards },
+				permissions: uniquePermissions,
 			});
 
 			// Update initial values
 			initialRef.current = {
 				name: name.trim(),
-				perms: selectedPerms,
-				boards: selectedBoards,
+				perms: normalizePermissionKeys(selectedPerms),
 			};
 
 			setSnack({ visible: true, text: "Role updated" });
@@ -224,12 +227,13 @@ export default function EditRole() {
 		await (async () => {
 		try {
 			setSaving(true);
+			const uniquePermissions = normalizePermissionKeys(selectedPerms);
+
 			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
 				name: name.trim(),
-				permissions: selectedPerms,
-				hasAccess: { boards: selectedBoards },
+				permissions: uniquePermissions,
 			});
-			initialRef.current = { name: name.trim(), perms: selectedPerms, boards: selectedBoards };
+			initialRef.current = { name: name.trim(), perms: uniquePermissions };
 			setSnack({ visible: true, text: "Role updated" });
 		} catch (error) {
 			console.error("Error saving role (confirmed):", error);
@@ -297,33 +301,8 @@ export default function EditRole() {
 					/>
 				</Card>
 
+				{/* TODO: Board access per role should be handled via the permission gating system in the future. */}
 				{!role.owner && (<>
-					<Card style={styles.card}>
-						<Card.Title title="Board Access"/>
-						<Card.Content>
-						{boards.length > 0 ? (
-							<View style={styles.chipsWrap}>
-								{boards.map((board) => {
-									const active = selectedBoards.includes(board.boardId);
-									return (
-										<Chip
-											key={board.boardId}
-											mode={active ? "flat" : "outlined"}
-											selected={active}
-											onPress={() => toggleBoard(board.boardId)}
-											style={styles.chip}
-										>
-											{board.name}
-										</Chip>
-									);
-								})}
-							</View>
-						) : (
-							<Text>The workspace has no boards.</Text>
-						)}
-						</Card.Content>
-					</Card>
-
 					<Card style={styles.card}>
 						<Card.Title title={`Permissions (${selectedPerms.length})`} />
 						<Card.Content>
@@ -422,6 +401,5 @@ export default function EditRole() {
 
 const styles = StyleSheet.create({
 	card: { marginTop: 16 },
-	chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-	chip: { marginBottom: 8 },
+
 });

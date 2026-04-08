@@ -1,20 +1,34 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Searchbar, useTheme, Chip, IconButton } from 'react-native-paper';
-import React, { useState } from 'react';
+import { Searchbar, useTheme, Chip } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
 
 const SearchBar = ({
     placeholder = "Search",
     onSearch = () => {},
     onFilterChange = () => {},
-    filters
+    filters,
+    value,
+    containerStyle,
+    searchbarStyle
 }) => {
-    const[searchQuery, setSearchQuery] = useState('');
     const theme = useTheme();
+    const placeholderColor = theme.colors?.placeholderText ?? theme.colors?.onSurfaceVariant ?? '#9e9e9e';
+    const iconColor = theme.colors?.icon ?? theme.colors?.onSurfaceVariant ?? '#616161';
+    const backgroundColor = theme.colors?.background ?? '#fff';
+    const borderColor = theme.colors?.outline ?? 'rgba(0,0,0,0.12)';
+
+    const isControlled = value !== undefined;
+    const [searchQuery, setSearchQuery] = useState(value ?? '');
 
     // create filter state if filters exist
     const [selectedFilter, setSelectedFilter] = useState(
         filters && filters.length > 0 ? filters[0] : null
     );
+
+    useEffect(() => {
+        if (!isControlled) return;
+        setSearchQuery(value ?? '');
+    }, [value, isControlled]);
 
     const handleSearch = () => {
         onSearch(searchQuery);
@@ -25,26 +39,33 @@ const SearchBar = ({
         onFilterChange(filter);
     };
 
+    const handleChange = (text) => {
+        if (!isControlled) {
+            setSearchQuery(text);
+        } else {
+            setSearchQuery(text);
+        }
+        onSearch(text);
+    };
+
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, containerStyle]}>
             <Searchbar
                 placeholder={placeholder}
-                placeholderTextColor={theme.colors.placeholderText}
-                onChangeText={(text) => {
-                    setSearchQuery(text);
-                    onSearch(text);
-                }}
+                placeholderTextColor={placeholderColor}
+                onChangeText={handleChange}
                 value={searchQuery}
                 onIconPress={handleSearch}
                 style={[
                     styles.searchbar,
                     {
-                        backgroundColor: theme.colors.background,
-                        borderColor: theme.colors.outline,
-                    }
+                        backgroundColor,
+                        borderColor,
+                    },
+                    searchbarStyle
                 ]}
                 inputStyle={{ fontSize: 16 }}
-                iconColor={theme.colors.icon}
+                iconColor={iconColor}
             />
 
             {filters && filters.length > 0 && (

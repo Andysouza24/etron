@@ -56,19 +56,21 @@ const Users = () => {
         let users = [];
         try {
             const result = await apiGet(endpoints.workspace.users.getUsers(workspaceId));
-            users = result.data;
+            users = Array.isArray(result?.data) ? result.data : [];
             setAllUsers(users);
         } catch (error) {
             console.error("Failed to fetch users:", error);
+            users = [];
         }
 
         let roles = []
         try {
             const result = await apiGet(endpoints.workspace.roles.getRoles(workspaceId));
-            roles = result.data
+            roles = Array.isArray(result?.data) ? result.data : [];
             setAllRoles(roles);
         } catch (error) {
             console.error("Failed to fetch workspace roles:", error);
+            roles = [];
         }
 
         sortUsers(users, roles);
@@ -78,18 +80,37 @@ const Users = () => {
     });
 
     function sortUsers(users = allUsers, roles = allRoles) {
-        const filteredUsers = users.filter(user => {
-            const matchesSearch = (user.name || user.email || '')
+        const normalizedUsers = Array.isArray(users) ? users : [];
+        const normalizedRoles = Array.isArray(roles) ? roles : [];
+        const normalizedSelectedRoles = Array.isArray(selectedRoles) ? selectedRoles : [];
+
+        const filteredUsers = normalizedUsers.filter(user => {
+            const matchesSearch = (user?.name || user?.email || '')
                 .toLowerCase()
                 .includes(searchQuery.toLowerCase());
 
-            const matchesRole = selectedRoles.length === 0 || selectedRoles.some(role => role.roleId === user.roleId);
+            const matchesRole = normalizedSelectedRoles.length === 0 || normalizedSelectedRoles.some(role => role?.roleId === user?.roleId);
             return matchesSearch && matchesRole;
         });
 
-        const rolesForSort = selectedRoles.length > 0 ? selectedRoles : roles;
+        const rolesForSort = normalizedSelectedRoles.length > 0 ? normalizedSelectedRoles : normalizedRoles;
+
+        if (!rolesForSort.length) {
+            setGroupedUsers([
+                {
+                    title: 'Members',
+                    data: filteredUsers
+                }
+            ]);
+            return;
+        }
+
         const sortedUsers = rolesForSort.map(role => {
-            return { title: role.name, data: filteredUsers.filter(user => user.roleId === role.roleId) };
+            const roleId = role?.roleId;
+            return {
+                title: role?.name || 'Members',
+                data: filteredUsers.filter(user => user?.roleId === roleId)
+            };
         });
         setGroupedUsers(sortedUsers)
     }

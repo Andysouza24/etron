@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { themes } from '../assets/styles/themes/themes';
 import SafeView from '../components/layout/SafeView';
 import { Authenticator } from '@aws-amplify/ui-react-native';
-import { VerificationProvider } from '../contexts/VerificationContext'; // temp until backend
+import { VerificationProvider } from '../contexts/VerificationContext';
 import { AppProvider } from '../contexts/AppContext';
 import { Amplify } from 'aws-amplify';
 import amplifyOutputs from '../amplify_outputs.json';

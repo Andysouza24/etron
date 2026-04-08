@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import metricService from '../../../../services/MetricService';
+import metricDataService from '../../../../services/MetricDataService';
 
 export default function useMetric() {
     // manage local state
@@ -58,6 +59,7 @@ export default function useMetric() {
     const getMetricData = useCallback(async (dataSourceId, metricId) => {
         try {
             setError(null);
+            //return await metricDataService.getMetricData(metricId, dataSourceId);
             return await metricService.getMetricData(dataSourceId, metricId);
         } catch (err) {
             console.error("[useMetric] Error fetching metric data: ", err);

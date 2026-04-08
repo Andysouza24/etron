@@ -58,16 +58,19 @@ export default function AuthLayout() {
                 const result = await apiGet(endpoints.workspace.core.getByUserId(userId));
                 workspace = result.data;
             } catch (error) {
-                await setHasWorkspaceAttribute(false);
                 if (error.message.includes("Workspace not found")) {
+                    await setHasWorkspaceAttribute(false);
                     console.log("No workspace yet.");
                     await removeWorkspaceInfo();
                     return false;
                 } else if (error.message.includes("No user found")) {
+                    await setHasWorkspaceAttribute(false);
                     console.log("No user found, rerouting to landing page...")
                     router.replace("/landing.jsx");
                     return false;
                 }
+                // errors don't clear workspace attribute
+                //TODO: fix attribute in cognito/dynamo, stop clearing from frontend
                 console.error("Error fetching workspace:", error);
                 return false;
             }

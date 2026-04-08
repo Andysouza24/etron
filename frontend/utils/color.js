@@ -1,3 +1,31 @@
+const HEX_COLOR_REGEX = /^#([0-9A-F]{3}|[0-9A-F]{6}|[0-9A-F]{8})$/i;
+
+export function sanitizeHexColor(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const prefixed = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  const upper = prefixed.toUpperCase();
+  if (!HEX_COLOR_REGEX.test(upper)) {
+    return "";
+  }
+
+  const shortMatch = upper.match(/^#([0-9A-F]{3})$/i);
+  if (shortMatch) {
+    const [, short] = shortMatch;
+    return `#${short[0]}${short[0]}${short[1]}${short[1]}${short[2]}${short[2]}`;
+  }
+
+  return upper;
+}
+
+export function isValidHexColor(value) {
+  if (typeof value !== "string") return false;
+  const candidate = value.trim().toUpperCase();
+  if (!candidate) return false;
+  return HEX_COLOR_REGEX.test(candidate);
+}
+
 export function hexToRgba(hex, alpha) {
   if (!hex || typeof hex !== "string") return "rgba(0,0,0,0)";
   const trimmed = hex.trim();

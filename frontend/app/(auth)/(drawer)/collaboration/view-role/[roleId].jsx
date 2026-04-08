@@ -85,6 +85,23 @@ function groupSelectedPermissions(selectedKeys = [], permIndex = {}) {
     }));
 }
 
+const normalizePermissionKeys = (list) => {
+    if (!Array.isArray(list)) return [];
+    const keys = list
+        .map((entry) => {
+            if (!entry) return null;
+            if (typeof entry === "string") return entry;
+            if (typeof entry === "object") {
+                if (typeof entry.key === "string") return entry.key;
+                if (typeof entry.permission === "string") return entry.permission;
+            }
+            return null;
+        })
+        .filter(Boolean);
+
+    return Array.from(new Set(keys));
+};
+
 export default function ViewRole() {
     const { roleId } = useLocalSearchParams();
 
@@ -92,7 +109,6 @@ export default function ViewRole() {
     const [permIndex, setPermIndex] = useState({});
     const [loading, setLoading] = useState(true);
     const [roleExists, setRoleExists] = useState(true);
-    const [boards, setBoards] = useState([]);
     const [openAccordions, setOpenAccordions] = useState({});
     const [manageRolePermission, setManageRolePermission] = useState(false);
 
@@ -110,10 +126,7 @@ export default function ViewRole() {
             setRole(role);
 
             result = await apiGet(endpoints.workspace.core.getDefaultPermissions);
-            setPermIndex(buildPermissionIndex(result.data));
-
-            result = await apiGet(endpoints.workspace.boards.getBoards(workspaceId));
-			setBoards(result.data);
+            setPermIndex(buildPermissionIndex(result?.data));
         } catch (error) {
             console.error("Error fetching role:", error);
             setRoleExists(false);
@@ -133,9 +146,14 @@ export default function ViewRole() {
         setManageRolePermission(manageRolePermission);
     }
 
+    const normalizedPermissions = useMemo(
+        () => normalizePermissionKeys(role?.permissions),
+        [role]
+    );
+
     const groupedReadable = useMemo(
-        () => groupSelectedPermissions(role?.permissions || [], permIndex),
-        [role, permIndex]
+        () => groupSelectedPermissions(normalizedPermissions, permIndex),
+        [normalizedPermissions, permIndex]
     );
 
     useFocusEffect(
@@ -168,62 +186,53 @@ export default function ViewRole() {
                     <List.Item title="Last Updated" description={formatDateTime(role.updatedAt)} />
                 </Card>
 
-                {!role.owner && (<StackLayout spacing={16}>
-                    <Card>
-                        <Card.Title title="Board Access" />
-                        <Card.Content>
-                            <View style={styles.chipsWrap}>
-                                {role.hasAccess.boards.map((roleBoard) => (
-                                    <Chip key={roleBoard} mode="outlined" style={styles.chip} onPress={() => router.navigate(`/boards/${roleBoard}`)}>  {/*Doesn't work yet, but will if we have boards*/}
-                                        {boards.find((board) => (board.id = roleBoard)).name}
-                                    </Chip>
-                                ))}
-                            </View>
-                        </Card.Content>
-                    </Card>
+                {/* TODO: Board access per role should be handled via the permission gating system in the future. */}
+                {!role?.owner && (
+                    <StackLayout spacing={16}>
+                        <Card>
+                            <Card.Title title={`Permissions (${normalizedPermissions.length})`} />
+                            <Card.Content>
+                                {!(groupedReadable.length > 0) ? (
+                                    <Text style={styles.muted}>No permissions assigned.</Text>
+                                ) : (
+                                    groupedReadable.map(({ section, categories }, index) => (
+                                        <View key={section}>
+                                            {index !== 0 && <Divider style={{ marginVertical: 8 }} />}
+                                            <Text style={styles.sectionTitle}>{section}</Text>
 
-                    <Card>
-                        <Card.Title title={`Permissions (${role.permissions.length || 0})`} />
-                        <Card.Content>
-                            {!(groupedReadable.length > 0) ? (
-                                <Text style={styles.muted}>No permissions assigned.</Text>
-                            ) : (
-                                groupedReadable.map(({ section, categories }, index) => (
-                                    <View key={section}>
-                                        {index !== 0 && <Divider style={{ marginVertical: 8 }} />}
-                                        <Text style={styles.sectionTitle}>{section}</Text>
-
-                                        {categories.map((category) => {
-                                            const open = !!openAccordions[`${section}:${category.categoryLabel}`];
-                                            return (
-                                                <View key={`${section}:${category.categoryLabel}`} style={{ marginBottom: 6 }}>
-                                                    <List.Accordion
-                                                        title={category.categoryLabel}
-                                                        expanded={open}
-                                                        onPress={() =>
-                                                            setOpenAccordions((s) => ({
-                                                                ...s,
-                                                                [`${section}:${category.categoryLabel}`]: !s[`${section}:${category.categoryLabel}`],
-                                                            }))
-                                                        }
-                                                    >
-                                                        {category.permissions.map((permission) => (
-                                                            <List.Item
-                                                                key={permission.key}
-                                                                title={permission.label}
-                                                                description={permission.description}
-                                                            />
-                                                        ))}
-                                                    </List.Accordion>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                ))
-                            )}
-                        </Card.Content>
-                    </Card>
-                </StackLayout>)}
+                                            {categories.map((category) => {
+                                                const accordionKey = `${section}:${category.categoryLabel}`;
+                                                const open = !!openAccordions[accordionKey];
+                                                return (
+                                                    <View key={accordionKey} style={{ marginBottom: 6 }}>
+                                                        <List.Accordion
+                                                            title={category.categoryLabel}
+                                                            expanded={open}
+                                                            onPress={() =>
+                                                                setOpenAccordions((prev) => ({
+                                                                    ...prev,
+                                                                    [accordionKey]: !prev[accordionKey],
+                                                                }))
+                                                            }
+                                                        >
+                                                            {category.permissions.map((permission) => (
+                                                                <List.Item
+                                                                    key={permission.key}
+                                                                    title={permission.label}
+                                                                    description={permission.description}
+                                                                />
+                                                            ))}
+                                                        </List.Accordion>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    ))
+                                )}
+                            </Card.Content>
+                        </Card>
+                    </StackLayout>
+                )}
             </StackLayout>) : (
                 <View style={styles.emptyWrap}>
                     <ItemNotFound
@@ -240,8 +249,6 @@ export default function ViewRole() {
 
 const styles = StyleSheet.create({
     loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
-    chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    chip: { marginBottom: 8 },
     bucketTitle: { fontWeight: "600", marginBottom: 6 },
     muted: { opacity: 0.7 },
     actionsRow: { alignItems: "flex-end", marginTop: 8 },

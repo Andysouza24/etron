@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Keyboard } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ScrollView, Keyboard, Platform, InteractionManager, Touchable } from 'react-native';
 import { Text, useTheme, IconButton, List, TextInput } from 'react-native-paper';
 import { router } from "expo-router";
 import PermissionGate from '../PermissionGate';
@@ -15,28 +15,60 @@ const DropDown = ({
     onSelect,
     value,
     allowed=true,
+    searchPlaceholder = "Search...",
+    onSearchChange,
+    searchQueryValue,
+    clearOnSelect = false,
     maxVisibleItems = 3.5,
 }) => {
     const theme = useTheme();
     const [expanded, setExpanded] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [internalSearchQuery, setInternalSearchQuery] = useState("");
+
+    const activeSearchQuery = searchQueryValue !== undefined ? searchQueryValue : internalSearchQuery;
     
     useEffect(() => {
-        if (value) {
-            const found = items.find((i) => i.value === value);
-            setSelectedItem(found || null);
+        if (value === undefined) {
+            return;
         }
+
+        if (value === null) {
+            setSelectedItem(null);
+            return;
+        }
+
+        const found = items.find((i) => i.value === value);
+        setSelectedItem(found || null);
     }, [value, items]);
     
     const handleItemSelect = (item) => {
         setSelectedItem(item);
         setExpanded(false);
-        if (onSelect) onSelect(item.value);
+        if (onSelect) {
+            onSelect(item.value, item);
+        }
+
+        if (clearOnSelect) {
+            setSelectedItem(null);
+            if (searchQueryValue === undefined) {
+                setInternalSearchQuery("");
+            }
+        }
+    }
+
+    const handleSearchQueryChange = (query) => {
+        if (searchQueryValue === undefined) {
+            setInternalSearchQuery(query);
+        }
+
+        if (onSearchChange) {
+            onSearchChange(query);
+        }
     }
 
     const filteredItems = items.filter((item) =>
-        (item.label ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+        (item.label ?? "").toLowerCase().includes(activeSearchQuery.toLowerCase())
     )
 
     const listMaxHeight = Math.min(
@@ -47,53 +79,55 @@ const DropDown = ({
     return (
         <List.Section>
             <List.Accordion
-                title={selectedItem ? selectedItem.label : title}
-                expanded={expanded}
-                onPress={() => {
-                    if (!expanded) Keyboard.dismiss();
-                    setExpanded(prev => !prev)
-                }}
-                style={[expanded ? styles.containerExpanded : styles.containerCollapsed, { borderColor: theme.colors.outline }]}
-            >
-                <View style={styles.searchContainer}>
-                    <TextInput
-                        mode="outlined"
-                        placeholder="Search..."
-                        placeholderTextColor={theme.colors.placeholderText}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        style={[styles.searchInput, { height: SEARCH_HEIGHT }]}
-                        outlineColor={theme.colors.outline}
-                        activeOutlineColor={theme.colors.primary}
-                        theme={{ roundness: 0 }}
-                    />
-                </View>
+    title={selectedItem ? selectedItem.label : title}
+    expanded={expanded}
+    onPress={() => {
+        if (!expanded) Keyboard.dismiss();
+        setExpanded(prev => !prev)
+    }}
+    style={[expanded ? styles.containerExpanded : styles.containerCollapsed, { borderColor: theme.colors.outline }]}
+>
+    <View style={styles.searchContainer}>
+        <TextInput
+            mode="outlined"
+            placeholder={searchPlaceholder}
+            placeholderTextColor={theme.colors.placeholderText}
+            value={activeSearchQuery}
+            onChangeText={handleSearchQueryChange}
+            style={[styles.searchInput, { height: SEARCH_HEIGHT }]}
+            outlineColor={theme.colors.outline}
+            activeOutlineColor={theme.colors.primary}
+            theme={{ roundness: 0 }}
+        />
+    </View>
+
 
                 <View
                     style={[ styles.panelContainer, {borderColor: theme.colors.outline,} ]}
                 >
+
                     <ScrollView
+                        style={{ maxHeight: 500 }}   // <-- THIS IS THE CUT-OFF HEIGHT
+                        keyboardShouldPersistTaps="handled"
                         nestedScrollEnabled
-                        style={{ maxHeight: listMaxHeight }}
-                        keyboardShouldPersistTaps="always"
-                        bounces
-                        onStartShouldSetResponderCapture={() => false}
-                        onMoveShouldSetResponderCapture={(e) => {
-                            const touches = e.nativeEvent?.touches;
-                            return touches && touches.length > 0;
-                        }}
                     >
-                        {filteredItems.map((item, index) => (
+                        {filteredItems.map((item, index) => (   
+                            <TouchableOpacity onPress={() => {
+                                    Keyboard.dismiss();
+                                    handleItemSelect(item);
+                                }}
+                                key={index}
+                                >
                             <List.Item
                                 key={index}
                                 title={item.label}
-                                style={[styles.items, { borderColor: theme.colors.outline, height: ITEM_HEIGHT }]}
-                                titleStyle={{ lineHeight: 20 }}
+                                style={[styles.items, { borderColor: theme.colors.outline }]}
                                 onPress={() => {
                                     Keyboard.dismiss();
                                     handleItemSelect(item);
                                 }}
                             />
+                            </TouchableOpacity>
                         ))}
                     </ScrollView>
 
