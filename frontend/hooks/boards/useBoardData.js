@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Alert } from "react-native";
 import { router } from "expo-router";
-import BoardService from "../services/BoardService";
+import BoardService from "../../services/BoardService";
 
 export const useBoardData = (boardId) => {
   const [board, setBoard] = useState(null);
