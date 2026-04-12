@@ -47,6 +47,8 @@ Resources:
         AppConfigurationBucketName: !Ref AppConfigurationBucketName
         WorkspaceBucketName: !Ref WorkspaceBucketName
         AuditQueueUrl: !Ref AuditQueueUrl
+        AppSyncUrl: !Ref AppSyncUrl
+        AppSyncApiKey: !Ref AppSyncApiKey
         UserPoolArn: !Ref UserPoolArn
 
   AuditDomainFunctions:
