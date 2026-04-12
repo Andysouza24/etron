@@ -7,38 +7,34 @@ import BoardService from '../../../../services/BoardService';
 import ResponsiveScreen from '../../../../components/layout/ResponsiveScreen';
 import SearchBar from '../../../../components/common/input/SearchBar';
 import BasicButton from '../../../../components/common/buttons/BasicButton';
-import BoardCard from './components/BoardCard';
+import BoardCard from '../../../../components/boards/BoardCard';
 import { formatTimeAgo } from '../../../../utils/boards/dateUtils';
 import { useHasPermission } from '../../../../hooks/useHasPermission';
+import { useBoardContext } from '../../../../contexts/BoardContext';
 
 const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const BoardsManagement = () => {
     const theme = useTheme();
     const { allowed: canManageBoards } = useHasPermission(MANAGE_BOARDS_PERM);
-    const [boards, setBoards] = useState([]);
+    const { boards, loading, ensureBoards, deleteBoard, duplicateBoard, refresh } = useBoardContext();
     const [searchQuery, setSearchQuery] = useState('');
-    const [loading, setLoading] = useState(true);
     const [activeBoardId, setActiveBoardId] = useState(null);
-    // Load boards
+
     const loadBoards = useCallback(async () => {
-        try {
-            setLoading(true);
-            const allBoards = await BoardService.getAllBoards();
-            const activeId = await BoardService.getActiveDashboardId(allBoards);
-            setBoards(allBoards);
-            setActiveBoardId(activeId);
-        } catch (error) {
-            console.error('Error loading boards:', error);
-            Alert.alert('Error', 'Failed to load boards');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+        const loadedBoards = await refresh();
+        const activeId = await BoardService.getActiveDashboardId(loadedBoards || boards);
+        setActiveBoardId(activeId);
+    }, [refresh]);
 
     useEffect(() => {
-        loadBoards();
-    }, [loadBoards]);
+        ensureBoards().then(async (loadedBoards) => {
+            if (loadedBoards) {
+                const activeId = await BoardService.getActiveDashboardId(loadedBoards);
+                setActiveBoardId(activeId);
+            }
+        });
+    }, [ensureBoards]);
 
     useFocusEffect(
         useCallback(() => {
@@ -72,10 +68,9 @@ const BoardsManagement = () => {
 
     const handleDuplicateBoard = async (board) => {
         try {
-            const duplicated = await BoardService.duplicateBoard(board.id);
+            const duplicated = await duplicateBoard(board.id);
             if (duplicated) {
                 Alert.alert('Success', `Board "${board.name}" duplicated`);
-                loadBoards();
             } else {
                 Alert.alert('Error', 'Failed to duplicate board');
             }
@@ -96,13 +91,8 @@ const BoardsManagement = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const success = await BoardService.deleteBoard(board.id);
-                            if (success) {
-                                Alert.alert('Success', 'Board deleted');
-                                loadBoards();
-                            } else {
-                                Alert.alert('Error', 'Failed to delete board');
-                            }
+                            await deleteBoard(board.id);
+                            Alert.alert('Success', 'Board deleted');
                         } catch (error) {
                             console.error('Error deleting board:', error);
                             Alert.alert('Error', 'Failed to delete board');

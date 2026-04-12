@@ -8,7 +8,7 @@ import CustomBottomSheet from '../../../../../components/BottomSheet';
 import MetricPicker from '../../../../../components/boards/MetricPicker';
 import ButtonPicker from '../../../../../components/boards/ButtonPicker';
 import ResponsiveScreen from '../../../../../components/layout/ResponsiveScreen';
-import { useBoardData } from '../../../../../hooks/useBoardData';
+import { useBoardData } from '../../../../../hooks/boards/useBoardData';
 import { useMetricStates } from '../../../../../hooks/useMetricStates';
 import { useDisplaySettings } from '../../../../../hooks/useDisplaySettings';
 import AddItemPicker from '../../../../../components/boards/AddItemPicker';
