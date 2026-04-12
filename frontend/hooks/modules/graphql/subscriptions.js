@@ -48,4 +48,18 @@ export const onDataSourceUpdate = /* GraphQL */ `
     createdBy
   }
 }
-`
+`;
+
+export const onBoardUpdate = /* GraphQL */ `
+  subscription OnBoardUpdate($workspaceId: ID!) {
+    onBoardUpdate(workspaceId: $workspaceId) {
+      workspaceId
+      boardId
+      name
+      config
+      isDashboard
+      updatedAt
+      action
+    }
+  }
+`;
