@@ -15,7 +15,7 @@ const BoardCard = ({
     onDuplicate,
     onSettings,
     onDelete,
-    style
+    style,
 }) => {
     const theme = useTheme();
     const [menuVisible, setMenuVisible] = useState(false);
@@ -24,9 +24,11 @@ const BoardCard = ({
         [
             styles.card,
             style,
-            isActive && { borderColor: theme.colors.primary, borderWidth: 2 }
+            isActive && {  }
         ]
-    ), [isActive, style, theme.colors.primary]);
+    ), [isActive, style]);
+
+
 
     const handleToggleMenu = () => setMenuVisible((prev) => !prev);
     const handleDismissMenu = () => setMenuVisible(false);
@@ -74,6 +76,7 @@ const BoardCard = ({
         <Card
             style={cardStyle}
             onPress={() => onView?.(board.id)}
+            mode={isActive ? "outlined" : "elevated"}
         >
             <Card.Content style={styles.content}>
                 <View style={styles.headerRow}>

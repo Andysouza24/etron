@@ -609,9 +609,10 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                     {editingActive && !isResizeActive && (
                         <FAB
                             icon="plus"
-                            style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-                            color={theme.colors.onPrimary ?? '#ffffff'}
+                            style={[styles.fab/*, { backgroundColor: theme.colors.metricsBlue }*/]}
+                            /*color={theme.colors.primary ?? '#ffffff'}*/
                             onPress={() => setShowAddItemPicker(true)}
+                            variant="surface"
                         />
                     )}
                 </View>

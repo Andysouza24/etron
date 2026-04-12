@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import { useTheme, Appbar, Icon, Text } from "react-native-paper";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { useTheme, Appbar, Icon, Divider } from "react-native-paper";
+import { View, StyleSheet } from "react-native";
 import { Drawer } from "expo-router/drawer"
-import DescriptiveButton from "../../../components/common/buttons/DescriptiveButton";
-import { commonStyles } from "../../../assets/styles/stylesheets/common";
 import PermissionGate from "../../../components/common/PermissionGate";
-import { hasPermission } from "../../../utils/permissions";
 import { usePermissionSync } from "../../../hooks/usePermissionSync";
 import { getWorkspaceId } from "../../../storage/workspaceStorage";
 import { useHasPermission } from "../../../hooks/useHasPermission";
@@ -71,49 +68,28 @@ const boardOptions = [
     },
 ]
 
-const DrawerRow = ({ label, icon, onPress, active = false, style }) => {
+const DrawerButton = ({ route, options, navigation, permKey, isActive }) => {
+    const { allowed } = useHasPermission(permKey);
     const theme = useTheme();
-    const lightBackground = theme.colors.altGM;
-    const activeBackground = theme.colors.activeBackground;
-    const onTile = theme.colors.onTile;
-
-    return (
-        <TouchableOpacity
-            onPress={onPress}
-            style={[
-                styles.row,
-                { backgroundColor: active ? activeBackground : lightBackground },
-                style,
-            ]}
-            activeOpacity={0.7}
-        >
-            <Icon source={icon} size={22} color={onTile} />
-            <Text style={[styles.rowLabel, { color: onTile }]} numberOfLines={1}>
-                {label}
-            </Text>
-        </TouchableOpacity>
-    )
-}
-
-const DrawerButton = ({route, options, navigation, permKey, isActive }) => {
-    const { allowed } = useHasPermission(permKey)
     return (
         <PermissionGate
             allowed={allowed}
-            onAllowed={() => navigation.navigate(route.name)}
+            onAllowed={() => navigation.jumpTo(route.name)}
         >
             <DrawerItem
-                key={route.key}
                 label={options.drawerLabel ?? route.name}
-                icon={({ size }) => <Icon source={options.drawerIcon ? options.drawerIcon({}).source ?? options.drawerIcon : options.drawerIcon} size={size} color={"#000"} />}
-                
-                style={[styles.itemContainer, isActive && styles.itemContainerActive]}
-                labelStyle={[styles.itemLabel]}
+                icon={options.drawerIcon}
                 focused={isActive}
+                activeTintColor={theme.colors.onSecondaryContainer}
+                activeBackgroundColor={theme.colors.secondaryContainer}
+                inactiveTintColor={theme.colors.onSurfaceVariant}
+                style={styles.itemContainer}
+                labelStyle={styles.itemLabel}
+                onPress={() => {}}
             />
         </PermissionGate>
     );
-}
+};
 
 const CustomDrawer = (props) => {
     const { navigation, drawerState, setDrawerState, state, descriptors } = props;
@@ -149,40 +125,51 @@ const CustomDrawer = (props) => {
     return (
         <View style={{ flex: 1 }}>
             <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
-                {drawerState == "default" ? (
-                    <Appbar.Action icon={"menu-open"} onPress={() => {navigation.closeDrawer()}} />
+                {drawerState === "default" ? (
+                    <Appbar.Action icon="menu-open" onPress={() => navigation.closeDrawer()} />
                 ) : (
-                    <Appbar.Action icon={"arrow-left-thin"} onPress={() => {setDrawerState("default")}} />
+                    <Appbar.Action icon="arrow-left-thin" onPress={() => setDrawerState("default")} />
                 )}
-                {drawerState == "default" ? (
+                {drawerState === "default" ? (
                     <View>
-                        <DrawerRow
+                        <DrawerItem
                             label="Dashboard"
-                            icon="view-dashboard"
+                            icon={({ color, size }) => <Icon source="view-dashboard" size={size} color={color} />}
+                            focused={activeRouteName === "dashboard"}
+                            activeTintColor={theme.colors.onSecondaryContainer}
+                            activeBackgroundColor={theme.colors.secondaryContainer}
+                            inactiveTintColor={theme.colors.onSurfaceVariant}
                             onPress={() => {
                                 setDrawerState("default");
-                                navigation.navigate("dashboard");
+                                navigation.jumpTo("dashboard");
                                 navigation.closeDrawer();
                             }}
-                            style={{ marginTop: 6 }}
-                            active={activeRouteName === "dashboard"}
+                            style={[styles.itemContainer, { marginTop: 6 }]}
+                            labelStyle={styles.itemLabel}
                         />
-                        <DrawerRow
+                        <DrawerItem
                             label="Boards"
-                            icon="view-grid-plus"
+                            icon={({ color, size }) => <Icon source="view-grid-plus" size={size} color={color} />}
+                            focused={activeRouteName === "boards"}
+                            activeTintColor={theme.colors.onSecondaryContainer}
+                            activeBackgroundColor={theme.colors.secondaryContainer}
+                            inactiveTintColor={theme.colors.onSurfaceVariant}
                             onPress={() => {
                                 setDrawerState("default");
-                                navigation.navigate("boards");
+                                navigation.jumpTo("boards");
                                 navigation.closeDrawer();
                             }}
-                            active={activeRouteName === "boards"}
+                            style={styles.itemContainer}
+                            labelStyle={styles.itemLabel}
                         />
-                        <View style={styles.divider} />
-                        <DrawerRow
+                        <Divider />
+                        <DrawerItem
                             label="Day Book"
-                            icon="file-document-multiple"
+                            icon={({ color, size }) => <Icon source="file-document-multiple" size={size} color={color} />}
+                            inactiveTintColor={theme.colors.onSurfaceVariant}
                             onPress={() => setDrawerState("day-book")}
-                            style={{ marginTop: 6}}
+                            style={[styles.itemContainer, { marginTop: 6 }]}
+                            labelStyle={styles.itemLabel}
                         />
                     </View>
                 ) : (
@@ -192,15 +179,14 @@ const CustomDrawer = (props) => {
                             route={route}
                             options={descriptors[route.key].options}
                             navigation={navigation}
-                            isActive={activeRouteName == route.name}
+                            isActive={activeRouteName === route.name}
                             permKey={permKey}
-                            style={{backgroundColor: theme.colors.buttonBackground}}
                         />
                     ))
                 )}
             </DrawerContentScrollView>
             <View style={styles.bottomSection}>
-                <View style={styles.divider} />
+                <Divider style={styles.divider} />
                 {generalRoutes.map(({ route, permKey }) => (
                     <DrawerButton
                         key={route.key}
@@ -208,7 +194,7 @@ const CustomDrawer = (props) => {
                         permKey={permKey}
                         options={descriptors[route.key].options}
                         navigation={navigation}
-                        isActive={activeRouteName == route.name}    
+                        isActive={activeRouteName === route.name}
                     />
                 ))}
             </View>
@@ -245,24 +231,29 @@ export default function DrawerLayout() {
                 drawerStyle: {
                     backgroundColor: theme.colors.navigationRailBackground,
                 },
+                drawerActiveTintColor: theme.colors.onSecondaryContainer,
+                drawerActiveBackgroundColor: theme.colors.secondaryContainer,
+                drawerInactiveTintColor: theme.colors.onSurfaceVariant,
+                drawerItemStyle: styles.itemContainer,
+                drawerLabelStyle: styles.itemLabel,
                 overlayColor: 'transparent',
-                sceneContainerStyle: {
+                sceneStyle: {
                     backgroundColor: theme.colors.background,
-                }
+                },
             }}
         >
-            {boardOptions.map(({ name, label, icon }) =>
+            {boardOptions.map(({ name, label, icon }) => (
                 <Drawer.Screen
                     key={name}
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
                         ),
                     }}
                 />
-            )}
+            ))}
 
             {dayBookOptions.map(({ name, label, icon }) => (
                 <Drawer.Screen
@@ -270,8 +261,8 @@ export default function DrawerLayout() {
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
                         ),
                     }}
                 />
@@ -283,9 +274,9 @@ export default function DrawerLayout() {
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
-                        )
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
+                        ),
                     }}
                 />
             ))}
@@ -298,40 +289,15 @@ const styles = StyleSheet.create({
         marginHorizontal: 10,
         marginVertical: 6,
         borderRadius: 10,
-        backgroundColor: "#FFFFFF"
-    },
-    itemContainerActive: {
-        backgroundColor: "#E0E0E0"
     },
     itemLabel: {
-        color: "#000",
         fontSize: 16,
     },
-
-    // Rows meant to look like drawer buttons
-    row: {
-        marginHorizontal: 10,
-        marginVertical: 6,
-        borderRadius: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-    },
-    rowLabel: {
-        fontSize: 16,
-    },
-
     bottomSection: {
         paddingBottom: 30,
-        marginHorizontal: 12
+        marginHorizontal: 12,
     },
     divider: {
-        alignSelf: "center",
-        width: "90%",
-        borderTopWidth: 1,
-        borderTopColor: "#FFFFFF",
         marginTop: 8,
         marginBottom: 4,
         opacity: 0.6,

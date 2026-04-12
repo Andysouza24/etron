@@ -32,7 +32,7 @@ const IconButton = ({
           {backgroundColor: backgroundColor || theme.colors.buttonBackgroundAlt}
         ]}
         contentStyle={styles.content}
-        labelStyle={styles.label}
+        //labelStyle={styles.label}
         onPress={onPress}
       >
         {label}
