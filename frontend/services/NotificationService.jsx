@@ -3,6 +3,20 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../utils/api/apiClient";
 
 class NotificationService {
 
+    // get all notifications for the current user
+    async getNotifications() {
+        return apiGet(endpoints.notifications.getNotifications);
+    }
+
+    // create a new notification
+    async createNotification({ title, body, data }) {
+        return apiPost(endpoints.notifications.createNotification, {
+            title,
+            body,
+            data,
+        });
+    }
+
     // register a device push token with the backend
     async registerPushToken(pushToken, platform) {
         return apiPost(endpoints.notifications.registerPushToken, {

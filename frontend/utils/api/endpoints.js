@@ -14,7 +14,7 @@ const AUDIT_BASE_URL =
   "https://5dzdrirs49.execute-api.ap-southeast-2.amazonaws.com/dev/audits";
 
 const NOTIFICATION_BASE_URL =
-  "https://<your-api-id>.execute-api.ap-southeast-2.amazonaws.com/dev/notifications";
+  "https://a4a8fkp9y8.execute-api.ap-southeast-2.amazonaws.com/dev/notifications";
 
 const endpoints = {
 	workspace: {
@@ -91,6 +91,8 @@ const endpoints = {
 	},
 
 	notifications: {
+	    getNotifications: `${NOTIFICATION_BASE_URL}`,
+	    createNotification: `${NOTIFICATION_BASE_URL}`,
 	    registerPushToken: `${NOTIFICATION_BASE_URL}/push-token`,
 	    removePushToken: `${NOTIFICATION_BASE_URL}/push-token`,
 	    getPreferences: `${NOTIFICATION_BASE_URL}/preferences`,
