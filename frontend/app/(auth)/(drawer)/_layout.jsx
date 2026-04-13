@@ -12,6 +12,11 @@ import { useHasPermission } from "../../../hooks/useHasPermission";
 
 const generalOptions = [
     {
+        name: "notifications",
+        label: "Notifications",
+        icon: "bell",
+    },
+    {
         name: "account-settings",
         label: "My Account",
         icon: "account",
@@ -26,7 +31,7 @@ const generalOptions = [
         name: "settings",
         label: "Settings",
         icon: "cog",
-    }
+    },
 ]
 
 const dayBookOptions = [
@@ -124,7 +129,7 @@ const CustomDrawer = (props) => {
 
     return (
         <View style={{ flex: 1 }}>
-            <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
+            <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1, paddingTop: 0 }}>
                 {drawerState === "default" ? (
                     <Appbar.Action icon="menu-open" onPress={() => navigation.closeDrawer()} />
                 ) : (
