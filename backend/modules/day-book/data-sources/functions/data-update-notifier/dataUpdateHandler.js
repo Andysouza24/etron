@@ -1,6 +1,7 @@
 // Author(s): Rhys Cleary
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
+const { evaluateAlerts } = require("./alertEvaluationService");
 const axios = require("axios");
 
 exports.handler = async (event) => {
@@ -63,5 +64,12 @@ exports.handler = async (event) => {
         );
     } catch (error) {
         console.error("Unable to send mutation:", error.message);
+    }
+
+    // evaluate metric alerts after data update
+    try {
+        await evaluateAlerts(workspaceId, dataSourceId, metrics);
+    } catch (error) {
+        console.error("Alert evaluation failed:", error.message);
     }
 };
