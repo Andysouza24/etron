@@ -1,0 +1,11 @@
+{
+  "name": "notification-evaluator",
+  "version": "1.0.0",
+  "description": "The backend for eTRON's notification evaluator function",
+  "author": "InSync",
+  "dependencies": {
+    "@etron/shared": "file:../../../shared/etron-shared-1.0.0.tgz"
+  },
+  "main": "evaluatorHandler.js",
+  "license": "ISC"
+}

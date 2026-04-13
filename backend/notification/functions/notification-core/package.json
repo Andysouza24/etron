@@ -1,0 +1,11 @@
+{
+  "name": "notification-core",
+  "version": "1.0.0",
+  "description": "The backend for eTRON's notification core function",
+  "author": "InSync",
+  "dependencies": {
+    "@etron/shared": "file:../../../shared/etron-shared-1.0.0.tgz"
+  },
+  "main": "notificationHandler.js",
+  "license": "ISC"
+}
