@@ -11,6 +11,7 @@ import workspaceService from '../../services/WorkspaceService';
 import { MetricProvider } from '../../contexts/MetricContext';
 import { DataSourceProvider } from '../../contexts/DataSourceContext';
 import { BoardProvider } from '../../contexts/BoardContext';
+import { NotificationProvider } from '../../contexts/NotificationContext';
 import { useAppContext } from '../../contexts/AppContext';
 
 export default function AuthLayout() {
@@ -163,12 +164,14 @@ export default function AuthLayout() {
 
 
     return (         
-        <DataSourceProvider>
-            <MetricProvider workspaceId={workspaceId}>
-                <BoardProvider workspaceId={workspaceId}>
-                    <Slot />
-                </BoardProvider>
-            </MetricProvider>
-        </DataSourceProvider>
+        <NotificationProvider>
+            <DataSourceProvider>
+                <MetricProvider workspaceId={workspaceId}>
+                    <BoardProvider workspaceId={workspaceId}>
+                        <Slot />
+                    </BoardProvider>
+                </MetricProvider>
+            </DataSourceProvider>
+        </NotificationProvider>
     );
 }
