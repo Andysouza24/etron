@@ -121,7 +121,10 @@ Resources:
           - Effect: Allow
             Action:
               - sqs:SendMessage
-            Resource: "*"
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt NotificationQueue.Arn
       Events:
         # Scheduled evaluation — can be enabled later when thresholds are implemented
         # ScheduledEvaluation:
@@ -135,3 +138,14 @@ Resources:
             Path: /notifications/evaluate
             Method: post
             RestApiId: !Ref eTRONApi
+        NotificationQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationQueue.Arn
+            BatchSize: 10
+
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: NotificationQueue
+      VisibilityTimeout: 60

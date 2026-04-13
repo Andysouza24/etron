@@ -1,10 +1,22 @@
-const { evaluate } = require("./evaluatorService");
+const { evaluate, sendPushNotification } = require("./evaluatorService");
 
 exports.handler = async (event) => {
     let statusCode = 200;
     let body;
 
     try {
+        // SQS invocation — process queued notification messages
+        if (event.Records) {
+            const results = [];
+            for (const record of event.Records) {
+                const message = JSON.parse(record.body);
+                const result = await sendPushNotification(message);
+                results.push(result);
+            }
+            return { statusCode: 200, body: JSON.stringify({ processed: results.length }) };
+        }
+
+        // API / scheduled invocations
         const requestJSON = event.body ? JSON.parse(event.body) : {};
         const authUserId = event.requestContext?.authorizer?.claims?.sub;
 
