@@ -83,3 +83,11 @@ Resources:
         AppSyncUrl: !Ref AppSyncUrl
         AppSyncApiKey: !Ref AppSyncApiKey
         UserPoolArn: !Ref UserPoolArn
+        
+  NotificationDomainFunctions:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./notification/template.yaml
+      Parameters:
+        AuditQueueUrl: !Ref AuditQueueUrl
+        UserPoolArn: !Ref UserPoolArn
