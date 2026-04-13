@@ -30,6 +30,7 @@ export default function CustomiseOptions({
     setBoxUseRawData,
 }) {
     const [view, setView] = useState("menu");
+    const [alerts, setAlerts] = useState([]);
 
     if (view !== "menu") {
         if (view === "appearance") {
@@ -64,7 +65,7 @@ export default function CustomiseOptions({
             );
         }
 
-        return <AdvancedOptions onBack={() => setView("menu")} onNavigate={setView} />;
+        return <AdvancedOptions onBack={() => setView("menu")} onNavigate={setView} alerts={alerts} setAlerts={setAlerts} />;
     }
 
     return (
