@@ -1,3 +1,4 @@
+const { randomUUID } = require("crypto");
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const {
     DynamoDBDocumentClient,
@@ -67,6 +68,46 @@ async function updatePreferences(userId, preferences) {
     return { message: "Preferences updated" };
 }
 
+async function createNotification(userId, { title, body, data }) {
+    if (!title) throw new Error("title is required");
+
+    const notificationId = randomUUID();
+    const createdAt = new Date().toISOString();
+
+    const item = {
+        userId,
+        notificationId,
+        title,
+        body: body || "",
+        data: data || {},
+        read: false,
+        createdAt,
+    };
+
+    await docClient.send(
+        new PutCommand({
+            TableName: "UserNotifications",
+            Item: item,
+        })
+    );
+
+    return item;
+}
+
+async function getNotifications(userId) {
+    const result = await docClient.send(
+        new QueryCommand({
+            TableName: "UserNotifications",
+            IndexName: "createdAt-index",
+            KeyConditionExpression: "userId = :uid",
+            ExpressionAttributeValues: { ":uid": userId },
+            ScanIndexForward: false,
+        })
+    );
+
+    return result.Items || [];
+}
+
 // used by the evaluator to look up tokens when sending
 async function getUserPushTokens(userId) {
     const result = await docClient.send(
@@ -86,4 +127,6 @@ module.exports = {
     getPreferences,
     updatePreferences,
     getUserPushTokens,
+    createNotification,
+    getNotifications,
 };

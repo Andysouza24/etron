@@ -63,6 +63,33 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
 
+  UserNotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserNotifications
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: notificationId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: notificationId
+          KeyType: RANGE
+      LocalSecondaryIndexes:
+        - IndexName: createdAt-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
   # Notification Core Lambda
   NotificationCoreFunction:
     Type: AWS::Serverless::Function
@@ -74,12 +101,26 @@ Resources:
             TableName: DevicePushTokens
         - DynamoDBCrudPolicy:
             TableName: NotificationPreferences
+        - DynamoDBCrudPolicy:
+            TableName: UserNotifications
         - Statement:
           - Effect: Allow
             Action:
               - sqs:SendMessage
             Resource: "*"
       Events:
+        GetNotifications:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: get
+            RestApiId: !Ref eTRONApi
+        CreateNotification:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: post
+            RestApiId: !Ref eTRONApi
         RegisterPushToken:
           Type: Api
           Properties:

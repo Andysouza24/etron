@@ -3,6 +3,8 @@ const {
     removePushToken,
     getPreferences,
     updatePreferences,
+    createNotification,
+    getNotifications,
 } = require("./notificationService");
 
 exports.handler = async (event) => {
@@ -20,6 +22,17 @@ exports.handler = async (event) => {
         const routeKey = `${event.httpMethod} ${event.resource}`;
 
         switch (routeKey) {
+            case "GET /notifications": {
+                body = await getNotifications(authUserId);
+                break;
+            }
+
+            case "POST /notifications": {
+                body = await createNotification(authUserId, requestJSON);
+                statusCode = 201;
+                break;
+            }
+
             case "POST /notifications/push-token": {
                 body = await registerPushToken(authUserId, requestJSON);
                 break;
