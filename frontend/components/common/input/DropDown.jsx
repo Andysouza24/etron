@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Keyboard, Platform, InteractionManager, Touchable } from 'react-native';
-import { Text, useTheme, IconButton, List, TextInput } from 'react-native-paper';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { Text, useTheme, Surface, Divider, Menu, Searchbar, Icon } from 'react-native-paper';
 import { router } from "expo-router";
 import PermissionGate from '../PermissionGate';
 
 const ITEM_HEIGHT = 48;
-const SEARCH_HEIGHT = 56;
-const FOOTER_HEIGHT = 50; 
+const MENU_CORNER_RADIUS = 4;
 
 const DropDown = ({
     title,
     items = [],
-    showRouterButton=true,
+    showRouterButton = true,
     onSelect,
     value,
-    allowed=true,
+    allowed = true,
     searchPlaceholder = "Search...",
     onSearchChange,
     searchQueryValue,
@@ -25,266 +24,173 @@ const DropDown = ({
     const [expanded, setExpanded] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [internalSearchQuery, setInternalSearchQuery] = useState("");
+    const searchBarRef = useRef(null);
 
     const activeSearchQuery = searchQueryValue !== undefined ? searchQueryValue : internalSearchQuery;
-    
+
     useEffect(() => {
-        if (value === undefined) {
-            return;
-        }
-
-        if (value === null) {
-            setSelectedItem(null);
-            return;
-        }
-
+        if (value === undefined) return;
+        if (value === null) { setSelectedItem(null); return; }
         const found = items.find((i) => i.value === value);
         setSelectedItem(found || null);
     }, [value, items]);
-    
+
+    useEffect(() => {
+        if (!expanded) {
+            if (searchQueryValue === undefined) setInternalSearchQuery("");
+            if (onSearchChange) onSearchChange("");
+        }
+    }, [expanded]);
+
     const handleItemSelect = (item) => {
         setSelectedItem(item);
         setExpanded(false);
-        if (onSelect) {
-            onSelect(item.value, item);
-        }
-
+        if (onSelect) onSelect(item.value, item);
         if (clearOnSelect) {
             setSelectedItem(null);
-            if (searchQueryValue === undefined) {
-                setInternalSearchQuery("");
-            }
+            if (searchQueryValue === undefined) setInternalSearchQuery("");
         }
-    }
+    };
 
     const handleSearchQueryChange = (query) => {
-        if (searchQueryValue === undefined) {
-            setInternalSearchQuery(query);
-        }
-
-        if (onSearchChange) {
-            onSearchChange(query);
-        }
-    }
+        if (searchQueryValue === undefined) setInternalSearchQuery(query);
+        if (onSearchChange) onSearchChange(query);
+    };
 
     const filteredItems = items.filter((item) =>
         (item.label ?? "").toLowerCase().includes(activeSearchQuery.toLowerCase())
-    )
+    );
 
     const listMaxHeight = Math.min(
         ITEM_HEIGHT * maxVisibleItems,
         ITEM_HEIGHT * filteredItems.length
     );
 
+    const triggerLabel = selectedItem ? selectedItem.label : title;
+    const isTitlePlaceholder = !selectedItem;
+
+    const handleClearSearch = () => {
+        handleSearchQueryChange("");
+    };
+
     return (
-        <List.Section>
-            <List.Accordion
-    title={selectedItem ? selectedItem.label : title}
-    expanded={expanded}
-    onPress={() => {
-        if (!expanded) Keyboard.dismiss();
-        setExpanded(prev => !prev)
-    }}
-    style={[expanded ? styles.containerExpanded : styles.containerCollapsed, { borderColor: theme.colors.outline }]}
->
-    <View style={styles.searchContainer}>
-        <TextInput
-            mode="outlined"
-            placeholder={searchPlaceholder}
-            placeholderTextColor={theme.colors.placeholderText}
-            value={activeSearchQuery}
-            onChangeText={handleSearchQueryChange}
-            style={[styles.searchInput, { height: SEARCH_HEIGHT }]}
-            outlineColor={theme.colors.outline}
-            activeOutlineColor={theme.colors.primary}
-            theme={{ roundness: 0 }}
-        />
-    </View>
+        <View style={{ zIndex: expanded ? 9999 : 0 }}>
+            {/* Backdrop to close on outside tap */}
+            {expanded && (
+                <Pressable
+                    style={styles.backdrop}
+                    onPress={() => setExpanded(false)}
+                />
+            )}
 
-
-                <View
-                    style={[ styles.panelContainer, {borderColor: theme.colors.outline,} ]}
+            {/* Trigger / inline search */}
+            {expanded ? (
+                <Searchbar
+                    ref={searchBarRef}
+                    placeholder={searchPlaceholder}
+                    value={activeSearchQuery}
+                    onChangeText={handleSearchQueryChange}
+                    onClearIconPress={handleClearSearch}
+                    traileringIcon="menu-up"
+                    onTraileringIconPress={() => setExpanded(false)}
+                    style={[
+                        styles.searchBar,
+                        {
+                            borderColor: theme.colors.outline,
+                            backgroundColor: theme.colors.surface,
+                        },
+                    ]}
+                    inputStyle={styles.searchBarInput}
+                    elevation={0}
+                />
+            ) : (
+                <Pressable
+                    onPress={() => {
+                        setExpanded(true);
+                    }}
+                    style={({ pressed }) => [
+                        styles.trigger,
+                        styles.triggerCollapsed,
+                        {
+                            borderColor: theme.colors.outline,
+                            backgroundColor: pressed
+                                ? theme.colors.surfaceVariant
+                                : theme.colors.surface,
+                        },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: false }}
+                    accessibilityLabel={triggerLabel}
                 >
-
-                    <ScrollView
-                        style={{ maxHeight: 500 }}   // <-- THIS IS THE CUT-OFF HEIGHT
-                        keyboardShouldPersistTaps="handled"
-                        nestedScrollEnabled
+                    <Text
+                        style={[
+                            styles.triggerText,
+                            { color: isTitlePlaceholder ? theme.colors.onSurfaceVariant : theme.colors.onSurface },
+                        ]}
+                        numberOfLines={1}
                     >
-                        {filteredItems.map((item, index) => (   
-                            <TouchableOpacity onPress={() => {
-                                    Keyboard.dismiss();
-                                    handleItemSelect(item);
-                                }}
-                                key={index}
-                                >
-                            <List.Item
+                        {triggerLabel}
+                    </Text>
+                    <Icon
+                        source="menu-down"
+                        size={24}
+                        color={theme.colors.onSurfaceVariant}
+                    />
+                </Pressable>
+            )}
+
+            {/* Expanded menu panel */}
+            {expanded && (
+                <Surface
+                    style={styles.menuSurface}
+                    elevation={2}
+                >
+                    <Divider />
+
+                    {/* Menu items */}
+                    <ScrollView
+                        style={{ maxHeight: listMaxHeight }}
+                        keyboardShouldPersistTaps="always"
+                        nestedScrollEnabled={true}
+                        scrollEnabled={true}
+                    >
+                        {filteredItems.map((item, index) => (
+                            <Menu.Item
                                 key={index}
                                 title={item.label}
-                                style={[styles.items, { borderColor: theme.colors.outline }]}
-                                onPress={() => {
-                                    Keyboard.dismiss();
-                                    handleItemSelect(item);
-                                }}
+                                onPress={() => handleItemSelect(item)}
+                                style={
+                                    selectedItem?.value === item.value
+                                        ? { backgroundColor: theme.colors.secondaryContainer }
+                                        : undefined
+                                }
+                                titleStyle={
+                                    selectedItem?.value === item.value
+                                        ? { color: theme.colors.onSecondaryContainer }
+                                        : undefined
+                                }
                             />
-                            </TouchableOpacity>
                         ))}
                     </ScrollView>
 
+                    {/* Footer: New Data Source */}
                     {showRouterButton && (
                         <PermissionGate allowed={allowed}>
-                            <TouchableOpacity
-                                style={[styles.routerButton, { borderColor: theme.colors.outline, height: FOOTER_HEIGHT }]}
-                                onPress={() => router.navigate('/modules/day-book/data-management/create-data-connection')}
-                            >
-                                <View style={styles.routerButtonContent}>
-                                    <IconButton icon="plus" size={20} style={styles.routerIcon} iconColor={theme.colors.icon} />
-                                    <Text style={[styles.routerText, { color: theme.colors.placeholderText }]}>
-                                        New Data Source
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
+                            <View>
+                                <Divider />
+                                <Menu.Item
+                                    leadingIcon="plus"
+                                    title="New Data Source"
+                                    onPress={() =>
+                                        router.navigate('/modules/day-book/data-management/create-data-connection')
+                                    }
+                                    titleStyle={{ color: theme.colors.onSurfaceVariant }}
+                                />
+                            </View>
                         </PermissionGate>
                     )}
-                </View>
-            </List.Accordion>
-        </List.Section>
-    );
-};
-
-export default DropDown;
-
-const styles = StyleSheet.create({
-    containerCollapsed: {
-        borderWidth: 1,
-        borderRadius: 10
-    },
-    containerExpanded: {
-        borderWidth: 1,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-    },
-    searchContainer: {
-        borderCurve: 0,
-    },
-    searchInput: {
-        height: 50,
-        fontSize: 16,
-    },
-
-    panelContainer: {
-        borderLeftWidth: 1,
-        borderRightWidth: 1,
-        borderBottomWidth: 1,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-        overflow: 'hidden',
-    },
-
-    items: {
-        borderWidth: 1,
-    },
-    lastItem: {
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-    },
-    routerButton: {
-        height: 50,
-        borderWidth: 1,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-        justifyContent: 'center',
-        paddingHorizontal: 5,
-    },
-    routerButtonContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    routerIcon: {
-        margin: 0,
-        marginRight: 4,
-    },
-    routerText: {
-        fontSize: 16,
-    },
-});
-
-/*
-const DropDown = ({
-    label = 'Select',
-    options = [], //Will pull individual sources from backend
-    selectedValue,
-    onValueChange,
-    placeholder = 'Search',
-}) => {
-    const [menuVisible, setMenuVisible] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const filteredOptions = options.filter(option =>
-        option.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const theme = useTheme();
-
-    return (
-        <View style={styles.container}>
-            <Menu
-                visible={menuVisible}
-                onDismiss={() => setMenuVisible(false)}
-                anchor={
-                    <TouchableOpacity onPress={() => setMenuVisible(true)}>
-                        <TextInput
-                            label={label}
-                            value={selectedValue}
-                            editable={false}
-                            right={<TextInput.Icon icon="menu-down" onPress={() => setMenuVisible(true)} />}
-                            style={styles.input}
-                        />
-                    </TouchableOpacity>
-                }
-                contentStyle={styles.menuContent}
-            >
-                <TextInput
-                    placeholder={placeholder}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    style={styles.searchInput}
-                    left={<TextInput.Icon icon="magnify"/>}
-                    right={<TextInput.Icon icon="menu-up" onPress={() => setMenuVisible(false)} />}
-                />
-
-                <ScrollView style={styles.list}>
-                    {filteredOptions.map((item, index) => (
-                        <List.Item
-                            key={`${item}-${index}`}
-                            title={item}
-                            onPress={() => {
-                                onValueChange(item);
-                                setMenuVisible(false);
-                                setSearchQuery('');
-                            }}
-                            titleStyle={{ color: theme.colors.text }}
-                            style={{
-                                paddingVertical: 4,
-                                paddingHorizontal: 10,
-                            }}
-                        />
-                    ))}
-                </ScrollView>
-
-                <TouchableOpacity
-                    style={styles.routerButton}
-                    onPress={() => {
-                        setMenuVisible(false);
-                        setSearchQuery('');
-                        router.navigate('/create-data-connection')
-                    }}
-                >
-                    <Text style={{ color: theme.colors.placeholderText, textAlignVertical: 'center' }}>
-                        New Data Source
-                    </Text>
-                </TouchableOpacity>
-            </Menu>
+                </Surface>
+            )}
         </View>
     );
 };
@@ -292,30 +198,48 @@ const DropDown = ({
 export default DropDown;
 
 const styles = StyleSheet.create({
-    container: {
-        margin: 0,
-        zIndex: 999,
-        width: 230,
-    },
-    input: {
-        backgroundColor: 'white',
-    },
-    searchInput: {
-        margin: 0,
-        backgroundColor: '#f2f2f2',
-    },
-    menuContent: {
-        paddingVertical: 0,
-        width: 230,
-    },
-    list: {
-        maxheight: 200,
-    },
-    routerButton: {
+    trigger: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderWidth: 1,
-        paddingHorizontal: 15,
-        paddingVertical: 0,
-        height: 50,
+        height: ITEM_HEIGHT,
+        paddingHorizontal: 12,
     },
-})
-*/
+    triggerCollapsed: {
+        borderRadius: MENU_CORNER_RADIUS,
+    },
+    triggerText: {
+        flex: 1,
+        fontSize: 16,
+        marginRight: 8,
+    },
+    backdrop: {
+        position: 'absolute',
+        top: -9999,
+        bottom: -9999,
+        left: -9999,
+        right: -9999,
+        zIndex: 1,
+    },
+    searchBar: {
+        borderWidth: 1,
+        borderRadius: 0,
+        borderTopLeftRadius: MENU_CORNER_RADIUS,
+        borderTopRightRadius: MENU_CORNER_RADIUS,
+        height: ITEM_HEIGHT,
+        zIndex: 2,
+    },
+    searchBarInput: {
+        fontSize: 14,
+    },
+    menuSurface: {
+        position: 'absolute',
+        top: ITEM_HEIGHT,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        borderBottomLeftRadius: MENU_CORNER_RADIUS,
+        borderBottomRightRadius: MENU_CORNER_RADIUS,
+    },
+});
