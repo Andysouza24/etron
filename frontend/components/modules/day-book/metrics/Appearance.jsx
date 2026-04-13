@@ -141,6 +141,8 @@ export default function Appearance({
         axisNumberFormat?.currencySymbol && !CURRENCY_ITEMS.some((c) => c.value === axisNumberFormat.currencySymbol && c.value !== "custom")
     );
 
+    const [view, setView] = useState("menu");
+
     const currentDecimal = numberFormat?.decimalSeparator ?? ".";
     const currentThousands = numberFormat?.thousandsSeparator ?? ",";
     const availableThousands = getAvailableThousandsItems(currentDecimal);
@@ -149,184 +151,183 @@ export default function Appearance({
     const axisThousands = axisNumberFormat?.thousandsSeparator ?? ",";
     const availableAxisThousands = getAvailableThousandsItems(axisDecimal);
 
-    return (
-        <View style={{ width: "100%" }}>
-            <OptionsHeader onBack={onBack} />
+    if (view === "graphDisplay") {
+        return (
+            <View style={{ width: "100%" }}>
+                <OptionsHeader onBack={() => setView("menu")} />
 
-            <DropDown
-                title="Select Display Type"
-                items={Object.values(GraphTypes).map((g) => ({
-                    value: g.value,
-                    label: g.label,
-                }))}
-                showRouterButton={false}
-                onSelect={setSelectedMetric}
-                value={selectedMetric}
-            />
-
-            {/* display-type-specific options */}
-            {isProgress && (
-                <TextField
-                    label="Value Required For 100%"
-                    placeholder="Auto (latest value)"
-                    value={maxValue != null ? String(maxValue) : ""}
-                    onChangeText={(text) => {
-                        if (text === "") {
-                            setMaxValue(null);
-                            return;
-                        }
-                        const parsed = Number(text);
-                        if (Number.isFinite(parsed)) {
-                            setMaxValue(parsed);
-                        }
-                    }}
-                    onBlur={() => {
-                        if (maxValue == null) return;
-                        const num = Number(maxValue);
-                        if (!Number.isFinite(num) || num <= 0) {
-                            setMaxValue(null);
-                        }
-                    }}
-                />
-            )}
-
-            {isProgress && (
-                <TouchableOpacity
-                    onPress={() => setCapPercentAt100(!capPercentAt100)}
-                    style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
-                >
-                    <Checkbox
-                        status={capPercentAt100 ? "checked" : "unchecked"}
-                        onPress={() => setCapPercentAt100(!capPercentAt100)}
-                    />
-                    <Text style={{ fontSize: 14, color: theme.colors.text }}>Cap percentage at 100%</Text>
-                </TouchableOpacity>
-            )}
-
-            {isPie && (
                 <DropDown
-                    title="Label Placement"
-                    items={PIE_LABEL_PLACEMENT_ITEMS}
+                    title="Select Display Type"
+                    items={Object.values(GraphTypes).map((g) => ({
+                        value: g.value,
+                        label: g.label,
+                    }))}
                     showRouterButton={false}
-                    onSelect={setPieLabelPlacement}
-                    value={pieLabelPlacement ?? "outside"}
+                    onSelect={setSelectedMetric}
+                    value={selectedMetric}
                 />
-            )}
 
-            {isBox && (
-                <>
-                    <DropDown
-                        title="Box Plot Grouping"
-                        items={BOX_GROUPING_ITEMS}
-                        showRouterButton={false}
-                        onSelect={setBoxGrouping}
-                        value={boxGrouping}
+                {/* display-type-specific options */}
+                {isProgress && (
+                    <TextField
+                        label="Value Required For 100%"
+                        placeholder="Auto (latest value)"
+                        value={maxValue != null ? String(maxValue) : ""}
+                        onChangeText={(text) => {
+                            if (text === "") {
+                                setMaxValue(null);
+                                return;
+                            }
+                            const parsed = Number(text);
+                            if (Number.isFinite(parsed)) {
+                                setMaxValue(parsed);
+                            }
+                        }}
+                        onBlur={() => {
+                            if (maxValue == null) return;
+                            const num = Number(maxValue);
+                            if (!Number.isFinite(num) || num <= 0) {
+                                setMaxValue(null);
+                            }
+                        }}
                     />
+                )}
 
-                    <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 4, marginBottom: 8, paddingHorizontal: 4 }}>
-                        {BOX_GROUPING_DESCRIPTIONS[boxGrouping] ?? ""}
-                    </Text>
-
-                    {boxGrouping === "timePeriod" && (
-                        <DropDown
-                            title="Time Period"
-                            items={BOX_TIME_PERIOD_ITEMS}
-                            showRouterButton={false}
-                            onSelect={setBoxTimePeriod}
-                            value={boxTimePeriod}
+                {isProgress && (
+                    <TouchableOpacity
+                        onPress={() => setCapPercentAt100(!capPercentAt100)}
+                        style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
+                    >
+                        <Checkbox
+                            status={capPercentAt100 ? "checked" : "unchecked"}
+                            onPress={() => setCapPercentAt100(!capPercentAt100)}
                         />
-                    )}
+                        <Text style={{ fontSize: 14, color: theme.colors.text }}>Cap percentage at 100%</Text>
+                    </TouchableOpacity>
+                )}
 
-                    {rawGraphData && (
-                        <TouchableOpacity
-                            onPress={() => setBoxUseRawData(!boxUseRawData)}
-                            style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
-                        >
-                            <Checkbox
-                                status={boxUseRawData ? "checked" : "unchecked"}
-                                onPress={() => setBoxUseRawData(!boxUseRawData)}
-                            />
-                            <Text style={{ fontSize: 14, color: theme.colors.text }}>Use pre-aggregation data</Text>
-                        </TouchableOpacity>
-                    )}
-                    {rawGraphData && boxUseRawData && (
-                        <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 2, marginBottom: 8, paddingHorizontal: 4 }}>
-                            Uses raw data before aggregation, giving multiple values per time period for a meaningful distribution.
+                {isPie && (
+                    <DropDown
+                        title="Label Placement"
+                        items={PIE_LABEL_PLACEMENT_ITEMS}
+                        showRouterButton={false}
+                        onSelect={setPieLabelPlacement}
+                        value={pieLabelPlacement ?? "outside"}
+                    />
+                )}
+
+                {isBox && (
+                    <>
+                        <DropDown
+                            title="Box Plot Grouping"
+                            items={BOX_GROUPING_ITEMS}
+                            showRouterButton={false}
+                            onSelect={setBoxGrouping}
+                            value={boxGrouping}
+                        />
+
+                        <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 4, marginBottom: 8, paddingHorizontal: 4 }}>
+                            {BOX_GROUPING_DESCRIPTIONS[boxGrouping] ?? ""}
                         </Text>
-                    )}
-                </>
-            )}
 
-            {/* formatting available for all display types */}
-            <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginTop: 16, marginBottom: 8, paddingHorizontal: 4 }}>
-                Number Formatting
-            </Text>
+                        {boxGrouping === "timePeriod" && (
+                            <DropDown
+                                title="Time Period"
+                                items={BOX_TIME_PERIOD_ITEMS}
+                                showRouterButton={false}
+                                onSelect={setBoxTimePeriod}
+                                value={boxTimePeriod}
+                            />
+                        )}
 
-            <DropDown
-                title="Currency Symbol"
-                items={CURRENCY_ITEMS}
-                showRouterButton={false}
-                onSelect={(val) => {
-                    if (val === "custom") {
-                        setIsCustomCurrency(true);
-                        setNumberFormat((prev) => ({ ...prev, currencySymbol: customCurrency }));
-                    } else {
-                        setIsCustomCurrency(false);
-                        setNumberFormat((prev) => ({ ...prev, currencySymbol: val }));
-                    }
-                }}
-                value={isCustomCurrency ? "custom" : (numberFormat?.currencySymbol ?? "")}
-            />
+                        {rawGraphData && (
+                            <TouchableOpacity
+                                onPress={() => setBoxUseRawData(!boxUseRawData)}
+                                style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
+                            >
+                                <Checkbox
+                                    status={boxUseRawData ? "checked" : "unchecked"}
+                                    onPress={() => setBoxUseRawData(!boxUseRawData)}
+                                />
+                                <Text style={{ fontSize: 14, color: theme.colors.text }}>Use pre-aggregation data</Text>
+                            </TouchableOpacity>
+                        )}
+                        {rawGraphData && boxUseRawData && (
+                            <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 2, marginBottom: 8, paddingHorizontal: 4 }}>
+                                Uses raw data before aggregation, giving multiple values per time period for a meaningful distribution.
+                            </Text>
+                        )}
+                    </>
+                )}
 
-            {isCustomCurrency && (
-                <TextField
-                    label="Custom Currency Symbol"
-                    placeholder="e.g. CHF, kr"
-                    value={customCurrency}
-                    onChangeText={(text) => {
-                        setCustomCurrency(text);
-                        setNumberFormat((prev) => ({ ...prev, currencySymbol: text }));
+                <BasicButton fullWidth label="Back" onPress={() => setView("menu")} />
+            </View>
+        );
+    }
+
+    if (view === "displayOptions") {
+        return (
+            <View style={{ width: "100%" }}>
+                <OptionsHeader onBack={() => setView("menu")} />
+
+                <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginTop: 8, marginBottom: 8, paddingHorizontal: 4 }}>
+                    Number Formatting
+                </Text>
+
+                <DropDown
+                    title="Currency Symbol"
+                    items={CURRENCY_ITEMS}
+                    showRouterButton={false}
+                    onSelect={(val) => {
+                        if (val === "custom") {
+                            setIsCustomCurrency(true);
+                            setNumberFormat((prev) => ({ ...prev, currencySymbol: customCurrency }));
+                        } else {
+                            setIsCustomCurrency(false);
+                            setNumberFormat((prev) => ({ ...prev, currencySymbol: val }));
+                        }
                     }}
+                    value={isCustomCurrency ? "custom" : (numberFormat?.currencySymbol ?? "")}
                 />
-            )}
 
-            <DropDown
-                title="Decimal Separator"
-                items={DECIMAL_SEPARATOR_ITEMS}
-                showRouterButton={false}
-                onSelect={(val) => {
-                    const newFormat = { ...numberFormat, decimalSeparator: val };
-                    if (newFormat.thousandsSeparator === val) {
-                        newFormat.thousandsSeparator = val === "." ? "," : ".";
-                    }
-                    setNumberFormat(newFormat);
-                }}
-                value={currentDecimal}
-            />
+                {isCustomCurrency && (
+                    <TextField
+                        label="Custom Currency Symbol"
+                        placeholder="e.g. CHF, kr"
+                        value={customCurrency}
+                        onChangeText={(text) => {
+                            setCustomCurrency(text);
+                            setNumberFormat((prev) => ({ ...prev, currencySymbol: text }));
+                        }}
+                    />
+                )}
 
-            <DropDown
-                title="Thousands Separator"
-                items={availableThousands}
-                showRouterButton={false}
-                onSelect={(val) => {
-                    setNumberFormat((prev) => ({ ...prev, thousandsSeparator: val }));
-                }}
-                value={currentThousands}
-            />
+                <DropDown
+                    title="Decimal Separator"
+                    items={DECIMAL_SEPARATOR_ITEMS}
+                    showRouterButton={false}
+                    onSelect={(val) => {
+                        const newFormat = { ...numberFormat, decimalSeparator: val };
+                        if (newFormat.thousandsSeparator === val) {
+                            newFormat.thousandsSeparator = val === "." ? "," : ".";
+                        }
+                        setNumberFormat(newFormat);
+                    }}
+                    value={currentDecimal}
+                />
 
-            {/* separate axis formatting toggle */}
-            <TouchableOpacity
-                onPress={() => {
-                    if (usesSeparateAxis) {
-                        setAxisNumberFormat(null);
-                    } else {
-                        setAxisNumberFormat({ ...numberFormat });
-                    }
-                }}
-                style={{ flexDirection: "row", alignItems: "center", marginTop: 12, paddingHorizontal: 4 }}
-            >
-                <Checkbox
-                    status={usesSeparateAxis ? "checked" : "unchecked"}
+                <DropDown
+                    title="Thousands Separator"
+                    items={availableThousands}
+                    showRouterButton={false}
+                    onSelect={(val) => {
+                        setNumberFormat((prev) => ({ ...prev, thousandsSeparator: val }));
+                    }}
+                    value={currentThousands}
+                />
+
+                {/* separate axis formatting toggle */}
+                <TouchableOpacity
                     onPress={() => {
                         if (usesSeparateAxis) {
                             setAxisNumberFormat(null);
@@ -334,85 +335,105 @@ export default function Appearance({
                             setAxisNumberFormat({ ...numberFormat });
                         }
                     }}
-                />
-                <Text style={{ fontSize: 14, color: theme.colors.text }}>Use separate axis formatting</Text>
-            </TouchableOpacity>
-
-            {usesSeparateAxis && (
-                <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: theme.colors.primary }}>
-                    <DropDown
-                        title="Axis Currency Symbol"
-                        items={CURRENCY_ITEMS}
-                        showRouterButton={false}
-                        onSelect={(val) => {
-                            if (val === "custom") {
-                                setIsAxisCustomCurrency(true);
-                                setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: axisCustomCurrency }));
+                    style={{ flexDirection: "row", alignItems: "center", marginTop: 12, paddingHorizontal: 4 }}
+                >
+                    <Checkbox
+                        status={usesSeparateAxis ? "checked" : "unchecked"}
+                        onPress={() => {
+                            if (usesSeparateAxis) {
+                                setAxisNumberFormat(null);
                             } else {
-                                setIsAxisCustomCurrency(false);
-                                setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: val }));
+                                setAxisNumberFormat({ ...numberFormat });
                             }
                         }}
-                        value={isAxisCustomCurrency ? "custom" : (axisNumberFormat?.currencySymbol ?? "")}
                     />
+                    <Text style={{ fontSize: 14, color: theme.colors.text }}>Use separate axis formatting</Text>
+                </TouchableOpacity>
 
-                    {isAxisCustomCurrency && (
-                        <TextField
-                            label="Axis Custom Currency Symbol"
-                            placeholder="e.g. CHF, kr"
-                            value={axisCustomCurrency}
-                            onChangeText={(text) => {
-                                setAxisCustomCurrency(text);
-                                setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: text }));
+                {usesSeparateAxis && (
+                    <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: theme.colors.primary }}>
+                        <DropDown
+                            title="Axis Currency Symbol"
+                            items={CURRENCY_ITEMS}
+                            showRouterButton={false}
+                            onSelect={(val) => {
+                                if (val === "custom") {
+                                    setIsAxisCustomCurrency(true);
+                                    setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: axisCustomCurrency }));
+                                } else {
+                                    setIsAxisCustomCurrency(false);
+                                    setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: val }));
+                                }
                             }}
+                            value={isAxisCustomCurrency ? "custom" : (axisNumberFormat?.currencySymbol ?? "")}
                         />
-                    )}
 
-                    <DropDown
-                        title="Axis Decimal Separator"
-                        items={DECIMAL_SEPARATOR_ITEMS}
-                        showRouterButton={false}
-                        onSelect={(val) => {
-                            const newFormat = { ...axisNumberFormat, decimalSeparator: val };
-                            if (newFormat.thousandsSeparator === val) {
-                                newFormat.thousandsSeparator = val === "." ? "," : ".";
-                            }
-                            setAxisNumberFormat(newFormat);
-                        }}
-                        value={axisDecimal}
-                    />
+                        {isAxisCustomCurrency && (
+                            <TextField
+                                label="Axis Custom Currency Symbol"
+                                placeholder="e.g. CHF, kr"
+                                value={axisCustomCurrency}
+                                onChangeText={(text) => {
+                                    setAxisCustomCurrency(text);
+                                    setAxisNumberFormat((prev) => ({ ...prev, currencySymbol: text }));
+                                }}
+                            />
+                        )}
 
-                    <DropDown
-                        title="Axis Thousands Separator"
-                        items={availableAxisThousands}
-                        showRouterButton={false}
-                        onSelect={(val) => {
-                            setAxisNumberFormat((prev) => ({ ...prev, thousandsSeparator: val }));
-                        }}
-                        value={axisThousands}
-                    />
-                </View>
-            )}
-
-            {/* rounding */}
-            {showRounding && (
-                <>
-                    <RoundingSelector rounding={rounding} setRounding={setRounding} />
-                    {isProgress && (
-                        <RoundingSelector
-                            label="Percent Rounding"
-                            rounding={percentRounding}
-                            setRounding={setPercentRounding}
+                        <DropDown
+                            title="Axis Decimal Separator"
+                            items={DECIMAL_SEPARATOR_ITEMS}
+                            showRouterButton={false}
+                            onSelect={(val) => {
+                                const newFormat = { ...axisNumberFormat, decimalSeparator: val };
+                                if (newFormat.thousandsSeparator === val) {
+                                    newFormat.thousandsSeparator = val === "." ? "," : ".";
+                                }
+                                setAxisNumberFormat(newFormat);
+                            }}
+                            value={axisDecimal}
                         />
-                    )}
-                </>
-            )}
 
-            <BasicButton
-                fullWidth
-                label="Back"
-                onPress={onBack}
-            />
+                        <DropDown
+                            title="Axis Thousands Separator"
+                            items={availableAxisThousands}
+                            showRouterButton={false}
+                            onSelect={(val) => {
+                                setAxisNumberFormat((prev) => ({ ...prev, thousandsSeparator: val }));
+                            }}
+                            value={axisThousands}
+                        />
+                    </View>
+                )}
+
+                {/* rounding */}
+                {showRounding && (
+                    <>
+                        <RoundingSelector rounding={rounding} setRounding={setRounding} />
+                        {isProgress && (
+                            <RoundingSelector
+                                label="Percent Rounding"
+                                rounding={percentRounding}
+                                setRounding={setPercentRounding}
+                            />
+                        )}
+                    </>
+                )}
+
+                <BasicButton fullWidth label="Back" onPress={() => setView("menu")} />
+            </View>
+        );
+    }
+
+    // menu view
+    return (
+        <View style={{ width: "100%" }}>
+            <OptionsHeader onBack={onBack} />
+
+            <BasicButton fullWidth label="Format Graph Display" onPress={() => setView("graphDisplay")} />
+            <BasicButton fullWidth label="Format Display Options" onPress={() => setView("displayOptions")} />
+
+            <BasicButton fullWidth label="Back" onPress={onBack} />
         </View>
     );
 }
