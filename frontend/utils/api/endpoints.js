@@ -13,6 +13,9 @@ const REPORTS_BASE_URL =
 const AUDIT_BASE_URL =
   "https://5dzdrirs49.execute-api.ap-southeast-2.amazonaws.com/dev/audits";
 
+const NOTIFICATION_BASE_URL =
+  "https://<your-api-id>.execute-api.ap-southeast-2.amazonaws.com/dev/notifications";
+
 const endpoints = {
 	workspace: {
 		core: {
@@ -85,6 +88,14 @@ const endpoints = {
 			getUserAuditsDownloadUrl: `${AUDIT_BASE_URL}/download/user`,
 			getWorkspaceAuditsDownloadUrl: `${AUDIT_BASE_URL}/download/workspace`,
 		}
+	},
+
+	notifications: {
+	    registerPushToken: `${NOTIFICATION_BASE_URL}/push-token`,
+	    removePushToken: `${NOTIFICATION_BASE_URL}/push-token`,
+	    getPreferences: `${NOTIFICATION_BASE_URL}/preferences`,
+	    updatePreferences: `${NOTIFICATION_BASE_URL}/preferences`,
+	    evaluate: `${NOTIFICATION_BASE_URL}/evaluate`,
 	},
 
 	modules: {
