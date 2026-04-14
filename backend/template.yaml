@@ -73,7 +73,6 @@ Resources:
         
   DayBookFunctions:
     Type: AWS::CloudFormation::Stack
-    DependsOn: NotificationDomainFunctions
     Properties:
       TemplateURL: ./modules/day-book/template.yaml
       Parameters:
@@ -84,7 +83,6 @@ Resources:
         AppSyncUrl: !Ref AppSyncUrl
         AppSyncApiKey: !Ref AppSyncApiKey
         UserPoolArn: !Ref UserPoolArn
-        NotificationQueueUrl: !GetAtt NotificationDomainFunctions.Outputs.NotificationQueueUrl
         
   NotificationDomainFunctions:
     Type: AWS::CloudFormation::Stack
