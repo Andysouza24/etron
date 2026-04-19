@@ -44,6 +44,11 @@ export default function MetricDetails({
     rawGraphData,
     boxUseRawData,
     setBoxUseRawData,
+    alerts,
+    setAlerts,
+    userId,
+    workspaceId,
+    workspaceUsers,
 }) {
     const theme = useTheme();
     const [isNameSaved, setIsNameSaved] = useState(false);
@@ -180,6 +185,12 @@ export default function MetricDetails({
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    dependentVariables={dependentVariables}
+                    userId={userId}
+                    workspaceId={workspaceId}
+                    workspaceUsers={workspaceUsers}
                 />
             </View>
         </View>

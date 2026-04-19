@@ -28,9 +28,14 @@ export default function CustomiseOptions({
     rawGraphData,
     boxUseRawData,
     setBoxUseRawData,
+    alerts,
+    setAlerts,
+    dependentVariables,
+    userId,
+    workspaceId,
+    workspaceUsers,
 }) {
     const [view, setView] = useState("menu");
-    const [alerts, setAlerts] = useState([]);
 
     if (view !== "menu") {
         if (view === "appearance") {
@@ -65,7 +70,16 @@ export default function CustomiseOptions({
             );
         }
 
-        return <AdvancedOptions onBack={() => setView("menu")} onNavigate={setView} alerts={alerts} setAlerts={setAlerts} />;
+        return <AdvancedOptions
+            onBack={() => setView("menu")}
+            onNavigate={setView}
+            alerts={alerts}
+            setAlerts={setAlerts}
+            dependentVariables={dependentVariables}
+            userId={userId}
+            workspaceId={workspaceId}
+            workspaceUsers={workspaceUsers}
+        />;
     }
 
     return (

@@ -4,7 +4,16 @@ import BasicButton from "../../../../common/buttons/BasicButton";
 import OptionsHeader from "../OptionsHeader";
 import SetAlerts from "./SetAlerts";
 
-export default function AdvancedOptions({ onBack, onNavigate, alerts, setAlerts }) {
+export default function AdvancedOptions({
+    onBack,
+    onNavigate,
+    alerts,
+    setAlerts,
+    dependentVariables,
+    userId,
+    workspaceId,
+    workspaceUsers,
+}) {
     const [alertsVisible, setAlertsVisible] = useState(false);
 
     return (
@@ -17,7 +26,16 @@ export default function AdvancedOptions({ onBack, onNavigate, alerts, setAlerts 
                 onPress={() => setAlertsVisible(true)}
             />
 
-            <SetAlerts visible={alertsVisible} onDismiss={() => setAlertsVisible(false)} alerts={alerts} setAlerts={setAlerts} />
+            <SetAlerts
+                visible={alertsVisible}
+                onDismiss={() => setAlertsVisible(false)}
+                alerts={alerts}
+                setAlerts={setAlerts}
+                dependentVariables={dependentVariables}
+                userId={userId}
+                workspaceId={workspaceId}
+                workspaceUsers={workspaceUsers}
+            />
         </View>
     );
 }
