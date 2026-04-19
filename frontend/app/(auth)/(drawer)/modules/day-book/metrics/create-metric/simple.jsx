@@ -7,6 +7,10 @@ import { aggregateData, hasDuplicateValues } from "../../../../../../../utils/ag
 import MetricWizard from "../../../../../../../components/modules/day-book/metrics/MetricWizard";
 import SimpleConfig from "../../../../../../../components/modules/day-book/metrics/pages/SimpleConfig";
 import MetricDetails from "../../../../../../../components/modules/day-book/metrics/pages/MetricDetails";
+import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
+import { getCurrentUser } from "aws-amplify/auth";
+import { apiGet } from "../../../../../../../utils/api/apiClient";
+import endpoints from "../../../../../../../utils/api/endpoints";
 
 function parseNumericValue(value) {
     if (value == null || value === "") return value;
@@ -53,6 +57,29 @@ const CreateSimpleMetric = () => {
         decimalSeparator: ".",
         decimalPlaces: null,
     });
+
+    // alerts state
+    const [alerts, setAlerts] = useState([]);
+    const [workspaceId, setWorkspaceId] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [workspaceUsers, setWorkspaceUsers] = useState([]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const wsId = await getWorkspaceId();
+                setWorkspaceId(wsId);
+                const { userId } = await getCurrentUser();
+                setCurrentUserId(userId);
+                if (wsId) {
+                    const res = await apiGet(endpoints.workspace.users.getUsers(wsId));
+                    setWorkspaceUsers(res?.data ?? res ?? []);
+                }
+            } catch (err) {
+                console.error("[CreateSimpleMetric] Error loading workspace data:", err);
+            }
+        })();
+    }, []);
 
     const hasDuplicateDates = useMemo(
         () => hasDuplicateValues(ds.dataSourceData, dateSelection),
@@ -104,6 +131,7 @@ const CreateSimpleMetric = () => {
                 percentRounding,
                 axisNumberFormat,
                 boxUseRawData,
+                alerts,
             },
         });
     }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric, maxValue, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat]);
@@ -164,6 +192,11 @@ const CreateSimpleMetric = () => {
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    userId={currentUserId}
+                    workspaceId={workspaceId}
+                    workspaceUsers={workspaceUsers}
                 />
             ),
             validate: () => !!form.metricName.trim(),
