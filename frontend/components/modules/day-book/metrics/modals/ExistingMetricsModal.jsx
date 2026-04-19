@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { getWorkspaceId } from "../../../../../storage/workspaceStorage";
 import GraphTypes from "../graph-types";
 import {modalStyles} from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/existingMetricModal";
+import { sharedModalStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/sharedModalStyles";
 import metricService from "../../../../../services/MetricService";
 import BasicButton from "../../../../common/buttons/BasicButton";
 
@@ -35,9 +36,9 @@ export default function ExistingMetricsModal({visible, onDismiss, dataSourceId, 
             <Modal
                 visible={visible}
                 onDismiss={onDismiss}
-                contentContainerStyle={modalStyles.modal}
+                contentContainerStyle={sharedModalStyles.modalContainer}
             >
-                <Card style={modalStyles.card}>
+                <Card style={[sharedModalStyles.card, modalStyles.card]}>
                     <Card.Title title="Existing Metrics" />
                     <Card.Content>
                         {loading ? (
@@ -74,7 +75,7 @@ export default function ExistingMetricsModal({visible, onDismiss, dataSourceId, 
                             label="Close"
                             onPress={onDismiss}
                             style={{ marginTop: 12, alignSelf: "center" }}
-                            danger
+                            mode="outlined"
                         />
                     </Card.Content>
                 </Card>

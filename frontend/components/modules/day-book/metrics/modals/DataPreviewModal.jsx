@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { View, ScrollView, FlatList, StyleSheet } from "react-native";
 import { Modal, Portal, Card, DataTable, Text, ActivityIndicator } from "react-native-paper";
 import { dataPreviewStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/dataPreview";
+import { sharedModalStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/sharedModalStyles";
 
 const ROW_LOAD_AMOUNT = 20;
 
@@ -22,8 +23,8 @@ export default function DataPreviewModal({ visible, onDismiss, data, variableNam
 
     return (
         <Portal>
-            <Modal visible={visible} onDismiss={onDismiss} style={dataPreviewStyles.modal}>
-                <Card style={dataPreviewStyles.card}>
+            <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={sharedModalStyles.modalContainer}>
+                <Card style={[sharedModalStyles.card, dataPreviewStyles.card]}>
                     <Card.Content>
                         <ScrollView horizontal showsHorizontalScrollIndicator>
                             <View style={{ minWidth: variableNames.length * 100 }}>
