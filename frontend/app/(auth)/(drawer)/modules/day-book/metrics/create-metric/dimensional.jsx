@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
 import useMetricDataSource from "../../../../../../../hooks/modules/day_book/metrics/useMetricDataSource";
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
@@ -6,6 +6,10 @@ import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import MetricWizard from "../../../../../../../components/modules/day-book/metrics/MetricWizard";
 import DimensionalConfig from "../../../../../../../components/modules/day-book/metrics/pages/DimensionalConfig";
 import MetricDetails from "../../../../../../../components/modules/day-book/metrics/pages/MetricDetails";
+import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
+import { getCurrentUser } from "aws-amplify/auth";
+import { apiGet } from "../../../../../../../utils/api/apiClient";
+import endpoints from "../../../../../../../utils/api/endpoints";
 
 function parseNumeric(value) {
     if (typeof value === "number") return value;
@@ -44,6 +48,27 @@ const Dimensional = () => {
         decimalSeparator: ".",
         decimalPlaces: null,
     });
+    const [alerts, setAlerts] = useState([]);
+    const [workspaceId, setWorkspaceId] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [workspaceUsers, setWorkspaceUsers] = useState([]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const wsId = await getWorkspaceId();
+                setWorkspaceId(wsId);
+                const { userId } = await getCurrentUser();
+                setCurrentUserId(userId);
+                if (wsId) {
+                    const res = await apiGet(endpoints.workspace.users.getUsers(wsId));
+                    setWorkspaceUsers(res?.data ?? res ?? []);
+                }
+            } catch (err) {
+                console.error("[CreateDimensionalMetric] Error loading workspace data:", err);
+            }
+        })();
+    }, []);
 
     const valueField = useMemo(() => {
         if (!metricConfig?.dependentVariables?.length) return null;
@@ -183,6 +208,11 @@ const Dimensional = () => {
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    userId={currentUserId}
+                    workspaceId={workspaceId}
+                    workspaceUsers={workspaceUsers}
                 />
             ),
             validate: () => !!form.metricName.trim(),
