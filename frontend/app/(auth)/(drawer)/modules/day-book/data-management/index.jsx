@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { RefreshControl, Alert, ScrollView, View, StyleSheet, Pressable, FlatList, Dimensions } from "react-native";
-import { Text, ActivityIndicator, Card, Chip, IconButton, useTheme, Modal, Portal, DataTable } from "react-native-paper";
+import { Text, ActivityIndicator, Card, IconButton, useTheme, Modal, Portal, DataTable } from "react-native-paper";
 import { router, useFocusEffect } from "expo-router";
 import Header from "../../../../../../components/layout/Header";
 import { getAdapterInfo, getCategoryDisplayName } from "../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
@@ -17,30 +17,7 @@ import * as FileSystem from 'expo-file-system';
 import PermissionGate from "../../../../../../components/common/PermissionGate";
 import { hasPermission } from "../../../../../../utils/permissions";
 import { useHasPermission } from "../../../../../../hooks/useHasPermission";
-
-const StatusPill = ({ status }) => {
-	if (!status) return null;
-	const s = String(status).toLowerCase();
-	let mode = "outlined";
-	let label = status;
-	let style = { marginLeft: 8 };
-
-	if (s === "active" || s === "connected") {
-		mode = "flat";
-		style = [{ marginLeft: 8 }];
-		label = "Active";
-	} else if (s === "pending_upload" || s === "pending") {
-		mode = "flat";
-		style = [{ marginLeft: 8 }];
-		label = "Pending";
-	} else if (s === "error" || s === "failed") {
-		mode = "flat";
-		style = [{ marginLeft: 8 }];
-		label = "Error";
-	}
-
-	return <Chip compact mode={mode} style={style}>{label}</Chip>;
-};
+import StatusChip from "../../../../../../components/common/StatusChip";
 
 const DataConnectionCard = ({
 	label,
@@ -64,7 +41,7 @@ const DataConnectionCard = ({
 			<Card.Title
 				title={label}
 				subtitle={subtitle}
-				right={() => <StatusPill status={status} />}
+				right={() => <StatusChip status={status} style={{ marginRight: 16 }} />}
 				onPress={onNavigate}
 			/>
 			<Card.Actions style={{ justifyContent: "space-between", paddingHorizontal: 8, paddingBottom: 8 }}>
