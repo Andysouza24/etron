@@ -296,10 +296,9 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryLine
                                         key={yKey}
-                                        data={sortedData.map((d) => ({
-                                            x: d[xKey],
-                                            y: d[yKey],
-                                        }))}
+                                        data={sortedData
+                                            .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                            .filter((d) => d.y != null)}
                                         style={{
                                             data: { stroke: colours[index] || "blue" },
                                         }}
@@ -367,10 +366,9 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryBar
                                         key={yKey}
-                                        data={sortedData.map((d) => ({
-                                            x: d[xKey],
-                                            y: d[yKey],
-                                        }))}
+                                        data={sortedData
+                                            .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                            .filter((d) => d.y != null)}
                                         style={{
                                             data: { fill: colours[index] || "blue" },
                                         }}
@@ -548,10 +546,9 @@ const GraphTypes = {
                                 {yKeys.map((yKey, index) => (
                                     <VictoryArea
                                         key={yKey}
-                                        data={sortedData.map((d) => ({
-                                            x: d[xKey],
-                                            y: d[yKey],
-                                        }))}
+                                        data={sortedData
+                                            .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                            .filter((d) => d.y != null)}
                                         style={{
                                             data: {
                                                 fill: colours[index] || "blue",
@@ -629,10 +626,9 @@ const GraphTypes = {
                                     <VictoryScatter
                                         key={yKey}
                                         size={4}
-                                        data={sortedData.map((d) => ({
-                                            x: d[xKey],
-                                            y: d[yKey],
-                                        }))}
+                                        data={sortedData
+                                            .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                            .filter((d) => d.y != null)}
                                         style={{
                                             data: { fill: colours[index] || "blue" },
                                         }}
