@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { Card, Chip, IconButton, useTheme } from "react-native-paper";
+import { Card, IconButton, useTheme } from "react-native-paper";
 import TextField from "../../../../common/input/TextField";
 import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
 import ColorPicker from "react-native-wheel-color-picker";
 import ViewShot from "react-native-view-shot";
 import GraphPreview from "../GraphPreview";
 import CustomiseOptions from "../CustomiseOptions";
+import VariableChipSelector from "../VariableChipSelector";
 
 export default function MetricDetails({
     metricName,
@@ -81,25 +82,11 @@ export default function MetricDetails({
                 />
             )}
 
-            {dependentVariables.length > 0 && (
-                <View style={metricStepStyles.chipRow}>
-                    {dependentVariables.map((variable, index) => (
-                        <Chip
-                            key={index}
-                            selected={wheelIndex === index}
-                            onPress={() => setWheelIndex(index)}
-                            style={{
-                                marginTop: 4,
-                                backgroundColor: wheelIndex === index
-                                    ? theme.colors.primary : theme.colors.placeholder,
-                            }}
-                            showSelectedCheck={false}
-                        >
-                            {variable ?? `Y${index + 1}`}
-                        </Chip>
-                    ))}
-                </View>
-            )}
+            <VariableChipSelector
+                dependentVariables={dependentVariables}
+                wheelIndex={wheelIndex}
+                setWheelIndex={setWheelIndex}
+            />
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>
                 {/*<ColorPicker

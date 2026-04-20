@@ -1,9 +1,10 @@
 import { ScrollView, View } from "react-native";
-import { Card, Chip, useTheme } from "react-native-paper";
+import { Card, useTheme } from "react-native-paper";
 import TextField from "../../../common/input/TextField";
 import {metricStepStyles} from "../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
 import ColorPicker from "react-native-wheel-color-picker";
 import ViewShot from "react-native-view-shot";
+import VariableChipSelector from "./VariableChipSelector";
 
 
 
@@ -21,25 +22,11 @@ export default function CustomiseMetricStep({ form, dependentVariables = [], gra
             />
 
             {/* variable colour selector chips */}
-            {dependentVariables.length > 0 && (
-                <View style={metricStepStyles.chipRow}>
-                    {dependentVariables.map((variable, index) => (
-                        <Chip 
-                            key={index}
-                            selected={wheelIndex === index}
-                            onPress={() => setWheelIndex(index)}
-                            style={{ 
-                                marginTop: 4,
-                                backgroundColor: wheelIndex === index
-                                    ? theme.colors.primary : theme.colors.placeholder,
-                            }}
-                            showSelectedCheck={false}
-                            >
-                                {variable ?? `Y${index + 1}`}
-                            </Chip>
-                    ))}
-                </View>
-            )}
+            <VariableChipSelector
+                dependentVariables={dependentVariables}
+                wheelIndex={wheelIndex}
+                setWheelIndex={setWheelIndex}
+            />
 
             {/* colour picker */}
             <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>

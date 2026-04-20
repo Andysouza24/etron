@@ -1,7 +1,7 @@
 // Author(s): Noah Bradley
 
 import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, Modal, TouchableOpacity } from "react-native";
-import { Card, Text, Chip, useTheme } from "react-native-paper";
+import { Card, Text, useTheme } from "react-native-paper";
 import Header from "../../../../../../../components/layout/Header";
 import { commonStyles } from "../../../../../../../assets/styles/stylesheets/common";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -20,7 +20,9 @@ import { hasPermission } from "../../../../../../../utils/permissions";
 import PermissionGate from "../../../../../../../components/common/PermissionGate";
 import { captureRef } from "react-native-view-shot";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
+import ExportChipGroup from "../../../../../../../components/common/ExportChipGroup";
 
+// TODO: fix, graph view does not reflect settings applied during metric creation and the preview displayed during metric creation.
 
 const ViewMetric = () => {
     const { metricId } = useLocalSearchParams();
@@ -240,7 +242,7 @@ const ViewMetric = () => {
                 >
                     <View style={styles.modalOverlay}>
                         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-                            <Text style={styles.modalTitle}>Export Preview</Text>
+                            <Text variant="titleMedium" style={styles.modalTitle}>Export Preview</Text>
 
                             {/* Graph Preview */}
                             <Card style={[styles.modalCard]}>
@@ -278,45 +280,12 @@ const ViewMetric = () => {
                                 </Card.Content>
                             </Card>
 
-                            {/* Background Selector */}
-                            <View style={styles.backgroundSelectorContainer}>
-                                <Text style={styles.sectionHeader}>Choose Background</Text>
-                                <View style={styles.chipRow}>
-                                    {["white", "black", "transparent"].map((color) => (
-                                        <Chip
-                                            key={color}
-                                            selected={backgroundMode === color}
-                                            onPress={() => setBackgroundMode(color)}
-                                            style={{
-                                                marginHorizontal: 4,
-                                                backgroundColor: backgroundMode === color ? theme.colors.primary : "transparent",
-                                            }}
-                                        >
-                                            {color.charAt(0).toUpperCase() + color.slice(1)}
-                                        </Chip>
-                                    ))}
-                                </View>
-                            </View>
-
-                            {/* Axis Colour Selector */}
-                            <View style={styles.axisSelectorContainer}>
-                                <Text style={styles.sectionHeader}>Axis Colours</Text>
-                                <View style={styles.chipRow}>
-                                    {["dark", "light"].map((mode) => (
-                                        <Chip
-                                            key={mode}
-                                            selected={axisColorModeState === mode}
-                                            onPress={() => setAxisColorModeState(mode)}
-                                            style={{
-                                                marginHorizontal: 4,
-                                                backgroundColor: axisColorModeState === mode ? theme.colors.primary : "transparent",
-                                            }}
-                                        >
-                                            {mode === "dark" ? "White" : "Black"}
-                                        </Chip>
-                                    ))}
-                                </View>
-                            </View>
+                            <ExportChipGroup
+                                backgroundMode={backgroundMode}
+                                onBackgroundChange={setBackgroundMode}
+                                axisColorMode={axisColorModeState}
+                                onAxisColorChange={setAxisColorModeState}
+                            />
 
                             <View style={styles.buttonRow}>
                                 <BasicButton
@@ -370,8 +339,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     modalTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
         marginBottom: 12,
     },
     modalCard: {
@@ -381,27 +348,6 @@ const styles = StyleSheet.create({
     modalCloseButton: {
         alignSelf: "center",
         marginTop: 10,
-    },
-    backgroundSelectorContainer: {
-        width: "100%",
-        alignItems: "Left",
-        marginBottom: 16,
-    },
-    sectionHeader: {
-        fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 8,
-    },
-    chipRow: {
-        flexDirection: "row",
-        justifyContent: "left",
-        flexWrap: "wrap",
-        gap: 8,
-    },
-    axisSelectorContainer: {
-        width: "100%",
-        alignItems: "left",
-        marginBottom: 16,
     },
     buttonRow: {
         flexDirection: 'row',
