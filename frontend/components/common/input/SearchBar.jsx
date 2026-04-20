@@ -78,24 +78,21 @@ const SearchBar = ({
                         <Chip
                             key={filter}
                             mode="flat"
+                            compact
                             showSelectedCheck={false}
                             selected={selectedFilter === filter}
                             onPress={() => handleFilterPress(filter)}
-                            style={[
-                                styles.chip,
-                                {
-                                    borderRadius: 14,
-                                    backgroundColor: selectedFilter === filter
-                                        ? theme.colors.primary
-                                        : theme.colors.surfaceVariant,
-                                    paddingVertical: 2
-                                }
-                            ]}
-                            textStyle={{
-                                fontSize: 12,
-                                color: selectedFilter === filter ? theme.colors.onPrimary : theme.colors.text,
-                                lineHeight: 12
+                            style={{
+                                backgroundColor: selectedFilter === filter
+                                    ? theme.colors.secondaryContainer
+                                    : theme.colors.surfaceVariant,
                             }}
+                            textStyle={{
+                                color: selectedFilter === filter
+                                    ? theme.colors.onSecondaryContainer
+                                    : theme.colors.onSurfaceVariant,
+                            }}
+                            accessibilityLabel={`Filter: ${filter}`}
                         >
                             {filter}
                         </Chip>
@@ -122,9 +119,6 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         gap: 8,
         alignItems: 'center',
-    },
-    chip: {
-        marginRight: 8,
     },
 });
 

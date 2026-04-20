@@ -20,9 +20,10 @@ export default function RowSelector({ data, idKey, selectedRows, onSelectedRowsC
             <View style={simpleStyles.rowSelectorHeader}>
                 <Text>Select Data Points (Optional)</Text>
                 <Chip
+                    mode="outlined"
                     onPress={handleToggleAll}
-                    style={{ backgroundColor: theme.colors.background }}
                     textStyle={{ color: theme.colors.primary }}
+                    accessibilityLabel={allSelected ? "Deselect all data points" : "Select all data points"}
                 >
                     {allSelected ? "Deselect All" : "Select All"}
                 </Chip>

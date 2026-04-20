@@ -148,12 +148,13 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
                                 mode="outlined"
                                 compact
                                 style={styles.metricDetailSummaryChip}
+                                accessibilityLabel={`${variable} average: ${formatMetricValue(summary.avg)}`}
                             >
                                 {`${variable}: avg ${formatMetricValue(summary.avg)}`}
                             </Chip>
                         ))}
                         {remainingSummaries > 0 && (
-                            <Chip mode="outlined" compact style={styles.metricDetailSummaryChip}>
+                            <Chip mode="outlined" compact style={styles.metricDetailSummaryChip} accessibilityLabel={`${remainingSummaries} more variables`}>
                                 {`+ ${remainingSummaries} more`}
                             </Chip>
                         )}
@@ -165,7 +166,7 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
                         <Text style={styles.metricDetailMetaLabel}>Variables</Text>
                         <View style={styles.metricDetailChipsRow}>
                             {dependentVariables.map(variable => (
-                                <Chip key={`${item.id}-${variable}`} mode="outlined" compact style={styles.metricDetailChip}>
+                                <Chip key={`${item.id}-${variable}`} mode="outlined" compact style={styles.metricDetailChip} accessibilityLabel={`Variable: ${variable}`}>
                                     {variable}
                                 </Chip>
                             ))}

@@ -221,7 +221,7 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
                                         styles.categoryChip,
                                         fieldState.category === cat.key && { backgroundColor: theme.colors.primaryContainer },
                                     ]}
-                                    textStyle={{ fontSize: 12 }}
+                                    accessibilityLabel={`Set ${field.name} category to ${cat.label}`}
                                 >
                                     {cat.label}
                                 </Chip>

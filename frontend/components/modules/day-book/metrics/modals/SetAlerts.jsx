@@ -531,16 +531,23 @@ export default function SetAlerts({
 
     const renderChipSelect = (items, selected, onToggle) => (
         <View style={styles.chipRow}>
-            {items.map((item) => (
-                <Chip
-                    key={item.value ?? item.userId}
-                    selected={selected.includes(item.value ?? item.userId)}
-                    showSelectedOverlay
-                    onPress={() => onToggle(item.value ?? item.userId)}
-                >
-                    {item.label ?? `${item.given_name} ${item.family_name}`}
-                </Chip>
-            ))}
+            {items.map((item) => {
+                const id = item.value ?? item.userId;
+                const isSelected = selected.includes(id);
+                return (
+                    <Chip
+                        key={id}
+                        selected={isSelected}
+                        showSelectedOverlay
+                        onPress={() => onToggle(id)}
+                        accessibilityRole="checkbox"
+                        style={isSelected ? { backgroundColor: theme.colors.secondaryContainer } : undefined}
+                        textStyle={{ color: isSelected ? theme.colors.onSecondaryContainer : theme.colors.onSurfaceVariant }}
+                    >
+                        {item.label ?? `${item.given_name} ${item.family_name}`}
+                    </Chip>
+                );
+            })}
         </View>
     );
 

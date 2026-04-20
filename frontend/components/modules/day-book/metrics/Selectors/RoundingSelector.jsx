@@ -1,6 +1,6 @@
 import React from "react";
-import { View, ScrollView, TouchableOpacity } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { View, ScrollView, StyleSheet, Pressable } from "react-native";
+import { Chip, Text, useTheme } from "react-native-paper";
 
 const MODES = [
     { value: "none", label: "No Rounding" },
@@ -9,8 +9,6 @@ const MODES = [
 ];
 
 const DECIMAL_OPTIONS = Array.from({ length: 11 }, (_, i) => i); // 0-10
-
-//TODO: improve the decimal places selector UI
 
 export default function RoundingSelector({ rounding, setRounding, label = "Value Rounding" }) {
     const theme = useTheme();
@@ -30,34 +28,35 @@ export default function RoundingSelector({ rounding, setRounding, label = "Value
     };
 
     return (
-        <View style={{ marginVertical: 8 }}>
-            <Text style={{ fontSize: 13, color: theme.colors.onSurface, marginBottom: 6, fontWeight: "600" }}>
+        <View style={styles.container}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurface, marginBottom: 8 }}>
                 {label}
             </Text>
 
             {/* selection chips */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+            <View style={styles.chipRow}>
                 {MODES.map((m) => {
                     const selected = mode === m.value;
                     return (
-                        <TouchableOpacity
+                        <Chip
                             key={m.value}
+                            selected={selected}
                             onPress={() => selectMode(m.value)}
+                            showSelectedCheck={false}
                             style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 16,
-                                backgroundColor: selected ? theme.colors.primary : theme.colors.surfaceVariant,
+                                backgroundColor: selected
+                                    ? theme.colors.secondaryContainer
+                                    : theme.colors.surfaceVariant,
                             }}
+                            textStyle={{
+                                color: selected
+                                    ? theme.colors.onSecondaryContainer
+                                    : theme.colors.onSurfaceVariant,
+                            }}
+                            accessibilityLabel={`Rounding mode: ${m.label}`}
                         >
-                            <Text style={{
-                                fontSize: 12,
-                                color: selected ? theme.colors.onPrimary : theme.colors.onSurface,
-                                fontWeight: selected ? "600" : "400",
-                            }}>
-                                {m.label}
-                            </Text>
-                        </TouchableOpacity>
+                            {m.label}
+                        </Chip>
                     );
                 })}
             </View>
@@ -65,34 +64,39 @@ export default function RoundingSelector({ rounding, setRounding, label = "Value
             {/* decimal places scroller */}
             {mode === "round" && (
                 <View>
-                    <Text style={{ fontSize: 12, color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
                         Decimal Places
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={{ flexDirection: "row", gap: 6 }}>
+                        <View style={styles.decimalRow}>
                             {DECIMAL_OPTIONS.map((dp) => {
                                 const selected = decimalPlaces === dp;
                                 return (
-                                    <TouchableOpacity
+                                    <Pressable
                                         key={dp}
                                         onPress={() => selectDecimal(dp)}
-                                        style={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: 18,
-                                            justifyContent: "center",
-                                            alignItems: "center",
-                                            backgroundColor: selected ? theme.colors.primary : theme.colors.surfaceVariant,
-                                        }}
+                                        style={[
+                                            styles.decimalButton,
+                                            {
+                                                backgroundColor: selected
+                                                    ? theme.colors.secondaryContainer
+                                                    : theme.colors.surfaceVariant,
+                                            },
+                                        ]}
+                                        accessibilityLabel={`${dp} decimal places`}
+                                        accessibilityRole="button"
                                     >
-                                        <Text style={{
-                                            fontSize: 13,
-                                            color: selected ? theme.colors.onPrimary : theme.colors.onSurface,
-                                            fontWeight: selected ? "700" : "400",
-                                        }}>
+                                        <Text
+                                            variant="labelMedium"
+                                            style={{
+                                                color: selected
+                                                    ? theme.colors.onSecondaryContainer
+                                                    : theme.colors.onSurfaceVariant,
+                                            }}
+                                        >
                                             {dp}
                                         </Text>
-                                    </TouchableOpacity>
+                                    </Pressable>
                                 );
                             })}
                         </View>
@@ -101,7 +105,7 @@ export default function RoundingSelector({ rounding, setRounding, label = "Value
             )}
 
             {/* description */}
-            <Text style={{ fontSize: 11, color: theme.colors.onSurfaceVariant, marginTop: 6 }}>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
                 {mode === "none" && "Values displayed exactly as stored."}
                 {mode === "round" && `Values rounded to ${decimalPlaces} decimal place${decimalPlaces !== 1 ? "s" : ""}.`}
                 {mode === "bestFit" && "Values automatically abbreviated (e.g. 1.4M, 2.5K)."}
@@ -109,3 +113,25 @@ export default function RoundingSelector({ rounding, setRounding, label = "Value
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        marginVertical: 8,
+    },
+    chipRow: {
+        flexDirection: "row",
+        gap: 8,
+        marginBottom: 8,
+    },
+    decimalRow: {
+        flexDirection: "row",
+        gap: 8,
+    },
+    decimalButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+});
