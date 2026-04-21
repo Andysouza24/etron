@@ -1,11 +1,15 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { View, Alert, StyleSheet, ScrollView } from "react-native";
-import { Text, TextInput, Button, useTheme, HelperText, ActivityIndicator } from "react-native-paper";
+import { Text, TextInput, Button, useTheme, HelperText, ActivityIndicator, Switch, Divider } from "react-native-paper";
 import { useLocalSearchParams, router } from "expo-router";
 import Header from "../../../../../../../components/layout/Header";
 import { commonStyles } from "../../../../../../../assets/styles/stylesheets/common";
 import useDataSources from "../../../../../../../hooks/modules/day_book/data-sources/useDataSource";
+import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
+
+const MANAGE_DATASOURCES_PERMISSION = "modules.daybook.datasources.manage_dataSources";
+const MANAGE_COLUMN_DISPLAY_PERMISSION = "modules.daybook.datasources.manage_column_display_settings";
 
 const UpdateDataSourceScreen = () => {
 	const theme = useTheme();
@@ -13,6 +17,8 @@ const UpdateDataSourceScreen = () => {
 	const sourceId = Array.isArray(id) ? id[0] : id;
 
 	const { getDataSource, updateDataSource } = useDataSources();
+	const { allowed: canManageDataSources } = useHasPermission(MANAGE_DATASOURCES_PERMISSION);
+	const { allowed: canManageColumnDisplay } = useHasPermission(MANAGE_COLUMN_DISPLAY_PERMISSION);
 
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
@@ -22,6 +28,7 @@ const UpdateDataSourceScreen = () => {
 	// Editable fields
 	const [name, setName] = useState("");
 	const [endpoint, setEndpoint] = useState("");
+	const [currencyDisplay, setCurrencyDisplay] = useState({}); // currency display toggles keyed by column name
 
 	useEffect(() => {
 		let mounted = true;
@@ -34,6 +41,13 @@ const UpdateDataSourceScreen = () => {
 				setSource(s);
 				setName(s?.name || "");
 				setEndpoint(s?.config?.endpoint ?? s?.config?.url ?? "");
+				const initial = {};
+				for (const col of (Array.isArray(s?.schema) ? s.schema : [])) {
+					if (col?.category === "value" && col.currencySymbol) {
+						initial[col.name] = col.displayCurrencySymbol !== false;
+					}
+				}
+				setCurrencyDisplay(initial);
 			} catch (e) {
 				if (!mounted) return;
 				setError(e?.message || "Failed to load data source");
@@ -65,6 +79,13 @@ const UpdateDataSourceScreen = () => {
 		return null;
 	};
 
+	const currencyColumns = useMemo(() => {
+		if (!Array.isArray(source?.schema)) return [];
+		return source.schema.filter(
+			(col) => col?.category === "value" && col?.currencySymbol
+		);
+	}, [source]);
+
 	const [fieldErrors, setFieldErrors] = useState({});
 
 	const onSave = async () => {
@@ -90,6 +111,26 @@ const UpdateDataSourceScreen = () => {
 				const nextConfig = { ...(source?.config || {}) };
 				nextConfig.endpoint = endpoint;
 				updates.config = nextConfig;
+			}
+			// column display settings only send changes
+			const displayChanges = {};
+			// currency display visibility
+			for (const col of (Array.isArray(source?.schema) ? source.schema : [])) {
+				if (col?.category !== "value" || !col.currencySymbol) continue;
+				const original = col.displayCurrencySymbol !== false;
+				const next = !!currencyDisplay[col.name];
+				if (original !== next) {
+					displayChanges[col.name] = { displayCurrencySymbol: next };
+				}
+			}
+			if (Object.keys(displayChanges).length > 0 && canManageColumnDisplay) {
+				updates.settings = {
+					...(updates.settings || {}),
+					displaySettings: {
+						...((updates.settings && updates.settings.displaySettings) || {}),
+						columnDisplaySettings: displayChanges,
+					},
+				};
 			}
 			const cleaned = sanitize(updates);
 			await updateDataSource(sourceId, cleaned);
@@ -142,6 +183,33 @@ const UpdateDataSourceScreen = () => {
 						</>
 					)}
 
+					{currencyColumns.length > 0 && canManageColumnDisplay && (
+						<View style={styles.section}>
+							<Divider style={{ marginVertical: 12 }} />
+							<Text variant="titleSmall" style={{ marginBottom: 4 }}>Currency display</Text>
+							<Text
+								variant="bodySmall"
+								style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}
+							>
+								Choose which currency-value columns show their symbol in data previews.
+							</Text>
+							{currencyColumns.map((col) => (
+								<View key={col.name} style={styles.toggleRow}>
+									<Text variant="bodyMedium" style={{ flex: 1 }} numberOfLines={1}>
+										{col.name} ({col.currencySymbol})
+									</Text>
+									<Switch
+										value={!!currencyDisplay[col.name]}
+										onValueChange={(v) =>
+											setCurrencyDisplay((prev) => ({ ...prev, [col.name]: v }))
+										}
+										accessibilityLabel={`Toggle currency symbol display for ${col.name}`}
+									/>
+								</View>
+							))}
+						</View>
+					)}
+
 					<View style={{ marginTop: 16 }}>
 						<Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
 							Save Changes
@@ -161,6 +229,15 @@ const styles = StyleSheet.create({
 	},
 	input: {
 		marginBottom: 8,
+	},
+	section: {
+		marginTop: 4,
+	},
+	toggleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 6,
+		gap: 12,
 	},
 	center: {
 		flex: 1,

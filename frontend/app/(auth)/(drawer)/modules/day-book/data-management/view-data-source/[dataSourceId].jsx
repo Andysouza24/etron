@@ -25,6 +25,7 @@ import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
 import { getCachedPermissions } from "../../../../../../../storage/permissionsStorage";
 import { getUserInfo } from "../../../../../../../storage/userStorage";
 import ItemNotFound from "../../../../../../../components/common/errors/MissingItem";
+import { formatCellValue } from "../../../../../../../utils/numberParser";
 
 const SelectDataSource = () => {
 	const theme = useTheme();
@@ -70,15 +71,20 @@ const SelectDataSource = () => {
 
 		setLoadingSource(true);
 		try {
-			//const source = await getDataSource(dataSourceId);
 			const workspaceId = await getWorkspaceId();
 			const result = await apiGet(endpoints.modules.day_book.data_sources.getDataSource(dataSourceId), { workspaceId });
 			const source = result.data;
-			setDataSource(source);
-			if (!null) setDataSourceExists(false);
-			setLoadingSource(false);
+			if (!source) {
+				setDataSourceExists(false);
+			} else {
+				setDataSource(source);
+				setDataSourceExists(true);
+			}
 		} catch (error) {
 			console.error("Error loading data source:", error);
+			setDataSourceExists(false);
+		} finally {
+			setLoadingSource(false);
 		}
 	};
 
@@ -143,9 +149,19 @@ const SelectDataSource = () => {
 			return Array.from(set);
 		};
 		const headers = inferHeaders();
+		const schemaByName = {};
+		if (Array.isArray(previewData.schema)) {
+			for (const col of previewData.schema) {
+				if (col && col.name) schemaByName[col.name] = col;
+			}
+		}
 		const toDisplayRows = allRows.slice(0, showAllRows ? 25 : 10);
-		const formatVal = (v) => {
+		const formatVal = (v, header) => {
 			if (v == null) return '';
+			const col = schemaByName[header];
+			if (col && col.currencySymbol && col.displayCurrencySymbol !== false && col.category === 'value') {
+				return formatCellValue(v, col);
+			}
 			const isDateLike = (s) => typeof s === 'string' && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s);
 			if (typeof v === 'string') {
 				if (isDateLike(v)) { try { return new Date(v).toLocaleString(); } catch { return v; } }
@@ -194,7 +210,7 @@ const SelectDataSource = () => {
 								<DataTable.Row key={idx} style={zebra ? { backgroundColor: theme.colors.primary } : null}>
 									{headers.map((h) => (
 										<DataTable.Cell key={h} style={{ width: 70 }}>
-											<Text style={zebra ? { color: '#000' } : null}>{formatVal(obj[h])}</Text>
+											<Text style={zebra ? { color: '#000' } : null}>{formatVal(obj[h], h)}</Text>
 										</DataTable.Cell>
 									))}
 								</DataTable.Row>

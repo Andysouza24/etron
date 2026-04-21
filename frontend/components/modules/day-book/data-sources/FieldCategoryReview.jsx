@@ -5,7 +5,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { View, StyleSheet, Pressable, ScrollView } from "react-native";
-import { Text, Chip, Divider, useTheme, Menu, TextInput } from "react-native-paper";
+import { Text, Chip, Divider, useTheme, Menu, TextInput, Switch } from "react-native-paper";
 import COMMON_DATE_FORMATS from "../../../../utils/constants/modules/day-book/data-sources/dateFormats";
 import VALUE_TYPES from "../../../../utils/constants/modules/day-book/data-sources/valueTypes";
 
@@ -24,17 +24,33 @@ and change any field between Date/Time, Value, and Dimension.
 const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
     const theme = useTheme();
 
-    // Per-field working state — { category, type, parseMode?, userDateFormat?, suggestedValueType? }
+    // Decide the default value-column type.
+    const resolveValueType = (currencySymbol, existingType, suggestedValueType) => {
+        if (currencySymbol) return "decimal(18,2)";
+        if (suggestedValueType) return suggestedValueType;
+        if (existingType && existingType !== "string" && existingType !== "timestamp") {
+            return existingType;
+        }
+        return "double";
+    };
+
+    // Per-field working state — { category, type, parseMode?, userDateFormat?, suggestedValueType?, currencySymbol?, displayCurrencySymbol? }
     const [fields, setFields] = useState(() => {
         const map = {};
         for (const f of schema) {
             if (f.name === "timestamp" || f.name === "rowId") continue;
+            const initialCategory = f.category || inferCategory(f.type);
+            const initialType = initialCategory === "value"
+                ? resolveValueType(f.currencySymbol, f.type, f.suggestedValueType)
+                : f.type;
             map[f.name] = {
-                category: f.category || inferCategory(f.type),
-                type: f.type,
+                category: initialCategory,
+                type: initialType,
                 userDateFormat: f.userDateFormat || null,
                 parseMode: f.parseMode || "auto",
                 suggestedValueType: f.suggestedValueType || null,
+                currencySymbol: f.currencySymbol || null,
+                displayCurrencySymbol: f.displayCurrencySymbol !== false,
             };
         }
         return map;
@@ -76,11 +92,20 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
                 }
             } else if (state.category === "value") {
                 col.type = state.type || state.suggestedValueType || "double";
+                if (state.currencySymbol) {
+                    col.currencySymbol = state.currencySymbol;
+                    col.displayCurrencySymbol = state.displayCurrencySymbol !== false;
+                } else {
+                    delete col.currencySymbol;
+                    delete col.displayCurrencySymbol;
+                }
                 delete col.userDateFormat;
                 delete col.parseMode;
             } else {
                 // dimension
                 col.type = "string";
+                delete col.currencySymbol;
+                delete col.displayCurrencySymbol;
                 delete col.userDateFormat;
                 delete col.parseMode;
             }
@@ -92,34 +117,44 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
 
     // ---- Category change ----
     const changeCategory = (fieldName, newCategory) => {
-        setFields(prev => {
-            const current = prev[fieldName];
-            let updated;
+        const current = fields[fieldName];
+        let updated;
 
-            if (newCategory === "value") {
-                const suggestedType = current.suggestedValueType ||
-                    (current.type && current.type !== "string" && current.type !== "timestamp"
-                        ? current.type : "double");
-                updated = { ...prev, [fieldName]: { ...current, category: "value", type: suggestedType } };
-            } else if (newCategory === "date") {
-                updated = { ...prev, [fieldName]: { ...current, category: "date", parseMode: "auto", userDateFormat: null } };
-            } else {
-                updated = { ...prev, [fieldName]: { ...current, category: "dimension", type: "string" } };
-            }
+        if (newCategory === "value") {
+            const suggestedType = resolveValueType(
+                current.currencySymbol,
+                current.type,
+                current.suggestedValueType
+            );
+            updated = { ...fields, [fieldName]: { ...current, category: "value", type: suggestedType } };
+        } else if (newCategory === "date") {
+            updated = { ...fields, [fieldName]: { ...current, category: "date", parseMode: "auto", userDateFormat: null } };
+        } else {
+            updated = { ...fields, [fieldName]: { ...current, category: "dimension", type: "string" } };
+        }
 
-            emitChange(updated);
-            return updated;
-        });
+        setFields(updated);
+        emitChange(updated);
     };
 
     // ---- Value type change ----
     const changeValueType = (fieldName, newType) => {
-        setFields(prev => {
-            const updated = { ...prev, [fieldName]: { ...prev[fieldName], type: newType } };
-            setTypeMenuVisible(v => ({ ...v, [fieldName]: false }));
-            emitChange(updated);
-            return updated;
-        });
+        const updated = { ...fields, [fieldName]: { ...fields[fieldName], type: newType } };
+        setFields(updated);
+        setTypeMenuVisible(v => ({ ...v, [fieldName]: false }));
+        emitChange(updated);
+    };
+
+    // ---- Currency-symbol display toggle ----
+    const toggleDisplayCurrencySymbol = (fieldName) => {
+        const current = fields[fieldName];
+        if (!current) return;
+        const updated = {
+            ...fields,
+            [fieldName]: { ...current, displayCurrencySymbol: !current.displayCurrencySymbol },
+        };
+        setFields(updated);
+        emitChange(updated);
     };
 
     // ---- Date format selection ----
@@ -131,34 +166,30 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
         }
 
         const isAuto = formatValue === "__auto__";
-        setFields(prev => {
-            const updated = {
-                ...prev,
-                [fieldName]: {
-                    ...prev[fieldName],
-                    parseMode: isAuto ? "auto" : "manual",
-                    userDateFormat: isAuto ? null : formatValue,
-                },
-            };
-            setShowCustomFormat(p => ({ ...p, [fieldName]: false }));
-            setFormatMenuVisible(p => ({ ...p, [fieldName]: false }));
-            emitChange(updated);
-            return updated;
-        });
+        const updated = {
+            ...fields,
+            [fieldName]: {
+                ...fields[fieldName],
+                parseMode: isAuto ? "auto" : "manual",
+                userDateFormat: isAuto ? null : formatValue,
+            },
+        };
+        setFields(updated);
+        setShowCustomFormat(p => ({ ...p, [fieldName]: false }));
+        setFormatMenuVisible(p => ({ ...p, [fieldName]: false }));
+        emitChange(updated);
     };
 
     const applyCustomFormat = (fieldName) => {
         const fmt = (customFormatText[fieldName] || "").trim();
         if (!fmt) return;
-        setFields(prev => {
-            const updated = {
-                ...prev,
-                [fieldName]: { ...prev[fieldName], parseMode: "manual", userDateFormat: fmt },
-            };
-            setShowCustomFormat(p => ({ ...p, [fieldName]: false }));
-            emitChange(updated);
-            return updated;
-        });
+        const updated = {
+            ...fields,
+            [fieldName]: { ...fields[fieldName], parseMode: "manual", userDateFormat: fmt },
+        };
+        setFields(updated);
+        setShowCustomFormat(p => ({ ...p, [fieldName]: false }));
+        emitChange(updated);
     };
 
     // ---- Label helpers ----
@@ -188,7 +219,14 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
             {nonSystemFields.map((field, index) => {
                 const fieldState = fields[field.name];
                 if (!fieldState) return null;
-                const sample = getSampleValue(field.name);
+                const rawSample = getSampleValue(field.name);
+                const showSymbol =
+                    fieldState.category === "value" &&
+                    fieldState.currencySymbol &&
+                    fieldState.displayCurrencySymbol;
+                const sample = rawSample && showSymbol && !rawSample.includes(fieldState.currencySymbol)
+                    ? `${fieldState.currencySymbol}${rawSample}`
+                    : rawSample;
 
                 return (
                     <View key={field.name}>
@@ -314,6 +352,23 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
                                         <Menu.Item key={t.value} title={t.label} onPress={() => changeValueType(field.name, t.value)} />
                                     ))}
                                 </Menu>
+
+                                {fieldState.currencySymbol ? (
+                                    <View style={styles.currencyToggleRow}>
+                                        <Text
+                                            variant="bodySmall"
+                                            style={{ color: theme.colors.onSurface, flex: 1 }}
+                                            numberOfLines={2}
+                                        >
+                                            Show {fieldState.currencySymbol} in preview
+                                        </Text>
+                                        <Switch
+                                            value={!!fieldState.displayCurrencySymbol}
+                                            onValueChange={() => toggleDisplayCurrencySymbol(field.name)}
+                                            accessibilityLabel={`Toggle currency symbol display for ${field.name}`}
+                                        />
+                                    </View>
+                                ) : null}
                             </View>
                         )}
                     </View>
@@ -400,6 +455,12 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontStyle: "italic",
         fontSize: 11,
+    },
+    currencyToggleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 10,
+        gap: 8,
     },
 });
 
