@@ -1,82 +1,22 @@
-// Author(s): Matthew Page, Noah Bradley
+﻿// Author(s): Matthew Page, Noah Bradley
 
 import { View, StyleSheet, Alert } from "react-native";
-import Header from "../../../../../components/layout/Header";
-import { ActivityIndicator, Card, Checkbox, Chip, List, Snackbar, Text, Portal, Dialog, Button } from "react-native-paper";
+import { ActivityIndicator, Card, Chip, Snackbar, Text, Portal, Dialog, Button } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import Header from "../../../../../components/layout/Header";
+import ResponsiveScreen from "../../../../../components/layout/ResponsiveScreen";
+import StackLayout from "../../../../../components/layout/StackLayout";
+import TextField from "../../../../../components/common/input/TextField";
+import ItemNotFound from "../../../../../components/common/errors/MissingItem";
+import PermissionPicker from "../../../../../components/collaboration/PermissionPicker";
 import { getWorkspaceId } from "../../../../../storage/workspaceStorage";
 import { apiGet, apiPatch } from "../../../../../utils/api/apiClient";
 import endpoints from "../../../../../utils/api/endpoints";
-import { router, useLocalSearchParams } from "expo-router";
-import ResponsiveScreen from "../../../../../components/layout/ResponsiveScreen";
-import TextField from "../../../../../components/common/input/TextField";
-import ItemNotFound from "../../../../../components/common/errors/MissingItem";
-import StackLayout from "../../../../../components/layout/StackLayout";
+import { buildPermissionGroups, normalizePermissionKeys } from "../../../../../utils/permissions/permissionTree";
 
 const MANAGE_ROLES = "app.collaboration.manage_roles";
-
-const normalizePermissionKeys = (list) => {
-	if (!Array.isArray(list)) return [];
-	const keys = list
-		.map((entry) => {
-			if (!entry) return null;
-			if (typeof entry === "string") return entry;
-			if (typeof entry === "object") {
-				if (typeof entry.key === "string") return entry.key;
-				if (typeof entry.permission === "string") return entry.permission;
-			}
-			return null;
-		})
-		.filter(Boolean);
-
-	return Array.from(new Set(keys));
-};
-
-function buildPermissionGroups(tree) {
-	const permissionGroups = [];
-
-	if (tree.app?.categories) {
-		const appCategories = tree.app.categories;
-		const categories = Object.keys(appCategories).map((key) => {
-			const category = appCategories[key];
-			return {
-				section: tree.app.label,
-				categoryKey: key,
-				categoryLabel: category.label,
-				permissions: (category.permissions).map((permission) => ({
-					key: permission.key,
-					label: permission.label,
-					description: permission.description,
-					defaultStatus: permission.defaultStatus,
-				})),
-			};
-		});
-		permissionGroups.push(...categories);
-	}
-
-	// "modules.daybook.*" (Data Sources, Metrics, Reports)
-	if (tree.modules?.daybook?.categories) {
-		const daybookCats = tree.modules.daybook.categories;
-		const categories = Object.keys(daybookCats).map((catKey) => {
-			const cat = daybookCats[catKey];
-			return {
-				section: tree.modules.daybook.label || "Day Book",
-				categoryKey: `daybook.${catKey}`,
-				categoryLabel: cat.label || catKey,
-				permissions: (cat.permissions || []).map((p) => ({
-				key: p.key,
-				label: p.label || p.key,
-				description: p.description || "",
-				defaultStatus: !!p.defaultStatus,
-				})),
-			};
-		});
-		permissionGroups.push(...categories);
-	}
-
-	return permissionGroups; // [{ section, categoryKey, categoryLabel, permissions:[{key,label,description,defaultStatus}]}...]
-}
 
 export default function EditRole() {
 	const { roleId } = useLocalSearchParams();
@@ -92,17 +32,14 @@ export default function EditRole() {
 	const [name, setName] = useState("");
 	const [selectedPerms, setSelectedPerms] = useState([]);
 
-	const [permissions, setPermissions] = useState([]);
+	const [permissionGroups, setPermissionGroups] = useState([]);
 
-	const [openAccordions, setOpenAccordions] = useState({});
 	const [currentUserRoleId, setCurrentUserRoleId] = useState(null);
 	const [confirmSelfLock, setConfirmSelfLock] = useState(false);
 
 	const initialRef = useRef({ name: "", perms: [] });
 
-	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-
-	const initialValuesChanged = (() => {
+	const initialValuesChanged = useMemo(() => {
 		const initial = initialRef.current;
 		if ((name || "").trim() !== (initial.name || "").trim()) return true;
 
@@ -110,9 +47,8 @@ export default function EditRole() {
 		const initPerms = new Set(initial.perms || []);
 		if (selPerms.size !== initPerms.size) return true;
 		for (const permission of selPerms) if (!initPerms.has(permission)) return true;
-
 		return false;
-	})();
+	}, [name, selectedPerms]);
 
 	const canSave = useMemo(() => {
 		return !saving && initialValuesChanged && !!name.trim();
@@ -134,12 +70,10 @@ export default function EditRole() {
 				return;
 			}
 			setRole(role);
-			console.log("Role:", role);
 
 			result = await apiGet(endpoints.workspace.core.getDefaultPermissions);
-			const allCategories = buildPermissionGroups(result?.data || {});
-			setPermissions(allCategories);
-			
+			setPermissionGroups(buildPermissionGroups(result?.data || {}));
+
 			try {
 				result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
 				setCurrentUserRoleId(result.data.roleId);
@@ -172,17 +106,6 @@ export default function EditRole() {
 		load();
 	}, [load]);
 
-	const togglePerm = (permission) => {
-		setSelectedPerms((selected) => {
-			const permissionKey = typeof permission === "string" ? permission : permission?.key;
-			if (!permissionKey) return selected;
-
-			return selected.includes(permissionKey)
-				? selected.filter((prevPermission) => prevPermission !== permissionKey)
-				: [...selected, permissionKey];
-		});
-	};
-
 	const willSelfLoseManageRoles = useMemo(() => {
 		if (!currentUserRoleId) return false;
 		if (currentUserRoleId !== roleId) return false;
@@ -191,6 +114,15 @@ export default function EditRole() {
 		return hadManage && !willHaveManage;
 	}, [currentUserRoleId, roleId, selectedPerms]);
 
+	const persistRole = async () => {
+		const uniquePermissions = normalizePermissionKeys(selectedPerms);
+		await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
+			name: name.trim(),
+			permissions: uniquePermissions,
+		});
+		initialRef.current = { name: name.trim(), perms: uniquePermissions };
+		setSnack({ visible: true, text: "Role updated" });
+	};
 
 	const handleSave = async () => {
 		try {
@@ -198,22 +130,8 @@ export default function EditRole() {
 				setConfirmSelfLock(true);
 				return;
 			}
-			
 			setSaving(true);
-			const uniquePermissions = normalizePermissionKeys(selectedPerms);
-
-			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
-				name: name.trim(),
-				permissions: uniquePermissions,
-			});
-
-			// Update initial values
-			initialRef.current = {
-				name: name.trim(),
-				perms: normalizePermissionKeys(selectedPerms),
-			};
-
-			setSnack({ visible: true, text: "Role updated" });
+			await persistRole();
 		} catch (error) {
 			console.error("Error saving role:", error);
 			setSnack({ visible: true, text: "Failed to save role" });
@@ -224,24 +142,15 @@ export default function EditRole() {
 
 	const confirmProceedSelfLock = async () => {
 		setConfirmSelfLock(false);
-		await (async () => {
 		try {
 			setSaving(true);
-			const uniquePermissions = normalizePermissionKeys(selectedPerms);
-
-			await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
-				name: name.trim(),
-				permissions: uniquePermissions,
-			});
-			initialRef.current = { name: name.trim(), perms: uniquePermissions };
-			setSnack({ visible: true, text: "Role updated" });
+			await persistRole();
 		} catch (error) {
 			console.error("Error saving role (confirmed):", error);
 			setSnack({ visible: true, text: "Failed to save role" });
 		} finally {
 			setSaving(false);
 		}
-		})();
 	};
 
 	const handleBack = async () => {
@@ -286,86 +195,32 @@ export default function EditRole() {
 					itemId={roleId}
 					listRoute="/collaboration/roles"
 				/>
-			) : (<StackLayout spacing={16}>
-				{willSelfLoseManageRoles && (
-					<Chip icon="alert" style={{ marginBottom: 16 }} selected>
-						You're removing your own “Manage Roles” permission.
-					</Chip>
-				)}
-				<Card style={styles.card}>
-					<TextField
-						label="Role Name"
-						placeholder="Role Name"
-						value={name}
-						onChangeText={setName}
-					/>
-				</Card>
-
-				{/* TODO: Board access per role should be handled via the permission gating system in the future. */}
-				{!role.owner && (<>
+			) : (
+				<StackLayout spacing={16}>
+					{willSelfLoseManageRoles && (
+						<Chip icon="alert" style={{ marginBottom: 16 }} selected>
+							You&apos;re removing your own &ldquo;Manage Roles&rdquo; permission.
+						</Chip>
+					)}
 					<Card style={styles.card}>
-						<Card.Title title={`Permissions (${selectedPerms.length})`} />
-						<Card.Content>
-							{Object.entries(permissions.reduce((acc, category) => {
-								(acc[category.section] ||= []).push(category);
-								return acc;
-							}, {})).map(([sectionLabel, categories]) => (
-								<View key={sectionLabel} style={{ marginBottom: 8 }}>
-									<Text style={{ marginBottom: 6 }}>{sectionLabel}</Text>
-
-									{categories.map((category) => {
-										const open = !!openAccordions[category.categoryKey];
-										const keys = category.permissions.map((permission) => permission.key);
-										const allSelected = keys.every((key) => selectedPerms.includes(key));
-
-										const handleBulkToggle = () => {
-											if (allSelected) setSelectedPerms(prev => prev.filter(key => !keys.includes(key)));
-											else setSelectedPerms(prev => Array.from(new Set([...prev, ...keys])));
-										};
-
-										return (
-											<View key={category.categoryKey} style={{ marginBottom: 6 }}>
-												<List.Accordion
-													title={category.categoryLabel}
-													expanded={open}
-													onPress={() => setOpenAccordions(s => ({ ...s, [category.categoryKey]: !s[category.categoryKey] }))}
-												>
-													<View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
-														<Chip compact onPress={handleBulkToggle}>
-															{allSelected ? 'Clear' : 'Select All'}
-														</Chip>
-													</View>
-
-													<View style={{ paddingLeft: 4 }}>
-														{category.permissions.map(perm => {
-															const checked = selectedPerms.includes(perm.key);
-															return (
-																<Checkbox.Item
-																	key={perm.key}
-																	status={checked ? 'checked' : 'unchecked'}
-																	onPress={() => setSelectedPerms(prev => checked ? prev.filter(k => k !== perm.key) : [...prev, perm.key] )}
-																	label={perm.label}
-																	position="leading"
-																	labelVariant="bodyMedium"
-																	description={perm.description || undefined}
-																/>
-															);
-														})}
-													</View>
-												</List.Accordion>
-											</View>
-										);
-									})}
-								</View>
-							))}
-
-							{permissions.length === 0 && (
-								<Text>No available permissions.</Text>
-							)}
-						</Card.Content>
+						<TextField
+							label="Role Name"
+							placeholder="Role Name"
+							value={name}
+							onChangeText={setName}
+						/>
 					</Card>
-				</>)}
-			</StackLayout>)}
+
+					{/* TODO: Board access per role should be handled via the permission gating system in the future. */}
+					{!role.owner && (
+						<PermissionPicker
+							groups={permissionGroups}
+							selectedPerms={selectedPerms}
+							onChange={setSelectedPerms}
+						/>
+					)}
+				</StackLayout>
+			)}
 
 			<Portal>
 				<Snackbar
@@ -373,7 +228,7 @@ export default function EditRole() {
 					onDismiss={() => setSnack((s) => ({ ...s, visible: false }))}
 					duration={2200}
 					wrapperStyle={{
-						bottom: (insets?.bottom ?? 0) + 12, // keep above the home indicator on iOS
+						bottom: (insets?.bottom ?? 0) + 12,
 						alignItems: "center",
 						justifyContent: "center",
 					}}
@@ -386,7 +241,7 @@ export default function EditRole() {
 					<Dialog.Title>Remove your own ability to manage roles?</Dialog.Title>
 					<Dialog.Content>
 						<Text>
-							You’re removing the “Manage Roles” permission from the role you currently hold. After saving, you won't able to continue editing roles.
+							You&rsquo;re removing the &ldquo;Manage Roles&rdquo; permission from the role you currently hold. After saving, you won&apos;t be able to continue editing roles.
 						</Text>
 					</Dialog.Content>
 					<Dialog.Actions>
@@ -401,5 +256,4 @@ export default function EditRole() {
 
 const styles = StyleSheet.create({
 	card: { marginTop: 16 },
-
 });
