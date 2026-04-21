@@ -22,6 +22,11 @@ function sanitiseNumberString(value, numberFormat = DEFAULT_NUMBER_FORMAT) {
     const fmt = NUMBER_FORMATS[numberFormat] || NUMBER_FORMATS[DEFAULT_NUMBER_FORMAT];
     let s = String(value).trim();
 
+    // Strip currency symbols, whitespace, and any other non-numeric characters.
+    // Keep digits, sign, decimal/thousand separators, and scientific-notation markers.
+    const keepChars = new Set(['-', '+', 'e', 'E', fmt.decimalSep, fmt.thousandSep]);
+    s = Array.from(s).filter(ch => /\d/.test(ch) || keepChars.has(ch)).join('');
+
     // Remove thousand separators globally
     const escaped = fmt.thousandSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     s = s.replace(new RegExp(escaped, 'g'), '');
@@ -42,9 +47,50 @@ function isNumericString(value, numberFormat = DEFAULT_NUMBER_FORMAT) {
     return /^-?\d+(\.\d+)?$/.test(sanitised);
 }
 
+
+// Unicode currency symbols plus common ASCII ones used as prefixes/suffixes, excludes bare letters
+const CURRENCY_SYMBOL_REGEX = /([$€£¥₹₩₽¢₺₪฿₫₦₱₲₴₵₸₡₭])/;
+
+
+// Inspect a single raw value and return the first currency symbol found, or null
+function extractCurrencySymbol(value) {
+    if (value == null) return null;
+    const s = String(value);
+    const match = s.match(CURRENCY_SYMBOL_REGEX);
+    return match ? match[1] : null;
+}
+
+// TODO: see if have multiple currency symbols in database - reasonable?
+// Scan a list of sample values and return the most common currency symbol, provided it appears on at least half of the non-empty numeric-looking values
+// Returns null if no dominant symbol is detected
+function detectCurrencySymbol(values, numberFormat = DEFAULT_NUMBER_FORMAT) {
+    const counts = {};
+    let considered = 0;
+    for (const v of values) {
+        if (v == null || String(v).trim() === "") continue;
+        if (!isNumericString(v, numberFormat)) continue;
+        considered++;
+        const sym = extractCurrencySymbol(v);
+        if (sym) counts[sym] = (counts[sym] || 0) + 1;
+    }
+    if (considered === 0) return null;
+
+    let best = null;
+    let bestCount = 0;
+    for (const [sym, count] of Object.entries(counts)) {
+        if (count > bestCount) {
+            best = sym;
+            bestCount = count;
+        }
+    }
+    return bestCount / considered >= 0.5 ? best : null;
+}
+
 module.exports = {
     sanitiseNumberString,
     isNumericString,
+    extractCurrencySymbol,
+    detectCurrencySymbol,
     NUMBER_FORMATS,
     DEFAULT_NUMBER_FORMAT,
 };

@@ -2,7 +2,7 @@
 const { getDataSchema, saveSchema } = require("../repositories/dataBucketRepository");
 const { createAthenaTable, runDDL } = require("./athenaService");
 const { detectDateFormat } = require("./dateParser");
-const { sanitiseNumberString, isNumericString } = require("./numberSanitiser");
+const { sanitiseNumberString, isNumericString, detectCurrencySymbol } = require("./numberSanitiser");
 
 async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     const tableName = `ds_${dataSourceId}`;
@@ -88,6 +88,15 @@ function generateSchema(data) {
     // Add category to each column
     for (const column of result) {
         column.category = classifyColumn(column.type);
+    }
+
+    // For value columns, detect a dominant currency symbol from sample values
+    // stored as column.currencySymbol; display-only to exclude from normaliseSchema and avoid triggering Athena table rebuilds
+    for (const column of result) {
+        if (column.category !== "value") continue;
+        const values = sampleData.map(row => row[column.name]);
+        const symbol = detectCurrencySymbol(values);
+        if (symbol) column.currencySymbol = symbol;
     }
 
     return result;

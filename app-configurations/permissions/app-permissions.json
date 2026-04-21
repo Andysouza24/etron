@@ -129,6 +129,20 @@
               "label": "View Data",
               "description": "Allows viewing data from sources",
               "defaultStatus": true
+            },
+            {
+              "key": "modules.daybook.datasources.manage_display_settings",
+              "label": "Manage Display Settings",
+              "description": "Allows managing display settings for data sources (includes all settings below)",
+              "defaultStatus": false,
+              "children": [
+                {
+                  "key": "modules.daybook.datasources.manage_column_display_settings",
+                  "label": "Manage Column Display Settings",
+                  "description": "Allows managing per-column display settings such as currency symbol visibility",
+                  "defaultStatus": false
+                }
+              ]
             }
           ]
         },

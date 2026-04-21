@@ -15,6 +15,8 @@
     "modules.daybook.datasources.view_dataSources",
     "modules.daybook.datasources.manage_dataSources",
     "modules.daybook.datasources.view_data",
+    "modules.daybook.datasources.manage_display_settings",
+    "modules.daybook.datasources.manage_column_display_settings",
     "modules.daybook.metrics.view_metrics",
     "modules.daybook.metrics.manage_metrics",
     "modules.daybook.reports.view_reports",
