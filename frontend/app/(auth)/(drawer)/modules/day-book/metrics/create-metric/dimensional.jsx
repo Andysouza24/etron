@@ -2,7 +2,10 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
 import useMetricDataSource from "../../../../../../../hooks/modules/day_book/metrics/useMetricDataSource";
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
+import useCurrencySymbolSeed from "../../../../../../../hooks/modules/day_book/metrics/useCurrencySymbolSeed";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
+import { parseNumericOrOriginal } from "../../../../../../../utils/numberParser";
+import { DEFAULT_NUMBER_FORMAT } from "../../../../../../../utils/constants/modules/day-book/metrics/numberFormat";
 import MetricWizard from "../../../../../../../components/modules/day-book/metrics/MetricWizard";
 import DimensionalConfig from "../../../../../../../components/modules/day-book/metrics/pages/DimensionalConfig";
 import MetricDetails from "../../../../../../../components/modules/day-book/metrics/pages/MetricDetails";
@@ -10,16 +13,6 @@ import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
 import { getCurrentUser } from "aws-amplify/auth";
 import { apiGet } from "../../../../../../../utils/api/apiClient";
 import endpoints from "../../../../../../../utils/api/endpoints";
-
-function parseNumeric(value) {
-    if (typeof value === "number") return value;
-    if (typeof value === "string") {
-        const stripped = value.replace(/,/g, "");
-        const num = Number(stripped);
-        if (!isNaN(num) && stripped !== "") return num;
-    }
-    return value;
-}
 
 const Dimensional = () => {
     const { allowed: viewDataPermission } = useHasPermission("modules.daybook.datasources.view_data");
@@ -42,12 +35,7 @@ const Dimensional = () => {
     const [percentRounding, setPercentRounding] = useState({ mode: "none", decimalPlaces: 1 });
     const [axisNumberFormat, setAxisNumberFormat] = useState(null);
     const [boxUseRawData, setBoxUseRawData] = useState(false);
-    const [numberFormat, setNumberFormat] = useState({
-        currencySymbol: "",
-        thousandsSeparator: ",",
-        decimalSeparator: ".",
-        decimalPlaces: null,
-    });
+    const [numberFormat, setNumberFormat] = useState({ ...DEFAULT_NUMBER_FORMAT });
     const [alerts, setAlerts] = useState([]);
     const [workspaceId, setWorkspaceId] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
@@ -75,6 +63,8 @@ const Dimensional = () => {
         return metricConfig.dependentVariables[0];
     }, [metricConfig]);
 
+    useCurrencySymbolSeed(valueField, ds.classifiedFields?.valueFields, setNumberFormat);
+
     const dimensionValues = useMemo(() => {
         if (!dimensionSelection || !ds.dataSourceData.length) return [];
         const unique = [...new Set(ds.dataSourceData.map((row) => row[dimensionSelection]))];
@@ -90,7 +80,7 @@ const Dimensional = () => {
         return rows.map((row) => {
             const newRow = {};
             for (const [key, value] of Object.entries(row)) {
-                newRow[key] = parseNumeric(value);
+                newRow[key] = parseNumericOrOriginal(value);
             }
             return newRow;
         });
@@ -108,7 +98,7 @@ const Dimensional = () => {
         for (const row of rows) {
             const dateVal = row[dateSelection];
             const dimVal = row[dimensionSelection];
-            const numVal = parseNumeric(row[valueField]);
+            const numVal = parseNumericOrOriginal(row[valueField]);
 
             if (dateVal == null) continue;
             if (!grouped[dateVal]) {

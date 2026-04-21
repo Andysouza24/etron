@@ -1,9 +1,4 @@
-function parseNumber(value) {
-    if (typeof value === "number") return value;
-    if (value == null || value === "") return NaN;
-    const cleaned = String(value).replace(/[$,\s]/g, "");
-    return cleaned !== "" ? Number(cleaned) : NaN;
-}
+import { parseNumericOrNull } from "./numberParser";
 
 export function aggregateData(data, dateKey, valueKeys, aggregationType) {
     const groups = new Map();
@@ -16,7 +11,7 @@ export function aggregateData(data, dateKey, valueKeys, aggregationType) {
     return Array.from(groups, ([dateVal, rows]) => {
         const result = { [dateKey]: dateVal };
         for (const key of valueKeys) {
-            const values = rows.map((r) => parseNumber(r[key])).filter((v) => !isNaN(v));
+            const values = rows.map((r) => parseNumericOrNull(r[key])).filter((v) => v != null);
             switch (aggregationType) {
                 case "sum":
                     result[key] = values.reduce((a, b) => a + b, 0);

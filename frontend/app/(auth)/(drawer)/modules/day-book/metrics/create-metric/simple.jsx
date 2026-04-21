@@ -2,8 +2,11 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
 import useMetricDataSource from "../../../../../../../hooks/modules/day_book/metrics/useMetricDataSource";
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
+import useCurrencySymbolSeed from "../../../../../../../hooks/modules/day_book/metrics/useCurrencySymbolSeed";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import { aggregateData, hasDuplicateValues } from "../../../../../../../utils/aggregation";
+import { parseNumericOrOriginal } from "../../../../../../../utils/numberParser";
+import { DEFAULT_NUMBER_FORMAT } from "../../../../../../../utils/constants/modules/day-book/metrics/numberFormat";
 import MetricWizard from "../../../../../../../components/modules/day-book/metrics/MetricWizard";
 import SimpleConfig from "../../../../../../../components/modules/day-book/metrics/pages/SimpleConfig";
 import MetricDetails from "../../../../../../../components/modules/day-book/metrics/pages/MetricDetails";
@@ -12,19 +15,11 @@ import { getCurrentUser } from "aws-amplify/auth";
 import { apiGet } from "../../../../../../../utils/api/apiClient";
 import endpoints from "../../../../../../../utils/api/endpoints";
 
-function parseNumericValue(value) {
-    if (value == null || value === "") return value;
-    if (typeof value === "number") return value;
-    const cleaned = String(value).replace(/[$,\s]/g, "");
-    const num = Number(cleaned);
-    return !isNaN(num) && cleaned !== "" ? num : value;
-}
-
 function convertToGraphData(rows) {
     return rows.map((row) => {
         const newRow = {};
         for (const [key, value] of Object.entries(row)) {
-            newRow[key] = parseNumericValue(value);
+            newRow[key] = parseNumericOrOriginal(value);
         }
         return newRow;
     });
@@ -51,12 +46,7 @@ const CreateSimpleMetric = () => {
     const [percentRounding, setPercentRounding] = useState({ mode: "none", decimalPlaces: 1 });
     const [axisNumberFormat, setAxisNumberFormat] = useState(null);
     const [boxUseRawData, setBoxUseRawData] = useState(false);
-    const [numberFormat, setNumberFormat] = useState({
-        currencySymbol: "",
-        thousandsSeparator: ",",
-        decimalSeparator: ".",
-        decimalPlaces: null,
-    });
+    const [numberFormat, setNumberFormat] = useState({ ...DEFAULT_NUMBER_FORMAT });
 
     // alerts state
     const [alerts, setAlerts] = useState([]);
@@ -89,6 +79,8 @@ const CreateSimpleMetric = () => {
     useEffect(() => {
         setAggChecked(hasDuplicateDates);
     }, [hasDuplicateDates]);
+
+    useCurrencySymbolSeed(valueSelection, ds.classifiedFields?.valueFields, setNumberFormat);
 
     const convertedRows = useMemo(() => {
         const rows =

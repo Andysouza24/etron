@@ -3,14 +3,25 @@ import { View, ScrollView, FlatList, StyleSheet } from "react-native";
 import { Modal, Portal, Card, DataTable, Text, ActivityIndicator } from "react-native-paper";
 import { dataPreviewStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/dataPreview";
 import { sharedModalStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/sharedModalStyles";
+import { formatCellValue } from "../../../../../utils/numberParser";
 
 const ROW_LOAD_AMOUNT = 20;
 
-export default function DataPreviewModal({ visible, onDismiss, data, variableNames }) {
+export default function DataPreviewModal({ visible, onDismiss, data, variableNames, schema }) {
     const [rowLimit, setRowLimit] = useState(ROW_LOAD_AMOUNT);
     const [loadingMore, setLoadingMore] = useState(false);
 
     const displayedRows = useMemo(() => data.slice(0, rowLimit), [data, rowLimit]);
+
+    const columnByName = useMemo(() => {
+        const map = {};
+        if (Array.isArray(schema)) {
+            for (const col of schema) {
+                if (col && col.name) map[col.name] = col;
+            }
+        }
+        return map;
+    }, [schema]);
 
     const onEndReached = useCallback(() => {
         if (loadingMore || rowLimit >= data.length) return;
@@ -43,7 +54,7 @@ export default function DataPreviewModal({ visible, onDismiss, data, variableNam
                                             <DataTable.Row>
                                                 {variableNames.map((name, i) => (
                                                     <DataTable.Cell key={i} style={{ width: 100 }} numberOfLines={1}>
-                                                        <Text>{String(item[name])}</Text>
+                                                        <Text>{formatCellValue(item[name], columnByName[name])}</Text>
                                                     </DataTable.Cell>
                                                 ))}
                                             </DataTable.Row>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram, VictoryLabel } from "victory-native";
 import { Text, View } from "react-native";
+import { parseNumericOrNull as parseNumericValue } from "../../../../utils/numberParser";
 
 //TODO: move formatting functions into a separate utils file
 //TODO: consider moving graphs into separate files for better organization and maintainability
@@ -47,14 +48,6 @@ function formatValueWithRounding(value, rounding, numberFormat) {
     }
     // "none" — full value
     return String(num);
-}
-
-function parseNumericValue(value) {
-    if (value == null || value === "") return null;
-    if (typeof value === "number") return Number.isFinite(value) ? value : null;
-    const cleaned = String(value).replace(/[$,\s]/g, "");
-    const num = Number(cleaned);
-    return Number.isFinite(num) ? num : null;
 }
 
 function formatTimestamp(value) {

@@ -73,6 +73,7 @@ export default function SimpleConfig({
                     onDismiss={() => setDataVisible(false)}
                     data={ds.dataSourceData}
                     variableNames={ds.dataSourceVariableNames}
+                    schema={ds.dataSourceSchema}
                 />
 
                 <ExistingMetricsModal
