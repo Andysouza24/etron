@@ -327,7 +327,6 @@ const DataManagement = () => {
 				/>
 			}
 			center={false}
-			scroll={true}
 			loadingOverlayActive={loading}
 		>
 			{body}
