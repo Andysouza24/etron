@@ -1,6 +1,7 @@
 import { getWorkspaceId } from '../storage/workspaceStorage';
 import endpoints from '../utils/api/endpoints';
 import { apiGet } from '../utils/api/apiClient';
+import { buildMetricGraphData } from '../utils/metricGraphData';
 
 class MetricDataService {
     constructor() {
@@ -62,32 +63,13 @@ class MetricDataService {
         return dataMap;
     }
 
-    processDataForChart(data, config) {
-        const { independentVariable, dependentVariables, selectedRows } = config;
+    processDataForChart(data, config, schema = null) {
+        const { data: processed } = buildMetricGraphData(data, config, schema);
+        return processed;
+    }
 
-        let processedData = data.map(row => {
-            const newRow = {};
-            
-            // Convert independent variable
-            newRow[independentVariable] = Number(row[independentVariable]) || row[independentVariable];
-            
-            // Convert dependent variables
-            dependentVariables.forEach(key => {
-                const valueAsNumber = Number(row[key]);
-                newRow[key] = !isNaN(valueAsNumber) ? valueAsNumber : row[key];
-            });
-
-            return newRow;
-        });
-
-        // Filter by selected rows if specified
-        if (selectedRows && selectedRows.length > 0) {
-            processedData = processedData.filter(
-                row => selectedRows.includes(row[independentVariable])
-            );
-        }
-
-        return processedData;
+    buildChartPayload(data, config, schema = null) {
+        return buildMetricGraphData(data, config, schema);
     }
 
     getCached(key) {

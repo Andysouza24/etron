@@ -21,6 +21,7 @@ import PermissionGate from "../../../../../../../components/common/PermissionGat
 import { captureRef } from "react-native-view-shot";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import ExportChipGroup from "../../../../../../../components/common/ExportChipGroup";
+import { buildMetricGraphData } from "../../../../../../../utils/metricGraphData";
 
 // TODO: fix, graph view does not reflect settings applied during metric creation and the preview displayed during metric creation.
 
@@ -29,6 +30,7 @@ const ViewMetric = () => {
     const [loading, setLoading] = useState(true);
     const [metricSettings, setMetricSettings] = useState(null);
     const [metricData, setMetricData] = useState(null);
+    const [metricSchema, setMetricSchema] = useState(null);
     const [metricExists, setMetricExists] = useState(true);
     const [deleting, setDeleting] = useState(false);
     const [coloursState, setColoursState] = useState(["red", "blue", "green", "purple"]);
@@ -66,6 +68,7 @@ const ViewMetric = () => {
                 { workspaceId }
             );
             setMetricData(dataResult.data.data);
+            setMetricSchema(dataResult.data.schema || null);
         } catch (error) {
             console.error("Error downloading metric:", error);
             setMetricExists(false);
@@ -139,6 +142,10 @@ const ViewMetric = () => {
         return graphRows;
     }
 
+    function buildChart() {
+        return buildMetricGraphData(metricData || [], metricSettings.config, metricSchema);
+    }
+
     if (loading || !metricExists) {
         return (
             <ResponsiveScreen
@@ -164,12 +171,7 @@ const ViewMetric = () => {
     }
 
     const graphDef = GraphTypes[metricSettings.config.type] || GraphTypes[metricSettings.config.graphType];
-    let filteredData = convertToGraphData(metricData);
-    if (metricSettings.config.selectedRows?.length > 0) {
-        filteredData = filteredData.filter((row) =>
-            metricSettings.config.selectedRows.includes(row[metricSettings.config.independentVariable])
-        );
-    }
+    const { data: filteredData, yKeys } = buildChart();
 
     if (!loading) {
         return (
@@ -198,12 +200,20 @@ const ViewMetric = () => {
                             {graphDef.render({
                                 data: filteredData,
                                 xKey: metricSettings.config.independentVariable,
-                                yKeys: metricSettings.config.dependentVariables,
+                                yKeys,
                                 colours: metricSettings.config.colours || coloursState,
                                 axisColorMode: theme.dark ? "dark" : "light",
                                 maxValue: metricSettings.config.maxValue,
+                                capPercentAt100: metricSettings.config.capPercentAt100,
                                 boxGrouping: metricSettings.config.boxGrouping,
                                 boxTimePeriod: metricSettings.config.boxTimePeriod,
+                                pieLabelPlacement: metricSettings.config.pieLabelPlacement,
+                                rounding: metricSettings.config.rounding,
+                                numberFormat: metricSettings.config.numberFormat,
+                                percentRounding: metricSettings.config.percentRounding,
+                                axisNumberFormat: metricSettings.config.axisNumberFormat,
+                                rawGraphData: metricSettings.config.rawGraphData,
+                                boxUseRawData: metricSettings.config.boxUseRawData,
                             })}
                         </View>
                     </Card.Content>
@@ -268,12 +278,20 @@ const ViewMetric = () => {
                                             {graphDef.render({
                                                 data: filteredData,
                                                 xKey: metricSettings.config.independentVariable,
-                                                yKeys: metricSettings.config.dependentVariables,
+                                                yKeys,
                                                 colours: metricSettings.config.colours || coloursState,
                                                 axisColorMode: axisColorModeState,
                                                 maxValue: metricSettings.config.maxValue,
+                                                capPercentAt100: metricSettings.config.capPercentAt100,
                                                 boxGrouping: metricSettings.config.boxGrouping,
                                                 boxTimePeriod: metricSettings.config.boxTimePeriod,
+                                                pieLabelPlacement: metricSettings.config.pieLabelPlacement,
+                                                rounding: metricSettings.config.rounding,
+                                                numberFormat: metricSettings.config.numberFormat,
+                                                percentRounding: metricSettings.config.percentRounding,
+                                                axisNumberFormat: metricSettings.config.axisNumberFormat,
+                                                rawGraphData: metricSettings.config.rawGraphData,
+                                                boxUseRawData: metricSettings.config.boxUseRawData,
                                             })}
                                         </View>
                                     </ViewShot>

@@ -190,6 +190,9 @@ async function getMetricVariableNames(workspaceId, metricId) {
         ...result.config.dependentVariables,
         result.config.independentVariable
     ];
+    if (result.config.dimensionField) {
+        variables.push(result.config.dimensionField);
+    }
     return variables;
 }
 

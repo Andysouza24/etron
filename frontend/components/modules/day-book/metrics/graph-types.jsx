@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram, VictoryLabel } from "victory-native";
+import { VictoryContainer, VictoryAxis, VictoryTheme, VictoryChart, VictoryLine, VictoryBar, VictoryGroup, VictoryPie, VictoryArea, VictoryScatter, VictoryBoxPlot, VictoryHistogram, VictoryLabel } from "victory-native";
 import { Text, View } from "react-native";
 import { parseNumericOrNull as parseNumericValue } from "../../../../utils/numberParser";
 
@@ -356,17 +356,33 @@ const GraphTypes = {
                                     }}
                                 />
 
-                                {yKeys.map((yKey, index) => (
-                                    <VictoryBar
-                                        key={yKey}
-                                        data={sortedData
-                                            .map((d) => ({ x: d[xKey], y: d[yKey] }))
-                                            .filter((d) => d.y != null)}
-                                        style={{
-                                            data: { fill: colours[index] || "blue" },
-                                        }}
-                                    />
-                                ))}
+                                {yKeys.length > 1 ? (
+                                    <VictoryGroup offset={Math.max(4, Math.min(20, (size.width - 90) / Math.max(1, sortedData.length * yKeys.length + 1)))}>
+                                        {yKeys.map((yKey, index) => (
+                                            <VictoryBar
+                                                key={yKey}
+                                                data={sortedData
+                                                    .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                                    .filter((d) => d.y != null)}
+                                                style={{
+                                                    data: { fill: colours[index] || "blue" },
+                                                }}
+                                            />
+                                        ))}
+                                    </VictoryGroup>
+                                ) : (
+                                    yKeys.map((yKey, index) => (
+                                        <VictoryBar
+                                            key={yKey}
+                                            data={sortedData
+                                                .map((d) => ({ x: d[xKey], y: d[yKey] }))
+                                                .filter((d) => d.y != null)}
+                                            style={{
+                                                data: { fill: colours[index] || "blue" },
+                                            }}
+                                        />
+                                    ))
+                                )}
                             </VictoryChart>
                         )}
                     </View>

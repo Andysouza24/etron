@@ -15,7 +15,10 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
     const theme = useTheme();
 
     const config = item.config || {};
-    const dependentVariables = Array.isArray(config.dependentVariables) ? config.dependentVariables : [];
+    const configDependentVariables = Array.isArray(config.dependentVariables) ? config.dependentVariables : [];
+    const dependentVariables = Array.isArray(metricState?.yKeys) && metricState.yKeys.length > 0
+        ? metricState.yKeys
+        : configDependentVariables;
     const colours = Array.isArray(config.colours) && config.colours.length > 0 ? config.colours : DEFAULT_CHART_COLOURS;
     const graphDef = config.chartType ? GraphTypes[config.chartType] : null;
     const isLoading = metricState ? metricState.loading : true;

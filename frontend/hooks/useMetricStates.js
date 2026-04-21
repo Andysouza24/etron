@@ -20,9 +20,10 @@ export const useMetricStates = (boardItems) => {
           throw new Error("No metric data available.");
         }
 
-        const processed = metricDataService.processDataForChart(
+        const { data: processed, yKeys } = metricDataService.buildChartPayload(
           rawData.data || [],
-          config
+          config,
+          rawData.schema
         );
 
         setMetricStates((prev) => {
@@ -36,6 +37,7 @@ export const useMetricStates = (boardItems) => {
             [itemId]: {
               ...current,
               data: processed,
+              yKeys,
               loading: false,
               error: null,
             },

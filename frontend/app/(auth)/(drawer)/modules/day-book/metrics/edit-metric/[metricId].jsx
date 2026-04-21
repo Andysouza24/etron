@@ -31,6 +31,7 @@ import { apiGet, apiPatch } from '../../../../../../../utils/api/apiClient';
 import ColorPicker from 'react-native-wheel-color-picker';
 import throttle from 'lodash.throttle';
 import ResponsiveScreen from '../../../../../../../components/layout/ResponsiveScreen';
+import { buildMetricGraphData } from '../../../../../../../utils/metricGraphData';
 
 const EditMetric = () => {
 	const router = useRouter();
@@ -62,6 +63,17 @@ const EditMetric = () => {
     const [capPercentAt100, setCapPercentAt100] = useState(false);
     const [boxGrouping, setBoxGrouping] = useState("yKey");
     const [boxTimePeriod, setBoxTimePeriod] = useState("date");
+    const [pieLabelPlacement, setPieLabelPlacement] = useState(null);
+    const [rounding, setRounding] = useState(null);
+    const [numberFormat, setNumberFormat] = useState(null);
+    const [percentRounding, setPercentRounding] = useState(null);
+    const [axisNumberFormat, setAxisNumberFormat] = useState(null);
+    const [rawGraphData, setRawGraphData] = useState(null);
+    const [boxUseRawData, setBoxUseRawData] = useState(null);
+    const [alerts, setAlerts] = useState(null);
+    const [metricType, setMetricType] = useState(null);
+    const [aggregation, setAggregation] = useState(null);
+    const [dimensionField, setDimensionField] = useState(null);
 
     const isProgressType = selectedMetric === "progressBar" || selectedMetric === "progressCircle";
     const isBoxType = selectedMetric === "box";
@@ -123,6 +135,17 @@ const EditMetric = () => {
                 setCapPercentAt100(metric.config?.capPercentAt100 ?? false);
                 setBoxGrouping(metric.config?.boxGrouping || "yKey");
                 setBoxTimePeriod(metric.config?.boxTimePeriod || "month");
+                setPieLabelPlacement(metric.config?.pieLabelPlacement ?? null);
+                setRounding(metric.config?.rounding ?? null);
+                setNumberFormat(metric.config?.numberFormat ?? null);
+                setPercentRounding(metric.config?.percentRounding ?? null);
+                setAxisNumberFormat(metric.config?.axisNumberFormat ?? null);
+                setRawGraphData(metric.config?.rawGraphData ?? null);
+                setBoxUseRawData(metric.config?.boxUseRawData ?? null);
+                setAlerts(metric.config?.alerts ?? null);
+                setMetricType(metric.config?.metricType ?? null);
+                setAggregation(metric.config?.aggregation ?? null);
+                setDimensionField(metric.config?.dimensionField ?? null);
 			} catch (e) {
 				console.error("Error loading metric:", e);
 			} finally {
@@ -205,14 +228,25 @@ const EditMetric = () => {
                 dataSourceId,
                 config: {
 					type: selectedMetric,
+					metricType,
 					independentVariable: chosenIndependentVariable,
 					dependentVariables: dependentArray,
+					dimensionField,
+					aggregation,
 					colours: coloursState,
 					selectedRows,
                     maxValue,
                     capPercentAt100,
                     boxGrouping,
                     boxTimePeriod,
+                    pieLabelPlacement,
+                    rounding,
+                    numberFormat,
+                    percentRounding,
+                    axisNumberFormat,
+                    rawGraphData,
+                    boxUseRawData,
+                    alerts,
 				},
             });
 			setSnack({ visible: true, text: "Metric updated" });
@@ -226,22 +260,30 @@ const EditMetric = () => {
 
 	const graphDef = selectedMetric ? GraphTypes[selectedMetric] : null;
 
-	const graphData = useMemo(() => {
-		const base =
-			selectedRows.length > 0 && dataSourceVariableNames.length > 0
-				? dataSourceData.filter(r => selectedRows.includes(r[dataSourceVariableNames[0]]))
-				: dataSourceData;
-		return convertToGraphData(base);
-	}, [dataSourceData, selectedRows, dataSourceVariableNames, chosenIndependentVariable, chosenDependentVariables]);
+	const { data: graphData, yKeys: graphYKeys } = useMemo(() => {
+		return buildMetricGraphData(
+			dataSourceData,
+			{
+				independentVariable: chosenIndependentVariable,
+				dependentVariables: dependentArray,
+				dimensionField,
+				aggregation,
+				selectedRows,
+			},
+			dataSourceVariableNames
+		);
+	}, [dataSourceData, dataSourceVariableNames, selectedRows, chosenIndependentVariable, dependentArray, dimensionField, aggregation]);
 
 
     useEffect(() => {
+        const seriesCount = Math.max(graphYKeys?.length || 0, dependentArray.length);
+        if (seriesCount === 0) return;
         setColoursState(prev => {
             const next = [...prev];
-            while (next.length < dependentArray.length) next.push("#5f80c7ff"); // default
-            return next.slice(0, dependentArray.length);
+            while (next.length < seriesCount) next.push("#5f80c7ff"); // default
+            return next.slice(0, seriesCount);
         });
-    }, [dependentArray.length]);
+    }, [dependentArray.length, graphYKeys?.length]);
 
     const onColourChange = useMemo (() => throttle((newColor) => {
         setColoursState(prev => {
@@ -475,12 +517,20 @@ const EditMetric = () => {
                                 {graphDef.render({
                                     data: graphData,
                                     xKey: chosenIndependentVariable,
-                                    yKeys: dependentArray,
+                                    yKeys: graphYKeys,
                                     colours: coloursState,
+                                    axisColorMode: theme.dark ? "dark" : "light",
 									maxValue,
 									capPercentAt100,
 									boxGrouping,
 									boxTimePeriod,
+                                    pieLabelPlacement,
+                                    rounding,
+                                    numberFormat,
+                                    percentRounding,
+                                    axisNumberFormat,
+                                    rawGraphData,
+                                    boxUseRawData,
                                 })}
                             </View>
                         </Card.Content>
