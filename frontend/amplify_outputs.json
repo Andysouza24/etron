@@ -91,7 +91,7 @@
     "url": "https://hvcdfdjxljfkvkfs5j54zqntxa.appsync-api.ap-southeast-2.amazonaws.com/graphql",
     "aws_region": "ap-southeast-2",
     "default_authorization_type": "API_KEY",
-    "api_key": "da2-yi6xwrz2svbc3mzmvk3c43edya",
+    "api_key": "da2-hvpajzcswvevzby36nacu5rrx4",
     "authorization_types": ["AMAZON_COGNITO_USER_POOLS", "API_KEY"]
   }
 }
