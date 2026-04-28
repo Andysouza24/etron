@@ -8,8 +8,15 @@ const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRe
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
 const metricRepo = require("@etron/day-book-shared/repositories/metricRepository");
 const adapterFactory = require("@etron/data-sources-shared/adapters/adapterFactory");
+const parentAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardAdapter");
+const fileAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardFileAdapter");
 const { removeAllStoredData, getUploadUrl, getDataSchema } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
+
+const {
+    backfillMicromaxDashboardParent,
+    cascadeDeleteMicromaxDashboardChildren,
+} = require("./dashboardRawData");
 
 const {
     PERMISSIONS,
@@ -39,6 +46,17 @@ async function createRemoteDataSource(authUserId, payload) {
     validateCommonCreateFields({ name, method, expiry });
 
     resolveAndValidateAdapter(sourceType, { config, secrets });
+
+    // Only one Micromax Dashboard parent connection is allowed per workspace.
+    if (sourceType === parentAdapter.SOURCE_TYPE) {
+        const existing = await dataSourceRepo.getDataSourcesByWorkspaceId(workspaceId);
+        const alreadyConnected = (existing || []).some(
+            (ds) => ds.sourceType === parentAdapter.SOURCE_TYPE
+        );
+        if (alreadyConnected) {
+            throw new Error("A Micromax Dashboard connection already exists for this workspace");
+        }
+    }
 
     const dataSourceId = uuidv4();
     const date = new Date().toISOString();
@@ -82,6 +100,17 @@ async function createRemoteDataSource(authUserId, payload) {
         dataSourceId,
         name,
     });
+
+    // For micromax-dashboard parents, backfill any files that already exist
+    // in the bucket so the new connection immediately reflects the current
+    // state. Best-effort: backfill failures don't block creation.
+    if (sourceType === parentAdapter.SOURCE_TYPE) {
+        try {
+            await backfillMicromaxDashboardParent(authUserId, dataSourceId, { workspaceId });
+        } catch (err) {
+            console.error("[crud] Micromax dashboard backfill failed (non-fatal):", err);
+        }
+    }
 
     return { ...dataSourceItem, secrets };
 }
@@ -190,6 +219,26 @@ async function deleteDataSourceInWorkspace(authUserId, workspaceId, dataSourceId
     const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
     if (!dataSource) {
         throw new Error("Data Source not found");
+    }
+
+    // Micromax-dashboard file children are managed by the ingest pipeline.
+    // Block direct deletion so the user can't desynchronise the bucket and
+    // the data source list — files disappear when removed from S3 or when
+    // the parent connection is deleted.
+    if (dataSource.sourceType === fileAdapter.SOURCE_TYPE) {
+        throw new Error(
+            "Micromax dashboard files are managed automatically. Delete the parent connection or remove the file from the bucket."
+        );
+    }
+
+    // Deleting a parent micromax-dashboard connection should also remove
+    // every file child that belongs to it.
+    if (dataSource.sourceType === parentAdapter.SOURCE_TYPE) {
+        try {
+            await cascadeDeleteMicromaxDashboardChildren(workspaceId, dataSourceId);
+        } catch (err) {
+            console.error("[crud] cascadeDeleteMicromaxDashboardChildren failed (continuing):", err);
+        }
     }
 
     await removeAllStoredData(workspaceId, dataSourceId);

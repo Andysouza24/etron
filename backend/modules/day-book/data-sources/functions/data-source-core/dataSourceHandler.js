@@ -1,6 +1,6 @@
 // Author(s): Rhys Cleary, Holly Wyatt
 
-const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData, previewSchema, confirmSchemaAndProcess } = require("./dataSourceService");
+const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData, previewSchema, confirmSchemaAndProcess, refreshMicromaxDashboardFile, backfillMicromaxDashboardParent } = require("./dataSourceService");
 
 exports.handler = async (event) => {
     let statusCode = 200;
@@ -114,6 +114,36 @@ exports.handler = async (event) => {
                     throw new Error("dataSourceId must be a UUID, 'string'");
                 }
                 body = await confirmSchemaAndProcess(authUserId, pathParams.dataSourceId, requestJSON);
+                break;
+            }
+
+            // MANUAL REFRESH FOR DASHBOARD RAW DATA INGEST
+            case "POST /day-book/data-sources/{dataSourceId}/dashboard-raw-data/refresh": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                if (!pathParams.dataSourceId) {
+                    throw new Error("Missing dataSourceId in path parameters");
+                }
+                if (typeof pathParams.dataSourceId !== "string") {
+                    throw new Error("dataSourceId must be a UUID, 'string'");
+                }
+                body = await refreshMicromaxDashboardFile(authUserId, pathParams.dataSourceId, requestJSON);
+                break;
+            }
+
+            // MANUAL RESCAN OF EVERY FILE FOR A MICROMAX-DASHBOARD CONNECTION
+            case "POST /day-book/data-sources/{dataSourceId}/micromax-dashboard/rescan": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                if (!pathParams.dataSourceId) {
+                    throw new Error("Missing dataSourceId in path parameters");
+                }
+                if (typeof pathParams.dataSourceId !== "string") {
+                    throw new Error("dataSourceId must be a UUID, 'string'");
+                }
+                body = await backfillMicromaxDashboardParent(authUserId, pathParams.dataSourceId, requestJSON);
                 break;
             }
 

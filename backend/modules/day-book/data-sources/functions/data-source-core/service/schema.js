@@ -127,6 +127,12 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
     }
 
     try {
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "processing",
+            errorMessage: null,
+            progressStage: "Translating data",
+            progressPercent: 15,
+        });
         const translatedData = translateData(rawData);
 
         if (translatedData.length === 0) {
@@ -137,9 +143,11 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
             return { success: false };
         }
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Validating format", percent: 30 });
         const { valid, error } = validateFormat(translatedData);
         if (!valid) throw new Error(`Invalid data format: ${error}`);
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Generating schema", percent: 45 });
         const autoSchema = generateSchema(translatedData.slice(0, 100));
 
         // build final schema from user-confirmed categories
@@ -148,15 +156,20 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
             return resolveColumnForCategory(col, userCol, translatedData);
         });
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Casting rows", percent: 60 });
         const castedData = castDataToSchema(translatedData, finalSchema);
+
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Writing parquet", percent: 75 });
         const parquetBuffer = await toParquet(castedData, finalSchema);
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Saving data", percent: 85 });
         if (dataSource.method === "extend") {
             await appendToStoredData(workspaceId, dataSourceId, castedData, finalSchema);
         } else {
             await replaceStoredData(workspaceId, dataSourceId, parquetBuffer);
         }
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Finalising", percent: 95 });
         await saveSchemaAndUpdateTable(workspaceId, dataSourceId, finalSchema);
 
         await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {

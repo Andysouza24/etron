@@ -7,6 +7,7 @@ const update = require("./service/update");
 const schema = require("./service/schema");
 const query = require("./service/query");
 const remote = require("./service/remote");
+const dashboardRawData = require("./service/dashboardRawData");
 
 module.exports = {
     // crud
@@ -33,4 +34,9 @@ module.exports = {
     testConnection: remote.testConnection,
     getRemotePreview: remote.getRemotePreview,
     getAvailableSpreadsheets: remote.getAvailableSpreadsheets,
+
+    // micromax-dashboard manual triggers
+    refreshMicromaxDashboardFile: dashboardRawData.refreshMicromaxDashboardFile,
+    backfillMicromaxDashboardParent: dashboardRawData.backfillMicromaxDashboardParent,
+    cascadeDeleteMicromaxDashboardChildren: dashboardRawData.cascadeDeleteMicromaxDashboardChildren,
 };
