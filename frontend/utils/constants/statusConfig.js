@@ -23,6 +23,18 @@ const STATUS_CONFIG = {
 		colorKey: "secondaryContainer",
 		textColorKey: "onSecondaryContainer",
 	},
+	processing: {
+		label: "Processing",
+		icon: "progress-clock",
+		colorKey: "secondaryContainer",
+		textColorKey: "onSecondaryContainer",
+	},
+	no_data: {
+		label: "No data",
+		icon: "database-off-outline",
+		colorKey: "surfaceVariant",
+		textColorKey: "onSurfaceVariant",
+	},
 	error: {
 		label: "Error",
 		icon: "alert-circle",
