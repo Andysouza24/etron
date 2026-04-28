@@ -3,6 +3,19 @@ const { Writable } = require('stream');
 const { parseDate, parseWithUserFormat } = require('./dateParser');
 const { sanitiseNumberString } = require('./numberSanitiser');
 
+// Parquet INT64 range: signed 64-bit. Writing a value outside this range throws ERR_OUT_OF_RANGE.
+const INT64_MAX = 9223372036854775807n; // 2^63 - 1
+const INT64_MIN = -9223372036854775808n; // -(2^63)
+
+function fitsInInt64(intLikeString) {
+    try {
+        const big = BigInt(String(intLikeString).trim());
+        return big >= INT64_MIN && big <= INT64_MAX;
+    } catch {
+        return false;
+    }
+}
+
 async function toParquet(data, schema) {
     if (!Array.isArray(data) || data.length === 0) {
         throw new Error("The data must be a non-empty array");
@@ -63,6 +76,11 @@ async function toParquet(data, schema) {
                     const bigintVal = Number.isNaN(Number(sanitisedBI)) ? null : Number(sanitisedBI);
                     if (bigintVal !== null && Number.isNaN(bigintVal)) {
                         console.warn(`Warning: NaN detected in bigint column "${name}" with value: ${value}, converting to null`);
+                        castedRow[name] = null;
+                    } else if (bigintVal !== null && !fitsInInt64(sanitisedBI)) {
+                        // Value exceeds INT64 range; cannot be encoded as parquet INT64.
+                        // Null it out instead of crashing the entire batch.
+                        console.warn(`Warning: value out of INT64 range in bigint column "${name}" (value: ${value}), converting to null`);
                         castedRow[name] = null;
                     } else {
                         castedRow[name] = bigintVal;

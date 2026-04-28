@@ -4,6 +4,21 @@ const { createAthenaTable, runDDL } = require("./athenaService");
 const { detectDateFormat } = require("./dateParser");
 const { sanitiseNumberString, isNumericString, detectCurrencySymbol } = require("./numberSanitiser");
 
+// Parquet INT64 range: signed 64-bit. Values outside this range cannot be encoded.
+const INT64_MAX = 9223372036854775807n; // 2^63 - 1
+const INT64_MIN = -9223372036854775808n; // -(2^63)
+
+function fitsInInt64(intStringOrNumber) {
+    try {
+        const big = typeof intStringOrNumber === 'bigint'
+            ? intStringOrNumber
+            : BigInt(String(intStringOrNumber).trim());
+        return big >= INT64_MIN && big <= INT64_MAX;
+    } catch {
+        return false;
+    }
+}
+
 async function saveSchemaAndUpdateTable(workspaceId, dataSourceId, newSchema) {
     const tableName = `ds_${dataSourceId}`;
     const database = process.env.ATHENA_DATABASE;
@@ -139,6 +154,9 @@ function deduceType(value, columnName = "") {
             if (sanitised.includes(".")) {
                 return isMoneyField(columnName) ? "decimal(18,2)" : "double";
             }
+            // Integers larger than INT64 (e.g. very large IDs) cannot be stored as bigint;
+            // keep them as string to preserve precision and avoid parquet overflow.
+            if (!fitsInInt64(sanitised)) return "string";
             return "bigint";
         }
 
@@ -173,6 +191,10 @@ function detectNumericType(values, columnName = '', numberFormat = 'dot_decimal'
     if (hasDecimals) {
         return isMoneyField(columnName) ? 'decimal(18,2)' : 'double';
     }
+    // If any integer in the sample overflows INT64, fall back to double (precision loss
+    // is preferred over a parquet write failure).
+    const overflows = numeric.some(v => !fitsInInt64(sanitiseNumberString(v, numberFormat)));
+    if (overflows) return 'double';
     return 'bigint';
 }
 

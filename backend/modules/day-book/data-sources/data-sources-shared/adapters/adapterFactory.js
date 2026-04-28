@@ -3,12 +3,16 @@ const customApiAdapter = require("./customApiAdapter");
 const ftpAdapter = require("./ftpAdapter");
 const mysqlAdapter = require("./mysqlAdapter");
 const localCsvAdapter = require("./localCsvAdapter");
+const micromaxDashboardAdapter = require("./micromaxDashboardAdapter");
+const micromaxDashboardFileAdapter = require("./micromaxDashboardFileAdapter");
 
 const adapters = {
     "api": customApiAdapter,
     "ftp": ftpAdapter,
     "mysql": mysqlAdapter,
     "local-csv": localCsvAdapter,
+    "micromax-dashboard": micromaxDashboardAdapter,
+    "micromax-dashboard-file": micromaxDashboardFileAdapter,
     
 };
 
