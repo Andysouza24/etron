@@ -19,6 +19,9 @@ Parameters:
     Type: String
   UserPoolArn:
     Type: String
+  DashboardRawDataBucketName:
+    Type: String
+    Default: micromax-dashboard-raw-data
 
 Globals:
   Function:
@@ -35,6 +38,7 @@ Globals:
         APP_SYNC_URL: !Ref AppSyncUrl
         APP_SYNC_API_KEY: !Ref AppSyncApiKey
         USERPOOL_ARN: !Ref UserPoolArn
+        DASHBOARD_RAW_DATA_BUCKET: !Ref DashboardRawDataBucketName
 
 Resources:
 
@@ -60,6 +64,8 @@ Resources:
       Environment:
         Variables:
           POLLING_LAMBDA_NAME: !Ref DataSourcePollFunction
+          DASHBOARD_RAW_DATA_BUCKET: !Ref DashboardRawDataBucketName
+          DASHBOARD_RAW_DATA_QUEUE_URL: !Ref DashboardRawDataIngestQueue
       Policies:
         - DynamoDBCrudPolicy:
             TableName: DataSources
@@ -221,6 +227,20 @@ Resources:
           Properties:
             Path: /day-book/data-sources/available-spreadsheets
             Method: get
+            RestApiId: !Ref eTRONApi
+
+        RefreshDashboardRawData:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/dashboard-raw-data/refresh
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        RescanMicromaxDashboard:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/micromax-dashboard/rescan
+            Method: post
             RestApiId: !Ref eTRONApi
 
             
@@ -699,6 +719,152 @@ Resources:
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
                 - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+
+  DashboardRawDataIngestQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: DashboardRawDataIngestQueue
+      VisibilityTimeout: 360
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DashboardRawDataIngestDLQ.Arn
+        maxReceiveCount: 3
+
+  DashboardRawDataIngestDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: DashboardRawDataIngestDLQ
+      MessageRetentionPeriod: 1209600
+
+  DashboardRawDataIngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./data-sources/functions/dashboard-raw-data-ingest
+      Handler: dashboardRawDataIngestHandler.handler
+      Description: EventBridge handler that materialises micromax-dashboard-file data sources from S3 events on the dashboard raw data bucket.
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          DASHBOARD_RAW_DATA_QUEUE_URL: !Ref DashboardRawDataIngestQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DashboardRawDataIngestQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: DataSources
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+                - s3:ListBucket
+                - s3:PutObject
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - athena:StartQueryExecution
+                - athena:GetQueryExecution
+                - athena:GetQueryResults
+                - athena:GetWorkGroup
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - glue:GetTable
+                - glue:DeleteTable
+                - glue:UpdateTable
+              Resource:
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+      Events:
+        ObjectCreated:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - "Object Created"
+              detail:
+                bucket:
+                  name:
+                    - !Ref DashboardRawDataBucketName
+                object:
+                  key:
+                    - wildcard: "exports/*.json"
+        ObjectDeleted:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - "Object Deleted"
+              detail:
+                bucket:
+                  name:
+                    - !Ref DashboardRawDataBucketName
+                object:
+                  key:
+                    - wildcard: "exports/*.json"
+
+  DashboardRawDataTransformFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./data-sources/functions/dashboard-raw-data-transform
+      Handler: dashboardRawDataTransformHandler.handler
+      Description: SQS consumer that converts dashboard-raw-data JSON uploads to parquet and writes them to the normal data source location.
+      Timeout: 300
+      MemorySize: 512
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: DataSources
+        - S3ReadPolicy:
+            BucketName: !Ref DashboardRawDataBucketName
+        - S3WritePolicy:
+            BucketName: !Ref WorkspaceBucketName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+                - s3:ListBucket
+                - s3:GetBucketLocation
+                - s3:HeadObject
+              Resource:
+                - !Sub arn:aws:s3:::${WorkspaceBucketName}
+                - !Sub arn:aws:s3:::${WorkspaceBucketName}/*
+                - !Sub arn:aws:s3:::${DashboardRawDataBucketName}
+                - !Sub arn:aws:s3:::${DashboardRawDataBucketName}/*
+            - Effect: Allow
+              Action:
+                - athena:StartQueryExecution
+                - athena:GetQueryExecution
+                - athena:GetQueryResults
+                - athena:GetWorkGroup
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - glue:GetDatabase
+                - glue:GetDatabases
+                - glue:GetTable
+                - glue:GetTables
+                - glue:CreateTable
+                - glue:UpdateTable
+                - glue:DeleteTable
+              Resource:
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/*
+                - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/*/*
+      Events:
+        IngestQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DashboardRawDataIngestQueue.Arn
+            BatchSize: 5
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
   DataUpdateNotifierFunction:
     Type: AWS::Serverless::Function
     Properties:

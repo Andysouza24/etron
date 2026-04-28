@@ -29,6 +29,9 @@ Parameters:
     Type: String
   UserPoolArn:
     Type: String
+  DashboardRawDataBucketName:
+    Type: String
+    Default: micromax-dashboard-raw-data
 
 Resources:
 
@@ -83,6 +86,7 @@ Resources:
         AppSyncUrl: !Ref AppSyncUrl
         AppSyncApiKey: !Ref AppSyncApiKey
         UserPoolArn: !Ref UserPoolArn
+        DashboardRawDataBucketName: !Ref DashboardRawDataBucketName
         
   NotificationDomainFunctions:
     Type: AWS::CloudFormation::Stack
