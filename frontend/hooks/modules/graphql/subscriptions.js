@@ -42,6 +42,8 @@ export const onDataSourceUpdate = /* GraphQL */ `
     metrics
     config
     error
+    progressStage
+    progressPercent
     lastUpdate
     createdAt
     updatedAt

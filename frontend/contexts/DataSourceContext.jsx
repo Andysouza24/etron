@@ -94,6 +94,18 @@ export function DataSourceProvider({ children }) {
         return result;
     }, []);
 
+    const refreshDashboardRawData = useCallback(async (sourceId) => {
+        const result = await serviceRef.current.refreshDashboardRawData(sourceId);
+        try { await refreshDataSources(); } catch {}
+        return result;
+    }, [refreshDataSources]);
+
+    const rescanMicromaxDashboard = useCallback(async (parentSourceId) => {
+        const result = await serviceRef.current.rescanMicromaxDashboard(parentSourceId);
+        try { await refreshDataSources(); } catch {}
+        return result;
+    }, [refreshDataSources]);
+
     return (
         <DataSourceContext.Provider value={{
             dataSources,
@@ -102,6 +114,8 @@ export function DataSourceProvider({ children }) {
             disconnectDataSource,
             testConnection,
             refreshDataSources,
+            refreshDashboardRawData,
+            rescanMicromaxDashboard,
             forceUpdate: () => setDataSources(prev => ({ ...prev, updateTrigger: prev.updateTrigger + 1 })),
         }}>
             {children}

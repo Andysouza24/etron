@@ -435,6 +435,20 @@ class DataSourceService {
           return String(t);
         })();
 
+  // Dashboard raw data: simple { fileName, description } config, no secrets.
+  if ((srcType || '').toLowerCase() === 'dashboard-raw-data') {
+          const fileName = clone.fileName?.trim();
+          const description = clone.description?.trim();
+          const configOut = sanitize({ fileName, description });
+          return { configOut, secrets: {} };
+        }
+
+  // parent connection - no config, no secrets
+  // pipeline auto discovers files in bucket and creates child data sources for each
+  if ((srcType || '').toLowerCase() === 'micromax-dashboard') {
+          return { configOut: {}, secrets: {} };
+        }
+
   // MySQL: include hostname and database fields; keep password in secrets only
   if ((srcType || '').toLowerCase() === 'mysql') {
           const hostname = clone.hostname || clone.host || clone.server;
@@ -619,6 +633,34 @@ class DataSourceService {
       return response.data;
     } catch {
       throw new Error("Failed to update data source");
+    }
+  }
+
+  async refreshDashboardRawData(sourceId) {
+    try {
+      const workspaceId = await getSavedWorkspaceId();
+      if (!workspaceId) throw new Error('No workspace selected');
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.refreshDashboardRawData, sourceId);
+      console.log('[DataSourceService] refreshDashboardRawData POST', { endpointUrl, workspaceId, sourceId });
+      const response = await this.apiClient.post(endpointUrl, { workspaceId });
+      return response.data;
+    } catch (err) {
+      console.error('[DataSourceService] refreshDashboardRawData:', err);
+      throw new Error(err?.response?.data?.error || 'Failed to refresh dashboard raw data');
+    }
+  }
+
+  async rescanMicromaxDashboard(parentSourceId) {
+    try {
+      const workspaceId = await getSavedWorkspaceId();
+      if (!workspaceId) throw new Error('No workspace selected');
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.rescanMicromaxDashboard, parentSourceId);
+      console.log('[DataSourceService] rescanMicromaxDashboard POST', { endpointUrl, workspaceId, parentSourceId });
+      const response = await this.apiClient.post(endpointUrl, { workspaceId });
+      return response.data;
+    } catch (err) {
+      console.error('[DataSourceService] rescanMicromaxDashboard:', err);
+      throw new Error(err?.response?.data?.error || 'Failed to rescan Micromax Dashboard files');
     }
   }
 

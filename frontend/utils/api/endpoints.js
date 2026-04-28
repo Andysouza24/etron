@@ -118,6 +118,8 @@ const endpoints = {
 				getUploadUrl: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/upload`,
 				getAvailableSheets: `${DATASOURCES_BASE_URL}/available-sheets`,
 				updateData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/update-data`,
+				refreshDashboardRawData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/dashboard-raw-data/refresh`,
+				rescanMicromaxDashboard: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/micromax-dashboard/rescan`,
 				
 				// google sheets specific endpoints
 				integrations: {
