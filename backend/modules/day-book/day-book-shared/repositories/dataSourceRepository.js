@@ -10,6 +10,7 @@ const {
     ScanCommand,
     BatchWriteCommand 
 } = require("@aws-sdk/lib-dynamodb");
+const { notifyDataSourceUpdate } = require("../utils/notifyDataSourceUpdate");
 
 const dynamoDB = DynamoDBDocumentClient.from(new DynamoDBClient());
 
@@ -183,7 +184,7 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
         updateExpression += " REMOVE " + removeFields.join(", ");
     }
 
-    await dynamoDB.send(
+    const result = await dynamoDB.send(
         new UpdateCommand( {
             TableName: tableName,
             Key: {
@@ -193,8 +194,14 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
             UpdateExpression: updateExpression,
             ExpressionAttributeValues: expressionAttributeValues,
             ExpressionAttributeNames: expressionAttributeNames,
+            ReturnValues: "ALL_NEW",
         })
     );
+
+    // broadcasts new state so subscription picks up status/progress transitions without polling
+    if (result.Attributes) {
+        await notifyDataSourceUpdate(result.Attributes);
+    }
 }
 
 // update progress fields without changing status
@@ -216,15 +223,21 @@ async function updateDataSourceProgress(workspaceId, dataSourceId, { stage, perc
     }
 
     try {
-        await dynamoDB.send(
+        const result = await dynamoDB.send(
             new UpdateCommand({
                 TableName: tableName,
                 Key: { workspaceId, dataSourceId },
                 UpdateExpression: "SET " + updateFields.join(", "),
                 ExpressionAttributeValues: expressionAttributeValues,
                 ExpressionAttributeNames: expressionAttributeNames,
+                ReturnValues: "ALL_NEW",
             })
         );
+
+        // broadcasts new progress
+        if (result.Attributes) {
+            await notifyDataSourceUpdate(result.Attributes);
+        }
     } catch (err) {
         // Progress updates are best-effort: never fail processing because of them.
         console.warn(`[dataSourceRepo] updateDataSourceProgress failed for ${workspaceId}/${dataSourceId}:`, err.message);

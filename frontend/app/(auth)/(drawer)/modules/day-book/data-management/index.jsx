@@ -1,6 +1,6 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { RefreshControl, Alert, ScrollView, View, StyleSheet } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
@@ -24,7 +24,6 @@ import useDataPreview from "../../../../../../hooks/modules/day_book/data-source
 
 const MICROMAX_PARENT_TYPE = "micromax-dashboard";
 const MICROMAX_FILE_TYPE = "micromax-dashboard-file";
-const PROCESSING_REFRESH_INTERVAL_MS = 3000;
 
 const DataManagement = () => {
 	const {
@@ -75,17 +74,6 @@ const DataManagement = () => {
 		}, [fetchDataSources])
 	);
 
-	// While any source is processing, refresh periodically to keep progress bars updating.
-	const anyProcessing = dataSourcesList.some(
-		(s) => (s.status || "").toLowerCase() === "processing"
-	);
-	useEffect(() => {
-		if (!anyProcessing) return undefined;
-		const interval = setInterval(() => {
-			ctxRefresh().catch(() => {});
-		}, PROCESSING_REFRESH_INTERVAL_MS);
-		return () => clearInterval(interval);
-	}, [anyProcessing, ctxRefresh]);
 
 	const handleRefresh = useCallback(async () => {
 		try {
