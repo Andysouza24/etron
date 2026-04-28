@@ -1,8 +1,8 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { RefreshControl, Alert, ScrollView, View, StyleSheet, Pressable } from "react-native";
-import { Text } from "react-native-paper";
+import { Text, IconButton } from "react-native-paper";
 import { router, useFocusEffect } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -10,6 +10,7 @@ import Header from "../../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
 import DataConnectionCard from "../../../../../../components/modules/day-book/data-sources/DataConnectionCard";
 import DataPreviewModal from "../../../../../../components/modules/day-book/data-sources/DataPreviewModal";
+import ProgressSummary from "../../../../../../components/common/ProgressSummary";
 
 import endpoints from "../../../../../../utils/api/endpoints";
 import { apiGet, apiPut, apiDelete, apiPost } from "../../../../../../utils/api/apiClient";
@@ -19,7 +20,7 @@ import { getAdapterInfo, getCategoryDisplayName } from "../../../../../../adapte
 import { useHasPermission } from "../../../../../../hooks/useHasPermission";
 
 const DataManagement = () => {
-	const { dataSources: ctxDataSources, system, refreshDataSources: ctxRefresh } = useDataSourceContext();
+	const { dataSources: ctxDataSources, system, refreshDataSources: ctxRefresh, refreshDashboardRawData } = useDataSourceContext();
 	const dataSourcesList = ctxDataSources.list;
 	const loading = system.isLoading && dataSourcesList.length === 0;
 	const hasError = system.hasError;
@@ -57,6 +58,19 @@ const DataManagement = () => {
 			}
 		}, [fetchDataSources])
 	);
+
+	// while any source is processing, refresh every few seconds to keep progress bars updating
+	// TODO: fix
+	const anyProcessing = dataSourcesList.some(
+		(s) => (s.status || "").toLowerCase() === "processing"
+	);
+	useEffect(() => {
+		if (!anyProcessing) return undefined;
+		const interval = setInterval(() => {
+			ctxRefresh().catch(() => {});
+		}, 3000);
+		return () => clearInterval(interval);
+	}, [anyProcessing, ctxRefresh]);
 
 	const handleUploadLocalCsv = useCallback(async (source) => {
 		try {
@@ -209,7 +223,16 @@ const DataManagement = () => {
 		router.navigate(`/modules/day-book/data-management/edit-data-source/${source.dataSourceId}`);
 	}, []);
 
-	const groupedSources = dataSourcesList.reduce((acc, source) => {
+	// keep parent out of card grid but show category-level settings button
+	const micromaxParent = dataSourcesList.find(
+		(source) => (source.sourceType || source.type) === "micromax-dashboard"
+	);
+
+	const visibleSources = dataSourcesList.filter(
+		(source) => (source.sourceType || source.type) !== "micromax-dashboard"
+	);
+
+	const groupedSources = visibleSources.reduce((acc, source) => {
 		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
 		const category = adapterInfo?.category || "other";
 		if (!acc[category]) acc[category] = [];
@@ -217,13 +240,50 @@ const DataManagement = () => {
 		return acc;
 	}, {});
 
+	if (micromaxParent && !groupedSources["micromax-dashboard"]) {
+		groupedSources["micromax-dashboard"] = [];
+	}
+
+	const openMicromaxSettings = () => {
+		if (!micromaxParent) return;
+		router.navigate(
+			`/modules/day-book/data-management/micromax-dashboard-settings/${micromaxParent.dataSourceId}`
+		);
+	};
+
+	const [refreshingSourceId, setRefreshingSourceId] = useState(null);
+
+	const handleRescanFile = useCallback(async (source) => {
+		if (!source?.dataSourceId) return;
+		setRefreshingSourceId(source.dataSourceId);
+		try {
+			await refreshDashboardRawData(source.dataSourceId);
+			Alert.alert(
+				"Refresh started",
+				`${source.name} will update once processing completes.`
+			);
+		} catch (err) {
+			Alert.alert("Refresh failed", err?.message || "Unable to refresh this file.");
+		} finally {
+			setRefreshingSourceId(null);
+		}
+	}, [refreshDashboardRawData]);
+
 	const renderDataSourceCard = (source) => {
 		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
 		if (!adapterInfo) return null;
 
-		const typeLabel = adapterInfo.displayName || adapterInfo.name || (source.sourceType || source.type);
+		const sourceType = source.sourceType || source.type;
+		const isMicromaxFile = sourceType === "micromax-dashboard-file";
+		const isRefreshingThis = refreshingSourceId === source.dataSourceId;
+
+		const typeLabel = adapterInfo.displayName || adapterInfo.name || sourceType;
 		const lastSyncText = source.lastUpdate ? `Last sync: ${formatLastSync(source.lastUpdate)}` : undefined;
-		const subtitle = lastSyncText ? `${typeLabel} - ${lastSyncText}` : typeLabel;
+		const subtitle = isRefreshingThis
+			? `${typeLabel} - Refreshing...`
+			: lastSyncText
+				? `${typeLabel} - ${lastSyncText}`
+				: typeLabel;
 
 		return (
 			<View key={source.dataSourceId} style={{ marginBottom: 12 }}>
@@ -231,11 +291,18 @@ const DataManagement = () => {
 					label={source.name}
 					subtitle={subtitle}
 					status={source.status}
+					progressStage={source.progressStage}
+					progressPercent={source.progressPercent}
 					onNavigate={() => navigateToViewSource(source)}
-					onDelete={() => handleDisconnectSource(source)}
-					onTest={() => handleTestConnection(source)}
+					onDelete={isMicromaxFile ? undefined : () => handleDisconnectSource(source)}
+					onTest={isMicromaxFile ? undefined : () => handleTestConnection(source)}
 					onSettings={() => navigateToEditSource(source)}
 					onViewData={() => handleViewData(source)}
+					onSync={
+						isMicromaxFile && manageDataSourcesPermission && !isRefreshingThis
+							? () => handleRescanFile(source)
+							: undefined
+					}
 					viewDataAllowed={viewDataPermission}
 					manageDataSourceAllowed={manageDataSourcesPermission}
 				/>
@@ -290,14 +357,45 @@ const DataManagement = () => {
 					</View>
 				)}
 
-				{Object.entries(groupedSources).map(([category, sources]) => (
-					<View key={category}>
-						<Text variant="titleMedium" style={styles.categoryTitle}>
-							{getCategoryDisplayName(category)} ({sources.length})
-						</Text>
-						{sources.map(renderDataSourceCard)}
-					</View>
-				))}
+				{Object.entries(groupedSources).map(([category, sources]) => {
+					const isMicromax = category === "micromax-dashboard";
+					const showSettings = isMicromax && !!micromaxParent && manageDataSourcesPermission;
+					const processingCount = sources.filter((s) => (s.status || "").toLowerCase() === "processing").length;
+					const processedCount = sources.length - processingCount;
+					const totalCount = sources.length;
+					const showCategoryProgress = isMicromax && totalCount > 0 && processingCount > 0;
+					return (
+						<View key={category}>
+							<View style={styles.categoryHeader}>
+								<Text variant="titleMedium" style={styles.categoryTitle}>
+									{getCategoryDisplayName(category)} ({sources.length})
+								</Text>
+								{showSettings && (
+									<IconButton
+										icon="cog-outline"
+										size={20}
+										onPress={openMicromaxSettings}
+										accessibilityLabel="Micromax Dashboard settings"
+									/>
+								)}
+							</View>
+							{showCategoryProgress && (
+								<ProgressSummary
+									label="Processing"
+									processed={processedCount}
+									total={totalCount}
+								/>
+							)}
+							{isMicromax && sources.length === 0 ? (
+								<Text style={styles.emptyCategoryText}>
+									No files have been received yet. Files uploaded to the export bucket will appear here automatically.
+								</Text>
+							) : (
+								sources.map(renderDataSourceCard)
+							)}
+						</View>
+					);
+				})}
 
 				{dataSourcesList.length === 0 && !loading && (
 					<View style={styles.emptyState}>
@@ -364,6 +462,17 @@ const styles = StyleSheet.create({
 	},
 	categoryTitle: {
 		marginBottom: 12,
+	},
+	categoryHeader: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+	},
+	emptyCategoryText: {
+		fontSize: 13,
+		color: "#666",
+		marginBottom: 12,
+		fontStyle: "italic",
 	},
 	summarySection: {
 		marginBottom: 24,

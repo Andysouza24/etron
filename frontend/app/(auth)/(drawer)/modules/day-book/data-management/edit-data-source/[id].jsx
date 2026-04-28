@@ -6,6 +6,7 @@ import Header from "../../../../../../../components/layout/Header";
 import { commonStyles } from "../../../../../../../assets/styles/stylesheets/common";
 import useDataSources from "../../../../../../../hooks/modules/day_book/data-sources/useDataSource";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
+import { useDataSourceContext } from "../../../../../../../contexts/DataSourceContext";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 
 const MANAGE_DATASOURCES_PERMISSION = "modules.daybook.datasources.manage_dataSources";
@@ -17,11 +18,13 @@ const UpdateDataSourceScreen = () => {
 	const sourceId = Array.isArray(id) ? id[0] : id;
 
 	const { getDataSource, updateDataSource } = useDataSources();
+	const { refreshDashboardRawData } = useDataSourceContext();
 	const { allowed: canManageDataSources } = useHasPermission(MANAGE_DATASOURCES_PERMISSION);
 	const { allowed: canManageColumnDisplay } = useHasPermission(MANAGE_COLUMN_DISPLAY_PERMISSION);
 
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState(null);
 	const [source, setSource] = useState(null);
 
@@ -61,6 +64,10 @@ const UpdateDataSourceScreen = () => {
 
 	// TODO: fix this, so it is just api - less confusion
 	const isApiType = useMemo(() => (source?.type === 'custom-api' || source?.type === 'api'), [source]);
+	const isDashboardRawDataType = useMemo(
+		() => (source?.type === 'micromax-dashboard-file' || source?.sourceType === 'micromax-dashboard-file'),
+		[source]
+	);
 
 	const createdLabel = useMemo(() => {
 		const raw = source?.createdAt || source?.created || source?.metadata?.createdAt || null;
@@ -87,6 +94,22 @@ const UpdateDataSourceScreen = () => {
 	}, [source]);
 
 	const [fieldErrors, setFieldErrors] = useState({});
+
+	const handleRefreshNow = async () => {
+		if (!sourceId) return;
+		setRefreshing(true);
+		try {
+			await refreshDashboardRawData(sourceId);
+			Alert.alert(
+				'Refresh started',
+				'A refresh has been queued. The data source will update once processing completes.'
+			);
+		} catch (e) {
+			Alert.alert('Refresh failed', e?.message || 'Unable to refresh this data source.');
+		} finally {
+			setRefreshing(false);
+		}
+	};
 
 	const onSave = async () => {
 		const errs = validate();
@@ -181,6 +204,38 @@ const UpdateDataSourceScreen = () => {
 							/>
 							{!!fieldErrors.endpoint && <HelperText type="error">{fieldErrors.endpoint}</HelperText>}
 						</>
+					)}
+
+					{isDashboardRawDataType && (
+						<View style={styles.section}>
+							<Divider style={{ marginVertical: 12 }} />
+							<Text variant="titleSmall" style={{ marginBottom: 4 }}>
+								Micromax Dashboard file
+							</Text>
+							<Text
+								variant="bodySmall"
+								style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}
+							>
+								File name: {source?.config?.fileName || '—'}
+							</Text>
+							<Text
+								variant="bodySmall"
+								style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}
+							>
+								This data source updates automatically when the file is uploaded
+								to the export bucket. Use the button below to re-process the
+								current file now.
+							</Text>
+							<Button
+								mode="outlined"
+								onPress={handleRefreshNow}
+								loading={refreshing}
+								disabled={refreshing || !canManageDataSources}
+								icon="refresh"
+							>
+								Refresh now
+							</Button>
+						</View>
 					)}
 
 					{currencyColumns.length > 0 && canManageColumnDisplay && (
