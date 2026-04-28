@@ -4,6 +4,7 @@ const { createAthenaTable, runDDL } = require("./athenaService");
 const { detectDateFormat } = require("./dateParser");
 const { sanitiseNumberString, isNumericString, detectCurrencySymbol } = require("./numberSanitiser");
 
+// TODO: figure out a better solution
 // Parquet INT64 range: signed 64-bit. Values outside this range cannot be encoded.
 const INT64_MAX = 9223372036854775807n; // 2^63 - 1
 const INT64_MIN = -9223372036854775808n; // -(2^63)
