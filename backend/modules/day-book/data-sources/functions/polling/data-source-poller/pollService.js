@@ -24,54 +24,79 @@ async function pollDataSource(workspace, dataSource) {
         return;
     }
 
-    // get sources secrets
-    const secrets = await dataSourceSecretsRepo.getSecrets(workspace.workspaceId, dataSource.dataSourceId);
+    // mark processing so the UI can render a progress bar while the
+    // poll cycle runs. Cleared by the active/error update below.
+    await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
+        status: "processing",
+        errorMessage: null,
+        progressStage: "Polling source",
+        progressPercent: 5,
+    });
 
-    // create adapter
-    const adapter = adapterFactory.getAdapter(dataSource.sourceType);
+    try {
+        // get sources secrets
+        const secrets = await dataSourceSecretsRepo.getSecrets(workspace.workspaceId, dataSource.dataSourceId);
 
-    // try polling
-    const newData = await retryPoll(adapter, dataSource.config, secrets);
-    const translatedData = translateData(newData);
+        // create adapter
+        const adapter = adapterFactory.getAdapter(dataSource.sourceType);
 
-    if (translatedData.length === 0) {
-        await dataSourceRepo.updateDataSourceStatus(
-            workspace.workspaceId, 
-            dataSource.dataSourceId, 
-            { status: "no_data", errorMessage: "No data existent" }
-        );
-        return;
-    }
+        // try polling
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Fetching data", percent: 15 });
+        const newData = await retryPoll(adapter, dataSource.config, secrets);
 
-    const {valid, error } = validateFormat(translatedData);
-    if (!valid) throw new Error(`Invalid data format: ${error}`);
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Translating data", percent: 25 });
+        const translatedData = translateData(newData);
 
-    // create the schema
-    const schema = generateSchema(translatedData.slice(0, 100));
+        if (translatedData.length === 0) {
+            await dataSourceRepo.updateDataSourceStatus(
+                workspace.workspaceId, 
+                dataSource.dataSourceId, 
+                { status: "no_data", errorMessage: "No data existent" }
+            );
+            return;
+        }
 
-    // cast rows to the schema
-    const castedData = castDataToSchema(translatedData, schema);
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Validating format", percent: 40 });
+        const {valid, error } = validateFormat(translatedData);
+        if (!valid) throw new Error(`Invalid data format: ${error}`);
 
-    // convert the data to parquet file
-    const parquetBuffer = await toParquet(castedData, schema);
+        // create the schema
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Generating schema", percent: 55 });
+        const schema = generateSchema(translatedData.slice(0, 100));
 
-    if (dataSource.method === "extend") {
-        // extend the data source
-        await appendToStoredData(workspace.workspaceId, dataSource.dataSourceId, castedData, schema);
-    } else {
-        // replace data
-        await replaceStoredData(workspace.workspaceId, dataSource.dataSourceId, parquetBuffer);
-    }
+        // cast rows to the schema
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Casting rows", percent: 70 });
+        const castedData = castDataToSchema(translatedData, schema);
 
-    // save the schema to S3
-    await saveSchemaAndUpdateTable(workspace.workspaceId, dataSource.dataSourceId, schema);
+        // convert the data to parquet file
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Writing parquet", percent: 80 });
+        const parquetBuffer = await toParquet(castedData, schema);
 
-    // update status
-    if (dataSource.status !== "active" || dataSource.error !== null) {
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Saving data", percent: 90 });
+        if (dataSource.method === "extend") {
+            // extend the data source
+            await appendToStoredData(workspace.workspaceId, dataSource.dataSourceId, castedData, schema);
+        } else {
+            // replace data
+            await replaceStoredData(workspace.workspaceId, dataSource.dataSourceId, parquetBuffer);
+        }
+
+        // save the schema to S3
+        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Finalising", percent: 95 });
+        await saveSchemaAndUpdateTable(workspace.workspaceId, dataSource.dataSourceId, schema);
+
+        // update status. Always overwrite because we set "processing" above so
+        // the progress bar would otherwise stay stuck at 95%.
         await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
             status: "active",
             errorMessage: null
         });
+    } catch (err) {
+        await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
+            status: "error",
+            errorMessage: err.message,
+        });
+        throw err;
     }
 }
 

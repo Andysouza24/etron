@@ -17,8 +17,21 @@ async function processUploadedFile(workspaceId, dataSourceId, rawData) {
     if (!dataSource) {
         throw new Error(`Data source not found: ${dataSourceId}`);
     }
+    // mark processing while transformation running so UI shows accurate status
+    // overwritten on completion
+    try {
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "processing",
+            errorMessage: null,
+            progressStage: "Queued",
+            progressPercent: 5,
+        });
+    } catch (err) {
+        console.warn(`[FileUpload] Failed to set processing status for ${workspaceId}/${dataSourceId}:`, err);
+    }
 
     try {
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Translating data", percent: 15 });
         const translatedData = translateData(rawData);
 
         if (translatedData.length === 0) {
@@ -31,19 +44,24 @@ async function processUploadedFile(workspaceId, dataSourceId, rawData) {
             return { success: false };
         }
 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Validating format", percent: 30 });
         const {valid, error } = validateFormat(translatedData);
         if (!valid) throw new Error(`Invalid data format: ${error}`);
 
         // create the schema 
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Generating schema", percent: 45 });
         const schema = generateSchema(translatedData.slice(0, 100));
 
         // cast rows to the schema
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Casting rows", percent: 60 });
         const castedData = castDataToSchema(translatedData, schema);
 
         // convert to parquet
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Writing parquet", percent: 75 });
         const parquetBuffer = await toParquet(castedData, schema);
 
         // save data depending on method
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Saving data", percent: 85 });
         if (dataSource.method === "extend") {
             await appendToStoredData(workspaceId, dataSourceId, castedData, schema);
         } else {
@@ -51,6 +69,7 @@ async function processUploadedFile(workspaceId, dataSourceId, rawData) {
         }
 
         // save the schema to S3
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Finalising", percent: 95 });
         await saveSchemaAndUpdateTable(workspaceId, dataSourceId, schema);
 
         // update status
