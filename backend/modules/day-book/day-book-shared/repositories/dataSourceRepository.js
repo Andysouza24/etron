@@ -7,6 +7,7 @@ const {
     DeleteCommand, 
     UpdateCommand,
     QueryCommand,
+    ScanCommand,
     BatchWriteCommand 
 } = require("@aws-sdk/lib-dynamodb");
 
@@ -153,6 +154,26 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
         expressionAttributeNames["#error"] = "error";
     }
 
+
+    // progress fields
+    // pass progress stage/progress percent so UI can show progress bar
+    if (statusItem.status === "processing") {
+        if (statusItem.progressStage !== undefined) {
+            updateFields.push("#progressStage = :progressStage");
+            expressionAttributeValues[":progressStage"] = statusItem.progressStage;
+            expressionAttributeNames["#progressStage"] = "progressStage";
+        }
+        if (statusItem.progressPercent !== undefined) {
+            updateFields.push("#progressPercent = :progressPercent");
+            expressionAttributeValues[":progressPercent"] = statusItem.progressPercent;
+            expressionAttributeNames["#progressPercent"] = "progressPercent";
+        }
+    } else {
+        removeFields.push("#progressStage", "#progressPercent");
+        expressionAttributeNames["#progressStage"] = "progressStage";
+        expressionAttributeNames["#progressPercent"] = "progressPercent";
+    }
+
     updateFields.push("#lastUpdate = :lastUpdate");
     expressionAttributeValues[":lastUpdate"] = new Date().toISOString();
     expressionAttributeNames["#lastUpdate"] = "lastUpdate";
@@ -174,6 +195,40 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
             ExpressionAttributeNames: expressionAttributeNames,
         })
     );
+}
+
+// update progress fields without changing status
+// used to publish stage updates while job is in flight 
+async function updateDataSourceProgress(workspaceId, dataSourceId, { stage, percent }) {
+    const expressionAttributeValues = { ":lastUpdate": new Date().toISOString() };
+    const expressionAttributeNames = { "#lastUpdate": "lastUpdate" };
+    const updateFields = ["#lastUpdate = :lastUpdate"];
+
+    if (stage !== undefined) {
+        updateFields.push("#progressStage = :progressStage");
+        expressionAttributeValues[":progressStage"] = stage;
+        expressionAttributeNames["#progressStage"] = "progressStage";
+    }
+    if (percent !== undefined) {
+        updateFields.push("#progressPercent = :progressPercent");
+        expressionAttributeValues[":progressPercent"] = percent;
+        expressionAttributeNames["#progressPercent"] = "progressPercent";
+    }
+
+    try {
+        await dynamoDB.send(
+            new UpdateCommand({
+                TableName: tableName,
+                Key: { workspaceId, dataSourceId },
+                UpdateExpression: "SET " + updateFields.join(", "),
+                ExpressionAttributeValues: expressionAttributeValues,
+                ExpressionAttributeNames: expressionAttributeNames,
+            })
+        );
+    } catch (err) {
+        // Progress updates are best-effort: never fail processing because of them.
+        console.warn(`[dataSourceRepo] updateDataSourceProgress failed for ${workspaceId}/${dataSourceId}:`, err.message);
+    }
 }
 
 // remove datasource
@@ -243,13 +298,91 @@ async function getDataSourcesByWorkspaceId(workspaceId) {
     return result.Items;
 }
 
+// finds every data source whose `sourceType === sourceType` and `config.fileName === fileName`.
+// uses a paginated scan since there's no GSI on config fields. low-volume callers only.
+async function findDataSourcesBySourceTypeAndFileName(sourceType, fileName) {
+    const matches = [];
+    let ExclusiveStartKey;
+
+    do {
+        const result = await dynamoDB.send(
+            new ScanCommand({
+                TableName: tableName,
+                FilterExpression: "#sourceType = :sourceType AND #config.#fileName = :fileName",
+                ExpressionAttributeNames: {
+                    "#sourceType": "sourceType",
+                    "#config": "config",
+                    "#fileName": "fileName",
+                },
+                ExpressionAttributeValues: {
+                    ":sourceType": sourceType,
+                    ":fileName": fileName,
+                },
+                ExclusiveStartKey,
+            })
+        );
+
+        if (result.Items) matches.push(...result.Items);
+        ExclusiveStartKey = result.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+
+    return matches;
+}
+
+// finds every data source with the given sourceType. paginated scan; low-volume callers only.
+async function findDataSourcesBySourceType(sourceType) {
+    const matches = [];
+    let ExclusiveStartKey;
+
+    do {
+        const result = await dynamoDB.send(
+            new ScanCommand({
+                TableName: tableName,
+                FilterExpression: "#sourceType = :sourceType",
+                ExpressionAttributeNames: { "#sourceType": "sourceType" },
+                ExpressionAttributeValues: { ":sourceType": sourceType },
+                ExclusiveStartKey,
+            })
+        );
+
+        if (result.Items) matches.push(...result.Items);
+        ExclusiveStartKey = result.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+
+    return matches;
+}
+
+// finds children of a parent (workspaceId-scoped query + filter on parentDataSourceId).
+async function findChildrenByParent(workspaceId, parentDataSourceId) {
+    const result = await dynamoDB.send(
+        new QueryCommand({
+            TableName: tableName,
+            KeyConditionExpression: "workspaceId = :workspaceId",
+            FilterExpression: "#config.#parentId = :parentId",
+            ExpressionAttributeNames: {
+                "#config": "config",
+                "#parentId": "parentDataSourceId",
+            },
+            ExpressionAttributeValues: {
+                ":workspaceId": workspaceId,
+                ":parentId": parentDataSourceId,
+            },
+        })
+    );
+    return result.Items || [];
+}
+
 module.exports = {
     addDataSource,
     updateDataSource,
     removeDataSource,
     getDataSourceById,
     getDataSourcesByWorkspaceId,
+    findDataSourcesBySourceTypeAndFileName,
+    findDataSourcesBySourceType,
+    findChildrenByParent,
     updateDataSourceStatus,
+    updateDataSourceProgress,
     addMetricToDataSource,
     removeMetricFromDataSource,
     removeAllDataSources
