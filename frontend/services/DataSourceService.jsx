@@ -552,7 +552,6 @@ class DataSourceService {
         if (!created || typeof created !== 'object') {
           throw new Error('Backend did not return a created resource');
         }
-        console.log("Adding!!!!!!!\n===========\n", response);
         const normalize = (s) => {
           const typeVal = s?.type || s?.sourceType || s?.adapterType || payload.sourceType;
           const nameVal = s?.name || payload.name;

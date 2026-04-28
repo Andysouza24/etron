@@ -1,26 +1,38 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { RefreshControl, Alert, ScrollView, View, StyleSheet, Pressable } from "react-native";
-import { Text, IconButton } from "react-native-paper";
+import { RefreshControl, Alert, ScrollView, View, StyleSheet } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
 
 import Header from "../../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
 import DataConnectionCard from "../../../../../../components/modules/day-book/data-sources/DataConnectionCard";
 import DataPreviewModal from "../../../../../../components/modules/day-book/data-sources/DataPreviewModal";
-import ProgressSummary from "../../../../../../components/common/ProgressSummary";
+import DataSourceCategorySection from "../../../../../../components/modules/day-book/data-sources/DataSourceCategorySection";
+import DataSourcesSummary from "../../../../../../components/modules/day-book/data-sources/DataSourcesSummary";
+import DataSourcesEmptyState from "../../../../../../components/modules/day-book/data-sources/DataSourcesEmptyState";
+import DataSourcesErrorState from "../../../../../../components/modules/day-book/data-sources/DataSourcesErrorState";
 
 import endpoints from "../../../../../../utils/api/endpoints";
-import { apiGet, apiPut, apiDelete, apiPost } from "../../../../../../utils/api/apiClient";
+import { apiPost, apiDelete } from "../../../../../../utils/api/apiClient";
+import formatRelativeTime from "../../../../../../utils/format/formatRelativeTime";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage";
 import { useDataSourceContext } from "../../../../../../contexts/DataSourceContext";
-import { getAdapterInfo, getCategoryDisplayName } from "../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
+import { getAdapterInfo } from "../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
 import { useHasPermission } from "../../../../../../hooks/useHasPermission";
+import useDataPreview from "../../../../../../hooks/modules/day_book/data-sources/useDataPreview";
+
+const MICROMAX_PARENT_TYPE = "micromax-dashboard";
+const MICROMAX_FILE_TYPE = "micromax-dashboard-file";
+const PROCESSING_REFRESH_INTERVAL_MS = 3000;
 
 const DataManagement = () => {
-	const { dataSources: ctxDataSources, system, refreshDataSources: ctxRefresh, refreshDashboardRawData } = useDataSourceContext();
+	const {
+		dataSources: ctxDataSources,
+		system,
+		refreshDataSources: ctxRefresh,
+		refreshDashboardRawData,
+	} = useDataSourceContext();
 	const dataSourcesList = ctxDataSources.list;
 	const loading = system.isLoading && dataSourcesList.length === 0;
 	const hasError = system.hasError;
@@ -30,13 +42,17 @@ const DataManagement = () => {
 
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [lastManualRefresh, setLastManualRefresh] = useState(0);
-	const [uploadingMap, setUploadingMap] = useState({});
 	const [workspaceId, setWorkspaceId] = useState(null);
+	const [refreshingSourceId, setRefreshingSourceId] = useState(null);
 
-	const [previewOpen, setPreviewOpen] = useState(false);
-	const [previewStatus, setPreviewStatus] = useState("idle");
-	const [previewSchema, setPreviewSchema] = useState([]);
-	const [previewRows, setPreviewRows] = useState([]);
+	const {
+		previewOpen,
+		previewStatus,
+		previewSchema,
+		previewRows,
+		openPreview,
+		dismissPreview,
+	} = useDataPreview(workspaceId);
 
 	const hasInitiallyLoadedRef = useRef(false);
 
@@ -45,8 +61,8 @@ const DataManagement = () => {
 			const wid = await getWorkspaceId();
 			setWorkspaceId(wid);
 			await ctxRefresh();
-		} catch (error) {
-			console.error("Error fetching data sources", error);
+		} catch (err) {
+			console.error("[DataManagement] fetchDataSources:", err);
 		}
 	}, [ctxRefresh]);
 
@@ -59,8 +75,7 @@ const DataManagement = () => {
 		}, [fetchDataSources])
 	);
 
-	// while any source is processing, refresh every few seconds to keep progress bars updating
-	// TODO: fix
+	// While any source is processing, refresh periodically to keep progress bars updating.
 	const anyProcessing = dataSourcesList.some(
 		(s) => (s.status || "").toLowerCase() === "processing"
 	);
@@ -68,83 +83,30 @@ const DataManagement = () => {
 		if (!anyProcessing) return undefined;
 		const interval = setInterval(() => {
 			ctxRefresh().catch(() => {});
-		}, 3000);
+		}, PROCESSING_REFRESH_INTERVAL_MS);
 		return () => clearInterval(interval);
 	}, [anyProcessing, ctxRefresh]);
-
-	const handleUploadLocalCsv = useCallback(async (source) => {
-		try {
-			const pick = await DocumentPicker.getDocumentAsync({
-				type: ["text/csv", "application/vnd.ms-excel", "application/csv", "text/comma-separated-values"],
-				copyToCacheDirectory: true,
-			});
-			if (pick.canceled) return;
-			const file = pick.assets?.[0];
-			if (!file?.uri) return;
-
-			setUploadingMap(prev => ({ ...prev, [source.dataSourceId]: true }));
-			const res = await apiGet(
-				endpoints.modules.day_book.data_sources.getUploadUrl(source.dataSourceId),
-				{ workspaceId }
-			);
-
-			const uploadUrl = res?.data?.uploadUrl ?? res?.data;
-			if (!uploadUrl) throw new Error("No uploadUrl returned.");
-
-			const blobResp = await fetch(file.uri);
-			const blob = await blobResp.blob();
-
-			await fetch(uploadUrl, {
-				method: "PUT",
-				body: blob,
-				headers: { "Content-Type": "text/csv" },
-			});
-
-			await apiPut(endpoints.modules.day_book.data_sources.updateData(source.dataSourceId), { workspaceId });
-			await fetchDataSources();
-			Alert.alert("Upload complete", "Your CSV has been uploaded.");
-		} catch (error) {
-			console.error("Upload CSV failed:", error);
-			Alert.alert("Upload failed", String(error?.message || error));
-		} finally {
-			setUploadingMap(prev => ({ ...prev, [source.dataSourceId]: false }));
-		}
-	}, [workspaceId, fetchDataSources]);
 
 	const handleRefresh = useCallback(async () => {
 		try {
 			setIsRefreshing(true);
 			await fetchDataSources();
 			setLastManualRefresh(Date.now());
-		} catch (error) {
-			console.error("Error refreshing:", error);
+		} catch (err) {
+			console.error("[DataManagement] handleRefresh:", err);
 			Alert.alert("Refresh failed", "Unable to refresh data sources.");
 		} finally {
 			setIsRefreshing(false);
 		}
 	}, [fetchDataSources]);
 
-	const count = dataSourcesList.length;
-	const connected = dataSourcesList.filter((s) => {
+	const activeCount = dataSourcesList.filter((s) => {
 		const st = (s.status || "").toLowerCase();
 		return st === "active" || st === "connected";
-	});
-	const errorsArr = dataSourcesList.filter((s) => (s.status || "").toLowerCase() === "error");
-
-	const formatLastSync = useCallback((dateString) => {
-		if (!dateString) return "Unknown";
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffMs = now - date;
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMs / 3600000);
-		const diffDays = Math.floor(diffMs / 86400000);
-
-		if (diffMins < 1) return "Just now";
-		if (diffMins < 60) return `${diffMins}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		return `${diffDays}d ago`;
-	}, []);
+	}).length;
+	const errorCount = dataSourcesList.filter(
+		(s) => (s.status || "").toLowerCase() === "error"
+	).length;
 
 	const handleDisconnectSource = useCallback((source) => {
 		Alert.alert(
@@ -163,9 +125,9 @@ const DataManagement = () => {
 								{ workspaceId }
 							);
 							await fetchDataSources();
-						} catch (error) {
-							console.error("Error disconnecting data source", error);
-							Alert.alert("Error", String(error));
+						} catch (err) {
+							console.error("[DataManagement] handleDisconnectSource:", err);
+							Alert.alert("Error", String(err));
 						} finally {
 							setIsRefreshing(false);
 						}
@@ -184,35 +146,10 @@ const DataManagement = () => {
 			};
 			await apiPost(endpoints.modules.day_book.data_sources.testConnection, body);
 			Alert.alert("Test Connection", "Connection test requested.");
-		} catch (error) {
-			console.error("[DataManagement] handleTestConnection error", error);
-			Alert.alert("Error", String(error));
-		}
-	}, []);
-
-	const handleViewData = useCallback(async (source) => {
-		try {
-			setPreviewOpen(true);
-			setPreviewStatus("loading");
-			const res = await apiGet(
-				endpoints.modules.day_book.data_sources.viewData(source.dataSourceId),
-				{ workspaceId }
-			);
-			const { data = [], schema = [] } = res.data || {};
-			setPreviewRows(Array.isArray(data) ? data : []);
-			setPreviewSchema(Array.isArray(schema) ? schema : []);
-			setPreviewStatus("ready");
 		} catch (err) {
-			console.error("Error loading preview data:", err);
-			setPreviewStatus("error");
+			console.error("[DataManagement] handleTestConnection:", err);
+			Alert.alert("Error", String(err));
 		}
-	}, [workspaceId]);
-
-	const dismissPreview = useCallback(() => {
-		setPreviewOpen(false);
-		setPreviewStatus("idle");
-		setPreviewSchema([]);
-		setPreviewRows([]);
 	}, []);
 
 	const navigateToViewSource = useCallback((source) => {
@@ -223,13 +160,13 @@ const DataManagement = () => {
 		router.navigate(`/modules/day-book/data-management/edit-data-source/${source.dataSourceId}`);
 	}, []);
 
-	// keep parent out of card grid but show category-level settings button
+	// Keep the parent Micromax record out of the card grid but expose a category-level settings button.
 	const micromaxParent = dataSourcesList.find(
-		(source) => (source.sourceType || source.type) === "micromax-dashboard"
+		(source) => (source.sourceType || source.type) === MICROMAX_PARENT_TYPE
 	);
 
 	const visibleSources = dataSourcesList.filter(
-		(source) => (source.sourceType || source.type) !== "micromax-dashboard"
+		(source) => (source.sourceType || source.type) !== MICROMAX_PARENT_TYPE
 	);
 
 	const groupedSources = visibleSources.reduce((acc, source) => {
@@ -240,8 +177,8 @@ const DataManagement = () => {
 		return acc;
 	}, {});
 
-	if (micromaxParent && !groupedSources["micromax-dashboard"]) {
-		groupedSources["micromax-dashboard"] = [];
+	if (micromaxParent && !groupedSources[MICROMAX_PARENT_TYPE]) {
+		groupedSources[MICROMAX_PARENT_TYPE] = [];
 	}
 
 	const openMicromaxSettings = () => {
@@ -250,8 +187,6 @@ const DataManagement = () => {
 			`/modules/day-book/data-management/micromax-dashboard-settings/${micromaxParent.dataSourceId}`
 		);
 	};
-
-	const [refreshingSourceId, setRefreshingSourceId] = useState(null);
 
 	const handleRescanFile = useCallback(async (source) => {
 		if (!source?.dataSourceId) return;
@@ -263,6 +198,7 @@ const DataManagement = () => {
 				`${source.name} will update once processing completes.`
 			);
 		} catch (err) {
+			console.error("[DataManagement] handleRescanFile:", err);
 			Alert.alert("Refresh failed", err?.message || "Unable to refresh this file.");
 		} finally {
 			setRefreshingSourceId(null);
@@ -274,11 +210,11 @@ const DataManagement = () => {
 		if (!adapterInfo) return null;
 
 		const sourceType = source.sourceType || source.type;
-		const isMicromaxFile = sourceType === "micromax-dashboard-file";
+		const isMicromaxFile = sourceType === MICROMAX_FILE_TYPE;
 		const isRefreshingThis = refreshingSourceId === source.dataSourceId;
 
 		const typeLabel = adapterInfo.displayName || adapterInfo.name || sourceType;
-		const lastSyncText = source.lastUpdate ? `Last sync: ${formatLastSync(source.lastUpdate)}` : undefined;
+		const lastSyncText = source.lastUpdate ? `Last sync: ${formatRelativeTime(source.lastUpdate)}` : undefined;
 		const subtitle = isRefreshingThis
 			? `${typeLabel} - Refreshing...`
 			: lastSyncText
@@ -286,7 +222,7 @@ const DataManagement = () => {
 				: typeLabel;
 
 		return (
-			<View key={source.dataSourceId} style={{ marginBottom: 12 }}>
+			<View key={source.dataSourceId} style={styles.cardSpacing}>
 				<DataConnectionCard
 					label={source.name}
 					subtitle={subtitle}
@@ -297,7 +233,7 @@ const DataManagement = () => {
 					onDelete={isMicromaxFile ? undefined : () => handleDisconnectSource(source)}
 					onTest={isMicromaxFile ? undefined : () => handleTestConnection(source)}
 					onSettings={() => navigateToEditSource(source)}
-					onViewData={() => handleViewData(source)}
+					onViewData={() => openPreview(source)}
 					onSync={
 						isMicromaxFile && manageDataSourcesPermission && !isRefreshingThis
 							? () => handleRescanFile(source)
@@ -310,22 +246,10 @@ const DataManagement = () => {
 		);
 	};
 
-	let body = null;
+	let body;
 
 	if (hasError) {
-		body = (
-			<View style={styles.errorContainer}>
-				<Text variant="headlineSmall" style={styles.errorTitle}>
-					Unable to Load Data Sources
-				</Text>
-				<Text variant="bodyMedium" style={styles.errorMessage}>
-					{error}
-				</Text>
-				<Pressable style={styles.retryButton} onPress={handleRefresh}>
-					<Text style={styles.retryButtonText}>Try Again</Text>
-				</Pressable>
-			</View>
-		);
+		body = <DataSourcesErrorState message={error} onRetry={handleRefresh} />;
 	} else {
 		body = (
 			<ScrollView
@@ -340,73 +264,35 @@ const DataManagement = () => {
 				}
 			>
 				{dataSourcesList.length > 0 && (
-					<View style={styles.summarySection}>
-						<Text variant="titleMedium" style={styles.summaryTitle}>
-							Summary
-						</Text>
-						<View style={styles.summaryRow}>
-							<Text>Total Sources: {count}</Text>
-							<Text>Active: {connected.length}</Text>
-							<Text>Errors: {errorsArr.length}</Text>
-						</View>
-						{lastManualRefresh > 0 && (
-							<Text style={styles.lastUpdateText}>
-								Last refreshed: {new Date(lastManualRefresh).toLocaleTimeString()}
-							</Text>
-						)}
-					</View>
+					<DataSourcesSummary
+						total={dataSourcesList.length}
+						activeCount={activeCount}
+						errorCount={errorCount}
+						lastRefreshAt={lastManualRefresh}
+					/>
 				)}
 
 				{Object.entries(groupedSources).map(([category, sources]) => {
-					const isMicromax = category === "micromax-dashboard";
+					const isMicromax = category === MICROMAX_PARENT_TYPE;
 					const showSettings = isMicromax && !!micromaxParent && manageDataSourcesPermission;
-					const processingCount = sources.filter((s) => (s.status || "").toLowerCase() === "processing").length;
-					const processedCount = sources.length - processingCount;
-					const totalCount = sources.length;
-					const showCategoryProgress = isMicromax && totalCount > 0 && processingCount > 0;
+					const emptyMessage = isMicromax
+						? "No files have been received yet. Files uploaded to the export bucket will appear here automatically."
+						: undefined;
+
 					return (
-						<View key={category}>
-							<View style={styles.categoryHeader}>
-								<Text variant="titleMedium" style={styles.categoryTitle}>
-									{getCategoryDisplayName(category)} ({sources.length})
-								</Text>
-								{showSettings && (
-									<IconButton
-										icon="cog-outline"
-										size={20}
-										onPress={openMicromaxSettings}
-										accessibilityLabel="Micromax Dashboard settings"
-									/>
-								)}
-							</View>
-							{showCategoryProgress && (
-								<ProgressSummary
-									label="Processing"
-									processed={processedCount}
-									total={totalCount}
-								/>
-							)}
-							{isMicromax && sources.length === 0 ? (
-								<Text style={styles.emptyCategoryText}>
-									No files have been received yet. Files uploaded to the export bucket will appear here automatically.
-								</Text>
-							) : (
-								sources.map(renderDataSourceCard)
-							)}
-						</View>
+						<DataSourceCategorySection
+							key={category}
+							category={category}
+							sources={sources}
+							showSettings={showSettings}
+							onOpenSettings={openMicromaxSettings}
+							renderSource={renderDataSourceCard}
+							emptyMessage={emptyMessage}
+						/>
 					);
 				})}
 
-				{dataSourcesList.length === 0 && !loading && (
-					<View style={styles.emptyState}>
-						<Text variant="headlineSmall" style={styles.emptyStateTitle}>
-							No Data Sources Connected
-						</Text>
-						<Text variant="bodyMedium" style={styles.emptyStateMessage}>
-							Connect your first data source to start tracking your data.
-						</Text>
-					</View>
-				)}
+				{dataSourcesList.length === 0 && !loading && <DataSourcesEmptyState />}
 			</ScrollView>
 		);
 	}
@@ -445,67 +331,7 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
-	errorContainer: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 32,
-	},
-	retryButton: {
-		paddingHorizontal: 24,
-		borderRadius: 8,
-		marginTop: 8,
-	},
-	retryButtonText: {
-		color: "#007AFF",
-		fontWeight: "600",
-	},
-	categoryTitle: {
+	cardSpacing: {
 		marginBottom: 12,
-	},
-	categoryHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-	},
-	emptyCategoryText: {
-		fontSize: 13,
-		color: "#666",
-		marginBottom: 12,
-		fontStyle: "italic",
-	},
-	summarySection: {
-		marginBottom: 24,
-		padding: 16,
-		borderRadius: 8,
-	},
-	summaryTitle: {
-		marginBottom: 8,
-	},
-	summaryRow: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 8,
-	},
-	lastUpdateText: {
-		fontSize: 12,
-		color: "#666",
-		fontStyle: "italic",
-	},
-	emptyState: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		paddingHorizontal: 32,
-		paddingVertical: 48,
-	},
-	emptyStateTitle: {
-		marginBottom: 8,
-		textAlign: "center",
-	},
-	emptyStateMessage: {
-		marginBottom: 24,
-		textAlign: "center",
-		color: "#666",
 	},
 });
