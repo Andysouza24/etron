@@ -15,6 +15,22 @@ export function getAdaptersForUI() {
 				},
 			],
 		},
+		{
+			heading: "Micromax Dashboard",
+			category: "micromax-dashboard",
+			adapters: [
+				{
+					label: "Micromax Dashboard",
+					icon: "view-dashboard-outline",
+					type: "micromax-dashboard",
+					description:
+						"Connect to the Micromax Dashboard data feed. Every file in the export bucket becomes its own data source.",
+					iconColor: "#0F62FE",
+					route:
+						"/modules/day-book/data-management/data-connection-inputs/micromax-dashboard",
+				},
+			],
+		},
 		/*{
 			heading: "Spreadsheets",
 			category: "cloud-storage",
@@ -82,6 +98,8 @@ import { createExcelAdapter } from "./excelAdapter";
 import { createCustomApiAdapter } from "./apiAdapter";
 import { createCustomFtpAdapter } from "./ftpAdapter";
 import { createMySqlAdapter } from "./mySqlAdapter";
+import { createMicromaxDashboardAdapter } from "./micromaxDashboardAdapter";
+import { createMicromaxDashboardFileAdapter } from "./micromaxDashboardFileAdapter";
 
 // TODO: figure out whats going on with this
 const adapterMap = {
@@ -92,6 +110,8 @@ const adapterMap = {
 	"custom-api": createCustomApiAdapter,
 	"custom-ftp": createCustomFtpAdapter,
 	mysql: createMySqlAdapter,
+	"micromax-dashboard": createMicromaxDashboardAdapter,
+	"micromax-dashboard-file": createMicromaxDashboardFileAdapter,
 };
 
 export function createDataAdapter(type, dependencies) {
@@ -120,6 +140,9 @@ const typeToCategory = {
 	"custom-ftp": "file-transfer",
 	// Databases
 	mysql: "database",
+	// Micromax Dashboard parent + auto-managed file children
+	"micromax-dashboard": "micromax-dashboard",
+	"micromax-dashboard-file": "micromax-dashboard",
 };
 
 export function getCategoryDisplayName(category) {
@@ -134,6 +157,8 @@ export function getCategoryDisplayName(category) {
 			return "Databases";
 		case "file-transfer":
 			return "File Transfer";
+		case "micromax-dashboard":
+			return "Micromax Dashboard";
 		default:
 			return "Other";
 	}
