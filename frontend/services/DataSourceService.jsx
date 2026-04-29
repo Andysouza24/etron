@@ -266,7 +266,7 @@ class DataSourceService {
         method = "GET",
         params = {},
       } = options;
-      const rawResponse = await adapter.fetchRawData(endpoint, method, params);
+      const rawResponse = await adapter.fetchRawData(sourceId, endpoint, method, params);
       try {
         const meta = {
           statusCode: rawResponse?.statusCode,

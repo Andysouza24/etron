@@ -6,92 +6,121 @@ import {
   generateApiNameFromUrl,
   buildApiConnectionData,
 } from "../../../utils/connectionValidators";
+import { getSavedWorkspaceId } from "../../../storage/workspaceStorage";
+import endpoints from "../../../utils/api/endpoints";
 
 import { formatDate, createBaseAdapter } from "./baseAdapter";
-import {
-  parseHeaders,
-  parseAuthentication,
-  applyAuthentication,
-  buildAuthHeaders,
-  buildApiUrl,
-  summarizeRequestError,
-  dispatchHttp,
-} from "./httpHelpers";
 
 const TYPE = "api";
 const PROVIDER = "Custom API";
 
-const buildRequestHeaders = (connectionData) => {
-  const isLegacy =
-    connectionData?.headers !== undefined ||
-    connectionData?.authentication !== undefined;
-  const baseHeaders = { Accept: "application/json" };
+// Map the various legacy/UI auth shapes onto the backend
+// `{ authType, secrets }` contract used by the data-sources Lambda.
+const buildAuthPayload = (connectionData = {}) => {
+  const parseMaybe = (v) => {
+    if (v == null || typeof v !== "string" || !v.trim()) return null;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return { type: "apiKey", value: v.trim() };
+    }
+  };
+  const auth = parseMaybe(connectionData.authentication);
+  const rawType = auth?.type || connectionData.authType || null;
+  const lc = rawType ? String(rawType).toLowerCase() : null;
+  const authType = (() => {
+    if (!lc) return undefined;
+    if (lc === "apikey") return "apiKey";
+    if (lc === "jwt" || lc === "bearer" || lc === "jwt-bearer") return "bearer";
+    return rawType;
+  })();
 
-  if (isLegacy) {
-    const parsedHeaders = parseHeaders(connectionData.headers);
-    const auth = parseAuthentication(connectionData.authentication);
-    const cfg = applyAuthentication(
-      { headers: { ...baseHeaders, ...parsedHeaders } },
-      auth
-    );
-    return cfg.headers || { ...baseHeaders, ...parsedHeaders };
+  const secrets = {};
+  switch (lc) {
+    case "apikey": {
+      const v =
+        auth?.value ??
+        connectionData.apiKey ??
+        connectionData.secrets?.apiKey;
+      if (v != null) secrets.apiKey = String(v);
+      break;
+    }
+    case "bearer": {
+      const t =
+        auth?.token ??
+        connectionData.token ??
+        connectionData.secrets?.token;
+      if (t != null) secrets.token = String(t);
+      break;
+    }
+    case "basic": {
+      const u =
+        auth?.username ??
+        connectionData.username ??
+        connectionData.secrets?.username;
+      const p =
+        auth?.password ??
+        connectionData.password ??
+        connectionData.secrets?.password;
+      if (u != null) secrets.username = String(u);
+      if (p != null) secrets.password = String(p);
+      break;
+    }
+    default:
+      break;
   }
-
   return {
-    ...baseHeaders,
-    ...buildAuthHeaders(connectionData?.authType, connectionData?.secrets),
+    authType,
+    secrets: Object.keys(secrets).length ? secrets : undefined,
   };
 };
 
-export const createCustomApiAdapter = (
-  authService,
-  apiClient,
-  options = {}
-) => {
+export const createCustomApiAdapter = (authService, apiClient) => {
   const base = createBaseAdapter({ provider: PROVIDER, type: TYPE });
 
-  const testConnection = async (configOrUrl, headers = "", authentication = "") => {
-    const isObject = configOrUrl && typeof configOrUrl === "object";
-    const endpoint = isObject ? configOrUrl.endpoint : configOrUrl;
-    const config = isObject
-      ? configOrUrl
-      : { endpoint, headers, authentication };
+  const requireWorkspaceId = async () => {
+    const workspaceId = await getSavedWorkspaceId();
+    if (!workspaceId) throw new Error("No workspace selected");
+    return workspaceId;
+  };
 
-    const requestHeaders = buildRequestHeaders(config);
-    const requestUrl = buildApiUrl(endpoint, "", {});
+  // Delegates to POST /day-book/data-sources/test-connection. The backend
+  // resolves the right adapter, applies auth, and probes the endpoint.
+  const testConnection = async (configOrUrl) => {
+    const isObject = configOrUrl && typeof configOrUrl === "object";
+    const endpoint = isObject
+      ? configOrUrl.endpoint ?? configOrUrl.url
+      : configOrUrl;
+    const source = isObject ? configOrUrl : { endpoint };
+    const { authType, secrets } = buildAuthPayload(source);
+
+    const workspaceId = await requireWorkspaceId();
+    const url = endpoints.modules.day_book.data_sources.testConnection;
 
     try {
-      const response = await dispatchHttp(apiClient, "GET", requestUrl, null, {
-        headers: requestHeaders,
-        timeout: 10000,
-        params: {},
-      });
-
-      const statusCode = response.statusCode ?? 200;
-      if (statusCode >= 400) {
-        throw new Error(
-          summarizeRequestError(
-            { response: { status: statusCode, headers: response.headers, data: response.data } },
-            requestUrl
-          )
-        );
+      const response = await apiClient.post(
+        url,
+        {
+          sourceType: TYPE,
+          config: { authType, endpoint },
+          secrets,
+        },
+        { params: { workspaceId } }
+      );
+      const result = response?.data ?? {};
+      if (result.status && result.status !== "success") {
+        throw new Error(result.errorMessage || "Connection test failed");
       }
-
-      const contentType =
-        response.headers?.["content-type"] ||
-        response.headers?.["Content-Type"] ||
-        "";
-
       return {
         status: "success",
-        responseTime: response.responseTime,
-        statusCode,
-        contentType,
-        sampleData: response.data ?? { message: "OK" },
+        sampleData: result.preview ?? { message: "OK" },
       };
     } catch (error) {
-      const concise = summarizeRequestError(error, endpoint);
-      throw new Error(`Connection test failed: ${concise}`);
+      const serverMsg =
+        error?.response?.data?.errorMessage ||
+        error?.response?.data?.message ||
+        error?.message;
+      throw new Error(`Connection test failed: ${serverMsg}`);
     }
   };
 
@@ -101,15 +130,7 @@ export const createCustomApiAdapter = (
       throw new Error("Connection data with endpoint and name is required");
     }
 
-    const testResult = await testConnection({
-      endpoint,
-      authType: connectionData?.authType,
-      secrets: connectionData?.secrets,
-    });
-
-    if (!["success", "connected"].includes(testResult.status)) {
-      throw new Error("Connection test failed");
-    }
+    const testResult = await testConnection(connectionData);
 
     const newConnection = {
       id: `api_${Date.now()}`,
@@ -118,8 +139,6 @@ export const createCustomApiAdapter = (
       status: "active",
       createdAt: new Date().toISOString(),
       lastTested: new Date().toISOString(),
-      headers: connectionData.headers || "{}",
-      authentication: connectionData.authentication || "",
       testResult,
     };
 
@@ -135,27 +154,6 @@ export const createCustomApiAdapter = (
   const getDataSources = async () => {
     base.requireConnected("Not connected to any API");
     const { currentConnection } = base.state;
-
-    if (options?.endpoints && currentConnection) {
-      const entries = [];
-      Object.entries(options.endpoints).forEach(([key, value]) => {
-        if (!value) return;
-        const path = typeof value === "string" ? value : value.path || "/";
-        const method =
-          typeof value === "string" ? "GET" : value.method || "GET";
-        entries.push({
-          id: `${currentConnection.id}_${key}`,
-          name: `${currentConnection.name} - ${key}`,
-          path,
-          method,
-          type: "endpoint",
-          lastModified: currentConnection.lastTested,
-          url: currentConnection.url,
-        });
-      });
-      if (entries.length) return entries;
-    }
-
     return [
       {
         id: `${currentConnection.id}_default`,
@@ -169,31 +167,25 @@ export const createCustomApiAdapter = (
     ];
   };
 
-  const fetchRawData = async (endpoint = "/", method = "GET", params = {}) => {
-    const { currentConnection, isConnected } = base.state;
-    const absolute =
-      typeof endpoint === "string" && /^https?:\/\//i.test(endpoint);
-    if (!isConnected && !absolute) {
-      throw new Error("Not connected to any API");
+  // Reads ingested data for a persisted data source via the backend
+  // (GET /day-book/data-sources/{id}/view-data). No live HTTP from the device.
+  const fetchRawData = async (dataSourceId) => {
+    if (!dataSourceId) {
+      throw new Error(
+        "dataSourceId is required to fetch data via the backend"
+      );
     }
+    const workspaceId = await requireWorkspaceId();
+    const url = endpoints.modules.day_book.data_sources.viewData(dataSourceId);
 
-    const requestHeaders = {
-      "Content-Type": "application/json",
-      ...buildRequestHeaders(currentConnection || {}),
+    const start = Date.now();
+    const response = await apiClient.get(url, { params: { workspaceId } });
+    return {
+      data: response?.data?.data ?? response?.data ?? [],
+      statusCode: response?.status,
+      headers: response?.headers,
+      responseTime: `${Date.now() - start}ms`,
     };
-
-    const upper = String(method).toUpperCase();
-    const isGet = upper === "GET";
-    const baseUrl = currentConnection?.url;
-    const url = baseUrl
-      ? buildApiUrl(baseUrl, endpoint, isGet ? params : {})
-      : buildApiUrl(endpoint, "", isGet ? params : {});
-
-    return dispatchHttp(apiClient, upper, url, isGet ? undefined : params, {
-      headers: requestHeaders,
-      timeout: 30000,
-      params: {},
-    });
   };
 
   const destroy = () => {
@@ -214,10 +206,6 @@ export const createCustomApiAdapter = (
     filterDataSources: base.filterDataSources,
     fetchRawData,
 
-    parseHeaders,
-    parseAuthentication,
-    applyAuthentication,
-    buildApiUrl,
     formatDate,
 
     destroy,
