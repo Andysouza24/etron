@@ -1,3 +1,12 @@
+import React from "react";
+import ConnectionPage from "../../../components/layout/ConnectionPage";
+import { FtpFormSection } from "../../../components/layout/FormSelection";
+import {
+  validateFtpForm,
+  generateFtpNameFromHostname,
+  buildFtpConnectionData,
+} from "../../../utils/connectionValidators";
+
 import { delay, validateSourceId, formatDate } from "./baseAdapter";
 
 // Production-only: no mock data usage
@@ -183,3 +192,14 @@ export const createCustomFtpAdapter = (options = {}) => {
     formatDate,
   };
 };
+
+export const FtpConnectionScreen = () => (
+  <ConnectionPage
+    connectionType="custom-ftp"
+    title="Custom FTP"
+    FormComponent={FtpFormSection}
+    formValidator={validateFtpForm}
+    connectionDataBuilder={buildFtpConnectionData}
+    nameGenerator={generateFtpNameFromHostname}
+  />
+);

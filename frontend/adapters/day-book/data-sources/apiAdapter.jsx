@@ -1,3 +1,12 @@
+import React from "react";
+import ConnectionPage from "../../../components/layout/ConnectionPage";
+import { ApiFormSection } from "../../../components/layout/FormSelection";
+import {
+  validateApiForm,
+  generateApiNameFromUrl,
+  buildApiConnectionData,
+} from "../../../utils/connectionValidators";
+
 import { delay, validateSourceId, formatDate } from "./baseAdapter";
 
 // utility functions for parsing and handling API connection data
@@ -578,3 +587,14 @@ export const createCustomApiAdapter = (
     destroy,
   };
 };
+
+export const ApiConnectionScreen = () => (
+  <ConnectionPage
+    connectionType="custom-api"
+    title="Custom API"
+    FormComponent={ApiFormSection}
+    formValidator={validateApiForm}
+    connectionDataBuilder={buildApiConnectionData}
+    nameGenerator={generateApiNameFromUrl}
+  />
+);
