@@ -1,7 +1,5 @@
 // Dynamic connection-input route
-// Each adapter file owns its own ConnectionScreen component
-// this route resolves the component for the requested type and renders it
-// Static sibling routes (e.g. local-csv.jsx) take priority for types without an adapter
+// each adapter declares a wizard config or legacy ConnectionScreen, wizard taking priority
 
 import React from "react";
 import { useLocalSearchParams } from "expo-router";
@@ -9,24 +7,42 @@ import { Text } from "react-native-paper";
 
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import Header from "../../../../../../../components/layout/Header";
-import { getConnectionScreen } from "../../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
+import {
+    getConnectionScreen,
+    getWizardConfig,
+} from "../../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
+import WizardProvider from "../../../../../../../components/modules/day-book/data-sources/wizard/WizardContext";
+import WizardScreen from "../../../../../../../components/modules/day-book/data-sources/wizard/WizardScreen";
 
 const ConnectionInputRoute = () => {
     const { type } = useLocalSearchParams();
-    const Screen = getConnectionScreen(type);
+    const typeKey = Array.isArray(type) ? type[0] : type;
 
-    if (!Screen) {
+    const wizard = getWizardConfig(typeKey);
+    if (wizard) {
         return (
-            <ResponsiveScreen
-                header={<Header title="Connection" showBack />}
-                center
+            <WizardProvider
+                type={typeKey}
+                steps={wizard.steps}
+                initialDraft={wizard.initialDraft}
+                onFinalise={wizard.finalise}
             >
-                <Text>Unknown connection type: {String(type)}</Text>
-            </ResponsiveScreen>
+                <WizardScreen title={wizard.title || "New connection"} />
+            </WizardProvider>
         );
     }
 
-    return <Screen />;
+    const Screen = getConnectionScreen(typeKey);
+    if (Screen) return <Screen />;
+
+    return (
+        <ResponsiveScreen
+            header={<Header title="Connection" showBack />}
+            center
+        >
+            <Text>Unknown connection type: {String(typeKey)}</Text>
+        </ResponsiveScreen>
+    );
 };
 
 export default ConnectionInputRoute;
