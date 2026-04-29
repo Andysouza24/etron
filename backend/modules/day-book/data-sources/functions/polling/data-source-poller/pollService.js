@@ -1,10 +1,10 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
 const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
 const adapterFactory = require("@etron/data-sources-shared/adapters/adapterFactory");
-const { saveStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
+const { saveStoredData, getDataSchema } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
 const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
 const { translateData } = require("@etron/data-sources-shared/utils/translateData");
 const { toParquet } = require("@etron/data-sources-shared/utils/typeConversion");
@@ -60,9 +60,12 @@ async function pollDataSource(workspace, dataSource) {
         const {valid, error } = validateFormat(translatedData);
         if (!valid) throw new Error(`Invalid data format: ${error}`);
 
-        // create the schema
+        // create the schema or honour the user-confirmed schema saved during activateDataSource for the wizard flow
         await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Generating schema", percent: 55 });
-        const schema = generateSchema(translatedData.slice(0, 100));
+        const existingSchema = await getDataSchema(workspace.workspaceId, dataSource.dataSourceId);
+        const schema = (Array.isArray(existingSchema) && existingSchema.length)
+            ? existingSchema
+            : generateSchema(translatedData.slice(0, 100));
 
         // cast rows to the schema
         await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Casting rows", percent: 70 });
