@@ -7,6 +7,7 @@ import { adapterDescriptor as googleSheetsDescriptor } from "./googleSheetsAdapt
 import { adapterDescriptor as mySqlDescriptor } from "./mySqlAdapter";
 import { adapterDescriptor as micromaxDashboardDescriptor } from "./micromaxDashboardAdapter";
 import { adapterDescriptor as micromaxDashboardFileDescriptor } from "./micromaxDashboardFileAdapter";
+import { adapterDescriptor as localCsvDescriptor } from "./localCsvAdapter";
 
 const DESCRIPTORS = [
   googleSheetsDescriptor,
@@ -16,12 +17,14 @@ const DESCRIPTORS = [
   mySqlDescriptor,
   micromaxDashboardDescriptor,
   micromaxDashboardFileDescriptor,
+  localCsvDescriptor,
 ];
 
 // Build derived registries once at module load.
 const factoryByType = {};
 const screenByType = {};
 const categoryByType = {};
+const wizardByType = {};
 
 DESCRIPTORS.forEach((descriptor) => {
   const keys = [descriptor.type, ...(descriptor.aliases || [])];
@@ -29,6 +32,9 @@ DESCRIPTORS.forEach((descriptor) => {
     factoryByType[key] = descriptor.factory;
     if (descriptor.ConnectionScreen) {
       screenByType[key] = descriptor.ConnectionScreen;
+    }
+    if (descriptor.wizard) {
+      wizardByType[key] = descriptor.wizard;
     }
     categoryByType[key] = descriptor.category;
   });
@@ -67,6 +73,19 @@ export function isTypeSupported(type) {
 
 export function getConnectionScreen(type) {
   return screenByType[type] || null;
+}
+// returns wizard config for given source type
+// returns null if type not migrated to wizard yet
+// wizard config shape:
+/*
+{
+  steps: [{ key, title, Component, props?, applies?(draft) }],
+  finalise: async (draft, context) => result,  // optional, runs on the final step's primary action
+  initialDraft: object, // optional starting state
+}
+*/
+export function getWizardConfig(type) {
+  return wizardByType[type] || null;
 }
 
 export function getAdapterInfo(type) {
