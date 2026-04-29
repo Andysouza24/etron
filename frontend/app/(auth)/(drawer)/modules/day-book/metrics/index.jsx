@@ -2,7 +2,7 @@
 
 import SearchBar from "../../../../../../components/common/input/SearchBar.jsx";
 import Divider from "../../../../../../components/layout/Divider.jsx";
-import { View, Flatlist, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from "react-native";
+import { View, Flatlist, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import Header from "../../../../../../components/layout/Header.jsx";
 import { useRouter } from "expo-router";
 import { Text, useTheme, Card } from "react-native-paper";
@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types.jsx";
 import { getCurrentUser } from "aws-amplify/auth";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen.jsx";
+import ThemedRefreshControl from "../../../../../../components/common/ThemedRefreshControl.jsx";
 import { hasPermission } from "../../../../../../utils/permissions.js";
 import { FlatList } from "react-native-gesture-handler";
 import { useMetricContext } from "../../../../../../contexts/MetricContext";
@@ -85,7 +86,7 @@ const MetricManagement = () => {
 
                 <ScrollView
                     style = {{ flex: 1 }}
-                    refreshControl = {<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    refreshControl = {<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     contentContainerStyle= {{ paddingBottom: 40 }}
                     bounces = {true}
                     alwaysBounceVertical = {true}
