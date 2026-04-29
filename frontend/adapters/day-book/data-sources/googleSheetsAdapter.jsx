@@ -1,5 +1,5 @@
 import React from "react";
-import ConnectionDataSourceLayout from "../../../components/layout/ConnectionDataSourceLayout";
+import ConnectionDataSourceLayout from "../../../components/modules/day-book/data-sources/ConnectionDataSourceLayout";
 
 import { delay, validateSourceId, formatDate } from "./baseAdapter";
 

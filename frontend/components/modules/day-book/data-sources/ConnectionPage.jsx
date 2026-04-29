@@ -3,22 +3,22 @@ import { useTheme, Text } from "react-native-paper";
 import { router } from "expo-router";
 import { useState, useEffect, useMemo } from "react";
 
-import Header from "./Header";
-import StackLayout from "./StackLayout";
-import BasicButton from "../../components/common/buttons/BasicButton";
-import IconButton from "../../components/common/buttons/IconButton";
-import TestResultCard from "../../components/cards/testResultCard";
-import ConnectionDialog from "../../components/overlays/ConnectionDialog";
-import CollapsibleList from "./CollapsibleList";
-import Divider from "./Divider";
+import Header from "../../../layout/Header";
+import StackLayout from "../../../layout/StackLayout";
+import BasicButton from "../../../common/buttons/BasicButton";
+import IconButton from "../../../common/buttons/IconButton";
+import TestResultCard from "../../../cards/testResultCard";
+import CollapsibleList from "../../../layout/CollapsibleList";
+import Divider from "../../../layout/Divider";
+import ConnectionDialog from "../../../overlays/ConnectionDialog";
 
-import { commonStyles } from "../../assets/styles/stylesheets/common";
-import { useDataSourceContext } from "../../contexts/DataSourceContext";
-import { createDataAdapter } from "../../adapters/day-book/data-sources";
-import { apiPost } from "../../utils/api/apiClient";
-import endpoints from "../../utils/api/endpoints";
+import { commonStyles } from "../../../../assets/styles/stylesheets/common";
+import { useDataSourceContext } from "../../../../contexts/DataSourceContext";
+import { createDataAdapter } from "../../../../adapters/day-book/data-sources";
+import { apiPost } from "../../../../utils/api/apiClient";
+import endpoints from "../../../../utils/api/endpoints";
 import { getCurrentUser, fetchAuthSession, signOut } from "aws-amplify/auth";
-import ResponsiveScreen from "./ResponsiveScreen";
+import ResponsiveScreen from "../../../layout/ResponsiveScreen";
 
 // --- Test Connection Section ---
 const TestConnectionSection = ({

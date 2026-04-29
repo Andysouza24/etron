@@ -1,5 +1,5 @@
 import React from "react";
-import ConnectionPage from "../../../components/layout/ConnectionPage";
+import ConnectionPage from "../../../components/modules/day-book/data-sources/ConnectionPage";
 import { MySqlFormSection } from "../../../components/layout/FormSelection";
 import {
   validateMySqlForm,
