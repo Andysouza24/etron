@@ -42,7 +42,7 @@ export function getAdaptersForUI() {
 					description: "Connect to Google Sheets via Google Drive API",
 					iconColor: "#0F9D58",
 					route:
-						"/modules/day-book/data-management/data-connection-inputs/google",
+						"/modules/day-book/data-management/data-connection-inputs/google-sheets",
 				},
 				{
 					label: "Microsoft Excel",
@@ -51,7 +51,7 @@ export function getAdaptersForUI() {
 					description: "Connect to Excel files via Microsoft Graph API",
 					iconColor: "#1D6F42",
 					route:
-						"/modules/day-book/data-management/data-connection-inputs/excel",
+						"/modules/day-book/data-management/data-connection-inputs/microsoft-excel",
 				},
 			],
 		},*/
@@ -65,7 +65,7 @@ export function getAdaptersForUI() {
 					type: "api",
 					description: "Connect to a custom REST API endpoint",
 					route:
-						"/modules/day-book/data-management/data-connection-inputs/custom-API",
+						"/modules/day-book/data-management/data-connection-inputs/custom-api",
 				},
 				/*{
 					label: "Custom FTP",
@@ -73,7 +73,7 @@ export function getAdaptersForUI() {
 					type: "custom-ftp",
 					description: "Connect to FTP/SFTP servers for file access",
 					route:
-						"/modules/day-book/data-management/data-connection-inputs/custom-FTP",
+						"/modules/day-book/data-management/data-connection-inputs/custom-ftp",
 				},*/
 			],
 		},
@@ -87,18 +87,18 @@ export function getAdaptersForUI() {
 					type: "mysql",
 					description: "Connect to MySQL databases",
 					route:
-						"/modules/day-book/data-management/data-connection-inputs/MySQL",
+						"/modules/day-book/data-management/data-connection-inputs/mysql",
 				},
 			],
 		},*/
 	];
 }
-import { createGoogleSheetsAdapter } from "./googleSheetsAdapter";
-import { createExcelAdapter } from "./excelAdapter";
-import { createCustomApiAdapter } from "./apiAdapter";
-import { createCustomFtpAdapter } from "./ftpAdapter";
-import { createMySqlAdapter } from "./mySqlAdapter";
-import { createMicromaxDashboardAdapter } from "./micromaxDashboardAdapter";
+import { createGoogleSheetsAdapter, GoogleSheetsConnectionScreen } from "./googleSheetsAdapter";
+import { createExcelAdapter, ExcelConnectionScreen } from "./excelAdapter";
+import { createCustomApiAdapter, ApiConnectionScreen } from "./apiAdapter";
+import { createCustomFtpAdapter, FtpConnectionScreen } from "./ftpAdapter";
+import { createMySqlAdapter, MySqlConnectionScreen } from "./mySqlAdapter";
+import { createMicromaxDashboardAdapter, MicromaxDashboardConnectionScreen } from "./micromaxDashboardAdapter";
 import { createMicromaxDashboardFileAdapter } from "./micromaxDashboardFileAdapter";
 
 // TODO: figure out whats going on with this
@@ -126,6 +126,22 @@ export function createDataAdapter(type, dependencies) {
 
 export function getSupportedTypes() {
 	return Object.keys(adapterMap);
+}
+
+// Maps a connection type to the React component that renders its create-connection screen.
+// Adapter files own their own screens; the dynamic [type].jsx route uses this lookup.
+const connectionScreenMap = {
+	"google-sheets": GoogleSheetsConnectionScreen,
+	"microsoft-excel": ExcelConnectionScreen,
+	api: ApiConnectionScreen,
+	"custom-api": ApiConnectionScreen,
+	"custom-ftp": FtpConnectionScreen,
+	mysql: MySqlConnectionScreen,
+	"micromax-dashboard": MicromaxDashboardConnectionScreen,
+};
+
+export function getConnectionScreen(type) {
+	return connectionScreenMap[type] || null;
 }
 
 // TODO: fix categories
