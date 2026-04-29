@@ -37,6 +37,25 @@
         }
       }
     },
+    "development-apk": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      }
+    },
     "preview": {
       "channel": "preview",
       "distribution": "internal",
