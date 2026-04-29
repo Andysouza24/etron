@@ -2,7 +2,7 @@
 
 import SearchBar from "../../../../../../components/common/input/SearchBar.jsx";
 import Divider from "../../../../../../components/layout/Divider.jsx";
-import { View, Button, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
+import { View, Button, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import Header from "../../../../../../components/layout/Header.jsx";
 import { useRouter } from "expo-router";
 import { Text, useTheme, Card } from "react-native-paper";
@@ -13,6 +13,7 @@ import endpoints from "../../../../../../utils/api/endpoints.js";
 import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import { getCurrentUser } from "aws-amplify/auth";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen.jsx";
+import ThemedRefreshControl from "../../../../../../components/common/ThemedRefreshControl.jsx";
 
 const MetricSelection = ({ asModal = false, onMetricSelect }) => {
     const router = useRouter();
@@ -93,7 +94,7 @@ const MetricSelection = ({ asModal = false, onMetricSelect }) => {
 
                 <ScrollView
                     style = {{ flex: 1 }}
-                    refreshControl = {<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    refreshControl = {<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     contentContainerStyle= {{ flexGrow: 1 }}
                     bounces = {true}
                     alwaysBounceVertical = {true}

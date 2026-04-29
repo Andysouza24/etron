@@ -1,7 +1,7 @@
 // settings screen for the Micromax Dashboard parent connection
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { ActivityIndicator, List, Text, useTheme } from "react-native-paper";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
@@ -9,6 +9,7 @@ import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveS
 import Header from "../../../../../../../components/layout/Header";
 import StackLayout from "../../../../../../../components/layout/StackLayout";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
+import ThemedRefreshControl from "../../../../../../../components/common/ThemedRefreshControl";
 import DataConnectionCard from "../../../../../../../components/modules/day-book/data-sources/DataConnectionCard";
 
 import { useDataSourceContext } from "../../../../../../../contexts/DataSourceContext";
@@ -196,10 +197,9 @@ const MicromaxDashboardSettings = () => {
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
-                    <RefreshControl
+                    <ThemedRefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={theme.colors.primary}
                     />
                 }
             >

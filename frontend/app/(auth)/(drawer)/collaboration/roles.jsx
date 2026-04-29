@@ -1,6 +1,6 @@
 // Author(s): Matthew Page, Noah Bradley
 
-import { View, FlatList, RefreshControl } from "react-native";
+import { View, FlatList } from "react-native";
 import Header from "../../../../components/layout/Header";
 import { Text, TextInput, TouchableRipple, useTheme, ActivityIndicator } from "react-native-paper";
 import { router, useFocusEffect } from "expo-router";
@@ -9,6 +9,7 @@ import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 import { apiGet } from "../../../../utils/api/apiClient";
 import endpoints from "../../../../utils/api/endpoints";
 import ResponsiveScreen from "../../../../components/layout/ResponsiveScreen";
+import ThemedRefreshControl from "../../../../components/common/ThemedRefreshControl";
 import { hasPermission } from "../../../../utils/permissions";
 
 
@@ -127,7 +128,7 @@ const Roles = () => {
                     data={filtered}
                     keyExtractor={(item) => item.roleId}
                     renderItem={renderItem}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadRoles(); }} />}
+                    refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadRoles(); }} />}
                     ListEmptyComponent={
                         <View style={{ alignItems: "center", marginTop: 48 }}>
                             <Text variant="titleMedium" style={{ marginBottom: 6 }}>

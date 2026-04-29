@@ -1,29 +1,23 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
 import { useState, useRef, useCallback } from "react";
-import { RefreshControl, Alert, ScrollView, View, StyleSheet } from "react-native";
+import { Alert } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
 import Header from "../../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
-import DataConnectionCard from "../../../../../../components/modules/day-book/data-sources/DataConnectionCard";
 import DataPreviewModal from "../../../../../../components/modules/day-book/data-sources/DataPreviewModal";
-import DataSourceCategorySection from "../../../../../../components/modules/day-book/data-sources/DataSourceCategorySection";
-import DataSourcesSummary from "../../../../../../components/modules/day-book/data-sources/DataSourcesSummary";
-import DataSourcesEmptyState from "../../../../../../components/modules/day-book/data-sources/DataSourcesEmptyState";
 import DataSourcesErrorState from "../../../../../../components/modules/day-book/data-sources/DataSourcesErrorState";
+import DataSourcesList from "../../../../../../components/modules/day-book/data-sources/DataSourcesList";
 
 import endpoints from "../../../../../../utils/api/endpoints";
 import { apiPost, apiDelete } from "../../../../../../utils/api/apiClient";
-import formatRelativeTime from "../../../../../../utils/format/formatRelativeTime";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage";
 import { useDataSourceContext } from "../../../../../../contexts/DataSourceContext";
-import { getAdapterInfo } from "../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
 import { useHasPermission } from "../../../../../../hooks/useHasPermission";
 import useDataPreview from "../../../../../../hooks/modules/day_book/data-sources/useDataPreview";
 
 const MICROMAX_PARENT_TYPE = "micromax-dashboard";
-const MICROMAX_FILE_TYPE = "micromax-dashboard-file";
 
 const DataManagement = () => {
 	const {
@@ -73,7 +67,6 @@ const DataManagement = () => {
 			}
 		}, [fetchDataSources])
 	);
-
 
 	const handleRefresh = useCallback(async () => {
 		try {
@@ -148,33 +141,15 @@ const DataManagement = () => {
 		router.navigate(`/modules/day-book/data-management/edit-data-source/${source.dataSourceId}`);
 	}, []);
 
-	// Keep the parent Micromax record out of the card grid but expose a category-level settings button.
-	const micromaxParent = dataSourcesList.find(
-		(source) => (source.sourceType || source.type) === MICROMAX_PARENT_TYPE
-	);
-
-	const visibleSources = dataSourcesList.filter(
-		(source) => (source.sourceType || source.type) !== MICROMAX_PARENT_TYPE
-	);
-
-	const groupedSources = visibleSources.reduce((acc, source) => {
-		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
-		const category = adapterInfo?.category || "other";
-		if (!acc[category]) acc[category] = [];
-		acc[category].push(source);
-		return acc;
-	}, {});
-
-	if (micromaxParent && !groupedSources[MICROMAX_PARENT_TYPE]) {
-		groupedSources[MICROMAX_PARENT_TYPE] = [];
-	}
-
-	const openMicromaxSettings = () => {
+	const openMicromaxSettings = useCallback(() => {
+		const micromaxParent = dataSourcesList.find(
+			(source) => (source.sourceType || source.type) === MICROMAX_PARENT_TYPE
+		);
 		if (!micromaxParent) return;
 		router.navigate(
 			`/modules/day-book/data-management/micromax-dashboard-settings/${micromaxParent.dataSourceId}`
 		);
-	};
+	}, [dataSourcesList]);
 
 	const handleRescanFile = useCallback(async (source) => {
 		if (!source?.dataSourceId) return;
@@ -193,97 +168,29 @@ const DataManagement = () => {
 		}
 	}, [refreshDashboardRawData]);
 
-	const renderDataSourceCard = (source) => {
-		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
-		if (!adapterInfo) return null;
-
-		const sourceType = source.sourceType || source.type;
-		const isMicromaxFile = sourceType === MICROMAX_FILE_TYPE;
-		const isRefreshingThis = refreshingSourceId === source.dataSourceId;
-
-		const typeLabel = adapterInfo.displayName || adapterInfo.name || sourceType;
-		const lastSyncText = source.lastUpdate ? `Last sync: ${formatRelativeTime(source.lastUpdate)}` : undefined;
-		const subtitle = isRefreshingThis
-			? `${typeLabel} - Refreshing...`
-			: lastSyncText
-				? `${typeLabel} - ${lastSyncText}`
-				: typeLabel;
-
-		return (
-			<View key={source.dataSourceId} style={styles.cardSpacing}>
-				<DataConnectionCard
-					label={source.name}
-					subtitle={subtitle}
-					status={source.status}
-					progressStage={source.progressStage}
-					progressPercent={source.progressPercent}
-					onNavigate={() => navigateToViewSource(source)}
-					onDelete={isMicromaxFile ? undefined : () => handleDisconnectSource(source)}
-					onTest={isMicromaxFile ? undefined : () => handleTestConnection(source)}
-					onSettings={() => navigateToEditSource(source)}
-					onViewData={() => openPreview(source)}
-					onSync={
-						isMicromaxFile && manageDataSourcesPermission && !isRefreshingThis
-							? () => handleRescanFile(source)
-							: undefined
-					}
-					viewDataAllowed={viewDataPermission}
-					manageDataSourceAllowed={manageDataSourcesPermission}
-				/>
-			</View>
-		);
-	};
-
-	let body;
-
-	if (hasError) {
-		body = <DataSourcesErrorState message={error} onRetry={handleRefresh} />;
-	} else {
-		body = (
-			<ScrollView
-				style={styles.container}
-				showsVerticalScrollIndicator={false}
-				refreshControl={
-					<RefreshControl
-						refreshing={isRefreshing || loading}
-						onRefresh={handleRefresh}
-						title="Pull to refresh"
-					/>
-				}
-			>
-				{dataSourcesList.length > 0 && (
-					<DataSourcesSummary
-						total={dataSourcesList.length}
-						activeCount={activeCount}
-						errorCount={errorCount}
-						lastRefreshAt={lastManualRefresh}
-					/>
-				)}
-
-				{Object.entries(groupedSources).map(([category, sources]) => {
-					const isMicromax = category === MICROMAX_PARENT_TYPE;
-					const showSettings = isMicromax && !!micromaxParent && manageDataSourcesPermission;
-					const emptyMessage = isMicromax
-						? "No files have been received yet. Files uploaded to the export bucket will appear here automatically."
-						: undefined;
-
-					return (
-						<DataSourceCategorySection
-							key={category}
-							category={category}
-							sources={sources}
-							showSettings={showSettings}
-							onOpenSettings={openMicromaxSettings}
-							renderSource={renderDataSourceCard}
-							emptyMessage={emptyMessage}
-						/>
-					);
-				})}
-
-				{dataSourcesList.length === 0 && !loading && <DataSourcesEmptyState />}
-			</ScrollView>
-		);
-	}
+	const body = hasError ? (
+		<DataSourcesErrorState message={error} onRetry={handleRefresh} />
+	) : (
+		<DataSourcesList
+			dataSources={dataSourcesList}
+			activeCount={activeCount}
+			errorCount={errorCount}
+			lastRefreshAt={lastManualRefresh}
+			refreshingSourceId={refreshingSourceId}
+			loading={loading}
+			isRefreshing={isRefreshing}
+			onRefresh={handleRefresh}
+			viewDataAllowed={viewDataPermission}
+			manageDataSourcesAllowed={manageDataSourcesPermission}
+			onNavigateToView={navigateToViewSource}
+			onNavigateToEdit={navigateToEditSource}
+			onDisconnect={handleDisconnectSource}
+			onTest={handleTestConnection}
+			onPreview={openPreview}
+			onRescan={handleRescanFile}
+			onOpenMicromaxSettings={openMicromaxSettings}
+		/>
+	);
 
 	return (
 		<ResponsiveScreen
@@ -298,7 +205,10 @@ const DataManagement = () => {
 					rightIconPermission={manageDataSourcesPermission}
 				/>
 			}
+			scroll={false}
+			padded={false}
 			center={false}
+			tapToDismissKeyboard={false}
 			loadingOverlayActive={loading}
 		>
 			{body}
@@ -314,12 +224,3 @@ const DataManagement = () => {
 };
 
 export default DataManagement;
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	cardSpacing: {
-		marginBottom: 12,
-	},
-});
