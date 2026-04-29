@@ -13,6 +13,7 @@ module.exports = {
     // crud
     createRemoteDataSource: crud.createRemoteDataSource,
     createLocalDataSource: crud.createLocalDataSource,
+    activateDataSource: crud.activateDataSource,
     getLocalDataSourceUploadUrl: crud.getLocalDataSourceUploadUrl,
     getDataSourceInWorkspace: crud.getDataSourceInWorkspace,
     getDataSourcesInWorkspace: crud.getDataSourcesInWorkspace,
@@ -23,6 +24,7 @@ module.exports = {
 
     // schema
     previewSchema: schema.previewSchema,
+    previewSchemaForSource: schema.previewSchemaForSource,
     confirmSchemaAndProcess: schema.confirmSchemaAndProcess,
 
     // data queries

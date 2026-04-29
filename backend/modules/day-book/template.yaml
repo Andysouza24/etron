@@ -222,6 +222,20 @@ Resources:
             Method: post
             RestApiId: !Ref eTRONApi
 
+        PreviewSchemaForSource:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/preview-schema
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        ActivateDataSource:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/activate
+            Method: post
+            RestApiId: !Ref eTRONApi
+
         GetAvailableSheets:
           Type: Api
           Properties:

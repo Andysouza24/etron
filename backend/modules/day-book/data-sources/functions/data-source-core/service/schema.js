@@ -2,6 +2,7 @@
 // CSV schema preview & confirmation flow.
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
+const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
 const { appendToStoredData, replaceStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
 const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
 const { translateData } = require("@etron/data-sources-shared/utils/translateData");
@@ -11,22 +12,12 @@ const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataT
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const { detectDateFormat } = require("@etron/data-sources-shared/utils/dateParser");
 
-const { PERMISSIONS, requirePermission } = require("./helpers");
+const { PERMISSIONS, requirePermission, resolveAndValidateAdapter } = require("./helpers");
 
-// Preview the auto-detected schema for uploaded CSV data.
-// Returns the schema with categories (date/value/dimension) and a sample of data.
-// The user can review and adjust field categories before confirming.
-async function previewSchema(authUserId, payload) {
-    const { workspaceId, rawData } = payload;
-    await validateWorkspaceId(workspaceId);
-    await requirePermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
-
-    if (!rawData) {
-        throw new Error("No data provided for preview");
-    }
-
-    const translatedData = translateData(rawData);
-    if (translatedData.length === 0) {
+// build schema preview from already-translated row data
+// ({ schema, sampleData, totalRows })
+function buildSchemaPreviewFromTranslated(translatedData) {
+    if (!Array.isArray(translatedData) || translatedData.length === 0) {
         throw new Error("The provided data is empty");
     }
 
@@ -51,6 +42,53 @@ async function previewSchema(authUserId, payload) {
         sampleData: translatedData.slice(0, 10),
         totalRows: translatedData.length,
     };
+}
+
+// preview the auto-detected schema for uploaded CSV data
+// returns the schema with categories (date/value/dimension) and a sample of data
+// user can review and adjust field categories before confirming
+async function previewSchema(authUserId, payload) {
+    const { workspaceId, rawData } = payload;
+    await validateWorkspaceId(workspaceId);
+    await requirePermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
+
+    if (!rawData) {
+        throw new Error("No data provided for preview");
+    }
+
+    const translatedData = translateData(rawData);
+    return buildSchemaPreviewFromTranslated(translatedData);
+}
+
+// Preview the auto-detected schema for an already-created remote data source.
+// The source must exist (typically created with `pendingSetup: true`) and have
+// valid config + secrets. The adapter polls a sample from the live source so
+// the wizard can show the same field-review UI used by CSV.
+async function previewSchemaForSource(authUserId, dataSourceId, payload) {
+    const { workspaceId } = payload;
+    await validateWorkspaceId(workspaceId);
+    await requirePermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
+
+    if (!dataSourceId || typeof dataSourceId !== "string") {
+        throw new Error("dataSourceId must be a UUID, 'string'");
+    }
+
+    const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
+    if (!dataSource) throw new Error(`Data source not found: ${dataSourceId}`);
+
+    const secrets = await dataSourceSecretsRepo.getSecrets(workspaceId, dataSourceId);
+    const adapter = resolveAndValidateAdapter(dataSource.sourceType, {
+        config: dataSource.config,
+        secrets,
+    });
+
+    if (typeof adapter.poll !== "function") {
+        throw new Error(`Source type "${dataSource.sourceType}" does not support schema preview`);
+    }
+
+    const data = await adapter.poll(dataSource.config, secrets);
+    const translatedData = translateData(data);
+    return buildSchemaPreviewFromTranslated(translatedData);
 }
 
 // Resolve a single column's final schema entry given the user-confirmed category.
@@ -189,6 +227,7 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
 
 module.exports = {
     previewSchema,
+    previewSchemaForSource,
     confirmSchemaAndProcess,
     resolveColumnForCategory,
 };

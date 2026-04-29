@@ -1,6 +1,6 @@
 // Author(s): Rhys Cleary, Holly Wyatt
 
-const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData, previewSchema, confirmSchemaAndProcess, refreshMicromaxDashboardFile, backfillMicromaxDashboardParent } = require("./dataSourceService");
+const { deleteDataSourceInWorkspace, getDataSourcesInWorkspace, getDataSourceInWorkspace, updateDataSourceInWorkspace, testConnection, createLocalDataSource, createRemoteDataSource, activateDataSource, getRemotePreview, viewData, viewDataForMetric, getLocalDataSourceUploadUrl, updatePartitionedData, previewSchema, previewSchemaForSource, confirmSchemaAndProcess, refreshMicromaxDashboardFile, backfillMicromaxDashboardParent } = require("./dataSourceService");
 
 exports.handler = async (event) => {
     let statusCode = 200;
@@ -114,6 +114,38 @@ exports.handler = async (event) => {
                     throw new Error("dataSourceId must be a UUID, 'string'");
                 }
                 body = await confirmSchemaAndProcess(authUserId, pathParams.dataSourceId, requestJSON);
+                break;
+            }
+
+            // PREVIEW SCHEMA FOR AN ALREADY-CREATED REMOTE DATA SOURCE
+            // (polls the live source via its adapter to produce sample rows)
+            case "POST /day-book/data-sources/{dataSourceId}/preview-schema": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                if (!pathParams.dataSourceId) {
+                    throw new Error("Missing dataSourceId in path parameters");
+                }
+                if (typeof pathParams.dataSourceId !== "string") {
+                    throw new Error("dataSourceId must be a UUID, 'string'");
+                }
+                body = await previewSchemaForSource(authUserId, pathParams.dataSourceId, requestJSON);
+                break;
+            }
+
+            // ACTIVATE A PENDING REMOTE DATA SOURCE
+            // Persists confirmedSchema (optional), flips status pending_setup -> active
+            case "POST /day-book/data-sources/{dataSourceId}/activate": {
+                if (!requestJSON.workspaceId) {
+                    throw new Error("Please specify a workspaceId");
+                }
+                if (!pathParams.dataSourceId) {
+                    throw new Error("Missing dataSourceId in path parameters");
+                }
+                if (typeof pathParams.dataSourceId !== "string") {
+                    throw new Error("dataSourceId must be a UUID, 'string'");
+                }
+                body = await activateDataSource(authUserId, pathParams.dataSourceId, requestJSON);
                 break;
             }
 

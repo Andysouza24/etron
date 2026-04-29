@@ -36,13 +36,39 @@ function validateCommonCreateFields({ name, method, expiry }) {
         throw new Error("Expiry is not in the correct format");
     }
 }
+// run post-create activation side effects for remote data source
+// used when a source is created and when a pending source is activated by wizard final step
+// side effects are best effort and never block caller
+async function runRemoteActivationSideEffects(authUserId, dataSourceItem) {
+    const { workspaceId, dataSourceId, sourceType } = dataSourceItem;
+
+    const client = new LambdaClient();
+    try {
+        const command = new InvokeCommand({
+            FunctionName: process.env.POLLING_LAMBDA_NAME,
+            InvocationType: "Event",
+            Payload: Buffer.from(JSON.stringify({ workspaceId, dataSource: dataSourceItem })),
+        });
+        await client.send(command);
+    } catch (error) {
+        console.error("Failed to trigger the polling lambda");
+    }
+
+    if (sourceType === parentAdapter.SOURCE_TYPE) {
+        try {
+            await backfillMicromaxDashboardParent(authUserId, dataSourceId, { workspaceId });
+        } catch (err) {
+            console.error("[crud] Micromax dashboard backfill failed (non-fatal):", err);
+        }
+    }
+}
 
 async function createRemoteDataSource(authUserId, payload) {
     const workspaceId = payload.workspaceId;
     await validateWorkspaceId(workspaceId);
     await requirePermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
 
-    const { name, sourceType, method, expiry, config, secrets } = payload;
+    const { name, sourceType, method, expiry, config, secrets, pendingSetup } = payload;
     validateCommonCreateFields({ name, method, expiry });
 
     resolveAndValidateAdapter(sourceType, { config, secrets });
@@ -68,7 +94,7 @@ async function createRemoteDataSource(authUserId, payload) {
         sourceType,
         method: method || "overwrite",
         expiry: expiry || null,
-        status: "active",
+        status: pendingSetup ? "pending_setup" : "active",
         createdBy: authUserId,
         config,
         createdAt: date,
@@ -79,19 +105,6 @@ async function createRemoteDataSource(authUserId, payload) {
     await dataSourceRepo.addDataSource(dataSourceItem);
     await dataSourceSecretsRepo.saveSecrets(workspaceId, dataSourceId, secrets);
 
-    // try triggering the polling lambda (best-effort)
-    const client = new LambdaClient();
-    try {
-        const command = new InvokeCommand({
-            FunctionName: process.env.POLLING_LAMBDA_NAME,
-            InvocationType: "Event",
-            Payload: Buffer.from(JSON.stringify({ workspaceId, dataSource: dataSourceItem })),
-        });
-        await client.send(command);
-    } catch (error) {
-        console.error("Failed to trigger the polling lambda");
-    }
-
     await auditDataSource({
         action: "Created",
         filter: "created",
@@ -101,18 +114,47 @@ async function createRemoteDataSource(authUserId, payload) {
         name,
     });
 
-    // For micromax-dashboard parents, backfill any files that already exist
-    // in the bucket so the new connection immediately reflects the current
-    // state. Best-effort: backfill failures don't block creation.
-    if (sourceType === parentAdapter.SOURCE_TYPE) {
-        try {
-            await backfillMicromaxDashboardParent(authUserId, dataSourceId, { workspaceId });
-        } catch (err) {
-            console.error("[crud] Micromax dashboard backfill failed (non-fatal):", err);
-        }
+    if (!pendingSetup) {
+        await runRemoteActivationSideEffects(authUserId, dataSourceItem);
     }
 
     return { ...dataSourceItem, secrets };
+}
+// activate a remote data source created with 'pendingSetup: true'
+// persists user-confirmed schema if provided
+// flips status to active and runs same post-create side effects
+// calling on an active data source is rejected
+async function activateDataSource(authUserId, dataSourceId, payload) {
+    const workspaceId = payload.workspaceId;
+    await validateWorkspaceId(workspaceId);
+    await requirePermission(authUserId, workspaceId, PERMISSIONS.MANAGE_DATASOURCES);
+
+    if (!dataSourceId || typeof dataSourceId !== "string") {
+        throw new Error("dataSourceId must be a UUID, 'string'");
+    }
+
+    const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
+    if (!dataSource) throw new Error(`Data source not found: ${dataSourceId}`);
+    if (dataSource.status === "active") {
+        throw new Error("Data source is already active");
+    }
+
+    const { confirmedSchema } = payload;
+    if (confirmedSchema && Array.isArray(confirmedSchema) && confirmedSchema.length) {
+        // schema persistence lives in the data-sources-shared bucket repo so that the polling lambda and view-data path read the same schema
+        const { saveSchemaAndUpdateTable } = require("@etron/data-sources-shared/utils/schema");
+        await saveSchemaAndUpdateTable(workspaceId, dataSourceId, confirmedSchema);
+    }
+
+    await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+        status: "active",
+        errorMessage: null,
+    });
+
+    const activatedItem = { ...dataSource, status: "active" };
+    await runRemoteActivationSideEffects(authUserId, activatedItem);
+
+    return activatedItem;
 }
 
 async function createLocalDataSource(authUserId, payload) {
@@ -270,6 +312,7 @@ async function deleteDataSourceInWorkspace(authUserId, workspaceId, dataSourceId
 module.exports = {
     createRemoteDataSource,
     createLocalDataSource,
+    activateDataSource,
     getLocalDataSourceUploadUrl,
     getDataSourceInWorkspace,
     getDataSourcesInWorkspace,
