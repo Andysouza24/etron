@@ -242,3 +242,10 @@ export {
   buildObjectKey,
   parseObjectKey,
 };
+
+export const adapterDescriptor = {
+  type: SOURCE_TYPE,
+  category: "micromax-dashboard",
+  factory: createMicromaxDashboardAdapter,
+  ConnectionScreen: MicromaxDashboardConnectionScreen,
+};

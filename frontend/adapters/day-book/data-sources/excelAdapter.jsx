@@ -156,3 +156,10 @@ export const ExcelConnectionScreen = () => {
     />
   );
 };
+
+export const adapterDescriptor = {
+  type: "microsoft-excel",
+  category: "cloud-storage",
+  factory: createExcelAdapter,
+  ConnectionScreen: ExcelConnectionScreen,
+};

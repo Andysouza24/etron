@@ -128,3 +128,10 @@ export const GoogleSheetsConnectionScreen = () => {
     />
   );
 };
+
+export const adapterDescriptor = {
+  type: "google-sheets",
+  category: "cloud-storage",
+  factory: createGoogleSheetsAdapter,
+  ConnectionScreen: GoogleSheetsConnectionScreen,
+};

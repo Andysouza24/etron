@@ -121,3 +121,11 @@ export {
   buildObjectKey,
   parseObjectKey,
 };
+
+export const adapterDescriptor = {
+  type: SOURCE_TYPE,
+  category: "micromax-dashboard",
+  factory: createMicromaxDashboardFileAdapter,
+  // No standalone connection screen — children are created by the backend.
+  ConnectionScreen: null,
+};
