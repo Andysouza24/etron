@@ -7,13 +7,13 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import * as DocumentPicker from "expo-document-picker";
 
-import StackLayout from "../../../../../layout/StackLayout";
-import BasicButton from "../../../../../common/buttons/BasicButton";
-import TextField from "../../../../../common/input/TextField";
-import { apiPost } from "../../../../../../utils/api/apiClient";
-import endpoints from "../../../../../../utils/api/endpoints";
-import { getWorkspaceId } from "../../../../../../storage/workspaceStorage";
-import { useWizard } from "../WizardContext";
+import StackLayout from "../../../../../../layout/StackLayout";
+import BasicButton from "../../../../../../common/buttons/BasicButton";
+import TextField from "../../../../../../common/input/TextField";
+import { apiPost } from "../../../../../../../utils/api/apiClient";
+import endpoints from "../../../../../../../utils/api/endpoints";
+import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
+import { useWizard } from "../../WizardContext";
 
 const ACCEPTED_TYPES = [
     "text/csv",
