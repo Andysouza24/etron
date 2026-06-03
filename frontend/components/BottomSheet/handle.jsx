@@ -149,6 +149,28 @@ const Handle = ({
     if (typeof onClose === 'function') onClose();
   }, [onClose]);
 
+  const shouldRenderHeader = variant === 'standard' && (title || headerComponent || headerActionLabel || headerChildren || showClose);
+  const shouldRenderSearch = variant === 'standard' && enableSearch;
+  const searchPlaceholderText = searchPlaceholder ?? 'Search';
+
+  const renderedHeader = useMemo(() => {
+    if (variant !== 'standard' || !shouldRenderHeader) return null;
+    if (headerComponent) return headerComponent;
+    return (
+      <SheetHeader
+        title={title}
+        actionLabel={headerActionLabel}
+        onActionPress={onHeaderActionPress}
+        showClose={showClose}
+        onClose={onClose}
+        closeIcon={closeIcon}
+        textColor={textColor}
+      >
+        {headerChildren}
+      </SheetHeader>
+    );
+  }, [variant, shouldRenderHeader, headerComponent, title, headerActionLabel, onHeaderActionPress, showClose, onClose, closeIcon, headerChildren]);
+
   if (variant === 'compact') {
     return (
       <Animated.View
@@ -179,28 +201,6 @@ const Handle = ({
       </Animated.View>
     );
   }
-
-  const shouldRenderHeader = variant === 'standard' && (title || headerComponent || headerActionLabel || headerChildren || showClose);
-  const shouldRenderSearch = variant === 'standard' && enableSearch;
-  const searchPlaceholderText = searchPlaceholder ?? 'Search';
-
-  const renderedHeader = useMemo(() => {
-    if (!shouldRenderHeader) return null;
-    if (headerComponent) return headerComponent;
-    return (
-      <SheetHeader
-        title={title}
-        actionLabel={headerActionLabel}
-        onActionPress={onHeaderActionPress}
-        showClose={showClose}
-        onClose={onClose}
-        closeIcon={closeIcon}
-        textColor={textColor}
-      >
-        {headerChildren}
-      </SheetHeader>
-    );
-  }, [shouldRenderHeader, headerComponent, title, headerActionLabel, onHeaderActionPress, showClose, onClose, closeIcon, headerChildren]);
 
   return (
     <Animated.View

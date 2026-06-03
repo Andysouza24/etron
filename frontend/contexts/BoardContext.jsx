@@ -110,7 +110,11 @@ export function BoardProvider({ children, workspaceId: workspaceIdProp }) {
             loadBoards(false);
             console.log("[BoardContext] Real-time board update:", action, boardId);
         }
-    }, workspaceId);
+    }, workspaceId, () => {
+        // on subscription reconnect, refetch the board list so the UI
+        // catches up on anything that happened while disconnected.
+        loadBoards(false);
+    });
 
     const refresh = useCallback(() => loadBoards(true), [loadBoards]);
 

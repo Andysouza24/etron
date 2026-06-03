@@ -1,77 +1,37 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
-import { View, ScrollView, ActivityIndicator, StyleSheet, Platform, Keyboard } from 'react-native'
+import { View, StyleSheet, Platform } from 'react-native'
 import { commonStyles } from '../../../../assets/styles/stylesheets/common';
 import Header from '../../../../components/layout/Header';
 import StackLayout from '../../../../components/layout/StackLayout';
 import DescriptiveButton from '../../../../components/common/buttons/DescriptiveButton';
 import { router } from 'expo-router';
 import { useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPut } from '../../../../utils/api/apiClient';
 import BasicDialog from '../../../../components/overlays/BasicDialog';
 import { useTheme, Text } from "react-native-paper";
-import { useVerification } from '../../../../contexts/VerificationContext';
-import { verifyPassword } from '../../../../utils/verifyPassword';
-import endpoints from '../../../../utils/api/endpoints';
 import DropDown from '../../../../components/common/input/DropDown';
-import { getCachedIsOwner, clearPermissionsCache } from '../../../../storage/permissionsStorage';
 
 import {
     getCurrentUser,
-    deleteUser,
     signOut,
-    updateUserAttribute,
 } from 'aws-amplify/auth';
 import BasicButton from '../../../../components/common/buttons/BasicButton';
 import ResponsiveScreen from '../../../../components/layout/ResponsiveScreen';
-import { getWorkspaceId } from '../../../../storage/workspaceStorage';
+import useAccountDeletion from '../../../../hooks/system/useAccountDeletion';
+import useWorkspaceLeave from '../../../../hooks/system/useWorkspaceLeave';
 
 const Account = () => {
     const theme = useTheme();
 
-    const [dialogVisible, setDialogVisible] = useState(false);
-    const [leaveDialogVisible, setLeaveDialogVisible] = useState(false);
-    const [password, setPassword] = useState("");
-    const [passwordError, setPasswordError] = useState(false);
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
-    const [deleting, setDeleting] = useState(false);
-    const [leaving, setLeaving] = useState(false);
-    const [leavePassword, setLeavePassword] = useState("");
-    const [leavePasswordError, setLeavePasswordError] = useState(false);
-    const [leavePasswordErrorMessage, setLeavePasswordErrorMessage] = useState("");
-    const [isOwner, setIsOwner] = useState(false);
-    const [ownerFlowVisible, setOwnerFlowVisible] = useState(false);
-    const [ownerPassword, setOwnerPassword] = useState("");
-    const [ownerPasswordError, setOwnerPasswordError] = useState(false);
-    const [ownerPasswordErrorMessage, setOwnerPasswordErrorMessage] = useState("");
-    const [users, setUsers] = useState([]);
-    const [roles, setRoles] = useState([]);
-    const [selectedNewOwner, setSelectedNewOwner] = useState("");
+
+    const deletion = useAccountDeletion();
+    const leave = useWorkspaceLeave({ router });
 
     useEffect(() => {
         setLoading(true);
         loadAccountEmail();
-        (async () => {
-            try {
-                const owner = await getCachedIsOwner();
-                setIsOwner(!!owner);
-            if (owner) {
-                const workspaceId = await getWorkspaceId();
-                const { userId: currentUserId } = await getCurrentUser();
-                let result = await apiGet(endpoints.workspace.users.getUsers(workspaceId));
-                const candidates = (result.data || []).filter(u => u.userId !== currentUserId);
-                setUsers(candidates);
-
-                result = await apiGet(endpoints.workspace.roles.getRoles(workspaceId));
-                setRoles((result.data || []).filter(r => !r.owner));
-            }
-            } catch (error) {
-                console.error("Ownership preload failed:", error);
-            } finally {
-                setLoading(false);
-            }
-        })();
     }, []);
 
     async function loadAccountEmail() {
@@ -88,166 +48,14 @@ const Account = () => {
     const accountSettingsButtons = [
         { label: "Personal Details", description: "Update first and last name, phone number, and avatar", onPress: () => router.navigate("account-settings/personal-details")},
         { label: "Password and Security", onPress: () => router.navigate("account-settings/password-security") },
-        { label: "Delete Account", onPress: () => setDialogVisible(true)}
+        { label: "Delete Account", onPress: () => deletion.open()}
     ]
-
-    async function handleDelete() {
-        setDeleting(true);
-        const validPassword = await verifyPassword(password); // verify the password before deleting
-
-        if (!validPassword) {
-            setPasswordError(true);
-            setDeleting(false);
-            return;
-        }
-
-        try {
-            const workspaceId = await getWorkspaceId();
-            const { userId } = await getCurrentUser();
-            try {
-                await apiDelete(endpoints.workspace.users.remove(workspaceId, userId));
-            } catch (error) {
-                console.error("Error deleting user details in workspace:", error);
-                return;
-            }
-            await clearPermissionsCache(); // clear permissions cache on account deletion
-            await deleteUser();  // Deletes user from Cognito
-            setDialogVisible(false);
-            // _layout will automatically redirect to sign in page from here
-        } catch (error) {
-            console.error("Error deleting account: ", error);
-        } finally {
-            setDeleting(false);
-        }
-    }
-
-    async function handleLeaveWorkspace() {
-        Keyboard.dismiss();
-        setLeaving(true);
-
-
-        if (!leavePassword) {
-            setLeavePasswordErrorMessage("Please enter your password.");
-            setLeavePasswordError(true);
-            setLeaving(false);
-            return;
-        }
-        const valid = await verifyPassword(leavePassword);
-
-
-        if (!valid) {
-            setLeavePasswordErrorMessage("The password entered is invalid.");
-            setLeavePasswordError(true);
-            setLeaving(false);
-            return;
-        }
-
-        try {
-            const workspaceId = await getWorkspaceId();
-            const { userId } = await getCurrentUser();
-            await apiDelete(endpoints.workspace.users.remove(workspaceId, userId));
-            await clearPermissionsCache(); // clear permissions cache on leaving workspace
-            setLeaveDialogVisible(false);
-            router.navigate("/workspace-choice");
-        } catch (error) {
-            console.error("Error leaving workspace:", error);
-        } finally {
-            setLeaving(false);
-            setLeavePassword("");
-            setLeavePasswordError(false);
-            setLeavePasswordErrorMessage("");
-        }
-    }
-
-    async function handleOwnerTransferAndLeave() {
-        Keyboard.dismiss?.();
-        if (!ownerPassword) {
-            setOwnerPasswordErrorMessage("Please enter your password.");
-            setOwnerPasswordError(true);
-            return;
-        }
-        setLeaving(true);
-        const valid = await verifyPassword(ownerPassword);
-        if (!valid) {
-            setOwnerPasswordErrorMessage("The password entered is invalid.");
-            setOwnerPasswordError(true);
-            setLeaving(false);
-            return;
-        }
-        try {
-            const workspaceId = await getWorkspaceId();
-            const { userId: currentUserId } = await getCurrentUser();
-            if (!selectedNewOwner) {
-                setOwnerPasswordErrorMessage("Select a new owner to continue.");
-                setOwnerPasswordError(true);
-                setLeaving(false);
-                return;
-            }
-            
-            const nonOwnerRole = roles[0];
-            if (!nonOwnerRole) {
-                throw new Error("No non-owner roles available to assign.");
-            }
-            
-            await apiPut(endpoints.workspace.core.transfer(workspaceId), {
-                receipientUserId: selectedNewOwner,
-                newRoleId: nonOwnerRole.roleId,
-            });
-            
-            await apiDelete(endpoints.workspace.users.remove(workspaceId, currentUserId));
-            await clearPermissionsCache(); // clear permissions cache on leaving workspace
-            setOwnerFlowVisible(false);
-            
-            router.navigate("/workspace-choice");
-        } catch (err) {
-            console.error("Transfer & leave failed:", err);
-        } finally {
-            setLeaving(false);
-            setOwnerPassword("");
-            setOwnerPasswordError(false);
-            setOwnerPasswordErrorMessage("");
-        }
-    }
-
-    async function handleOwnerDeleteWorkspace() {
-        Keyboard.dismiss?.();
-
-        if (!ownerPassword) {
-            setOwnerPasswordErrorMessage("Please enter your password.");
-            setOwnerPasswordError(true);
-            return;
-        }
-        setLeaving(true);
-
-        const valid = await verifyPassword(ownerPassword);
-        if (!valid) {
-            setOwnerPasswordErrorMessage("The password entered is invalid.");
-            setOwnerPasswordError(true);
-            setLeaving(false);
-            return;
-        }
-
-        try {
-            const workspaceId = await getWorkspaceId();
-            await apiDelete(endpoints.workspace.core.delete(workspaceId));
-            await clearPermissionsCache(); // clear permissions cache on leaving workspace
-            setOwnerFlowVisible(false);
-            router.navigate("/workspace-choice");
-        } catch (error) {
-            console.error("Workspace delete failed:", error);
-        } finally {
-            setLeaving(false);
-            setOwnerPassword("");
-            setOwnerPasswordError(false);
-            setOwnerPasswordErrorMessage("");
-        }
-    }
 
     return(
         <ResponsiveScreen
             header = {<Header title="My Account" showMenu />}
             center = {false}
-            loadingOverlayActive={deleting || leaving}
+            loadingOverlayActive={deletion.deleting || leave.leaving}
         >
             <StackLayout spacing={12}>
                 {accountSettingsButtons.map((item) => (
@@ -267,132 +75,119 @@ const Account = () => {
                         label={"Leave Workspace"}
                         danger
                         onPress={() => {
-                            if (isOwner) setOwnerFlowVisible(true);
-                            else setLeaveDialogVisible(true);
+                            if (leave.isOwner) leave.setOwnerFlowVisible(true);
+                            else leave.setLeaveDialogVisible(true);
                         }}
                     />
                 </View>
             </StackLayout>
-                
+
             <BasicDialog
-                visible={dialogVisible}
+                visible={deletion.dialogVisible}
                 message={"Are you sure you want to delete your account? You will have seven days to login before your data is permanently removed."}
                 showInput
                 inputLabel={"Password"}
                 inputPlaceholder={"Enter Password"}
-                inputValue={password}
-                inputOnChangeText={(text) => {
-                    setPassword(text);
-                    if (text) {
-                        setPasswordError(false);
-                    }
-                }}
-                onDismiss={() => {
-                    setDialogVisible(false);
-                    setPassword("");
-                    setPasswordError(false);
-                }}
+                inputValue={deletion.password}
+                inputOnChangeText={deletion.onPasswordChange}
+                onDismiss={deletion.close}
                 title="Delete Account"
-                inputError={passwordError}
+                inputError={deletion.passwordError}
                 inputErrorMessage={"Incorrect password"}
                 secureTextEntry={true}
                 leftActionLabel="Go Back"
-                handleLeftAction={() => {
-                    setDialogVisible(false);
-                    setPassword("");
-                    setPasswordError(false);
-                }}
+                handleLeftAction={deletion.close}
                 rightActionLabel={"Confirm"}
                 rightDanger
-                handleRightAction={handleDelete}
+                handleRightAction={deletion.handleDelete}
             />
 
             <BasicDialog
-                visible={leaveDialogVisible}
+                visible={leave.leaveDialogVisible}
                 onDismiss={() => {
-                    setLeaveDialogVisible(false);
-                    setLeavePassword("");
-                    setLeavePasswordError(false);
-                    setLeavePasswordErrorMessage("");
+                    leave.setLeaveDialogVisible(false);
+                    leave.setLeavePassword("");
+                    leave.setLeavePasswordError(false);
+                    leave.setLeavePasswordErrorMessage("");
                 }}
                 title="Leave Workspace"
                 message="Enter your password to confirm leaving this workspace."
                 showInput
                 inputLabel="Password"
                 inputPlaceholder="Enter your password"
-                inputValue={leavePassword}
+                inputValue={leave.leavePassword}
                 inputOnChangeText={(text) => {
-                    setLeavePassword(text);
-                    if (text) setLeavePasswordError(false);
+                    leave.setLeavePassword(text);
+                    if (text) leave.setLeavePasswordError(false);
                 }}
-                inputError={leavePasswordError}
-                inputErrorMessage={leavePasswordErrorMessage}
+                inputError={leave.leavePasswordError}
+                inputErrorMessage={leave.leavePasswordErrorMessage}
                 secureTextEntry
                 leftActionLabel="Cancel"
                 handleLeftAction={() => {
-                    setLeaveDialogVisible(false);
-                    setLeavePassword("");
-                    setLeavePasswordError(false);
-                    setLeavePasswordErrorMessage("");
+                    leave.setLeaveDialogVisible(false);
+                    leave.setLeavePassword("");
+                    leave.setLeavePasswordError(false);
+                    leave.setLeavePasswordErrorMessage("");
                 }}
                 rightActionLabel="Leave Workspace"
                 rightDanger
-                rightDisabled={!leavePassword}
-                handleRightAction={handleLeaveWorkspace}
+                rightDisabled={!leave.leavePassword}
+                handleRightAction={leave.handleLeaveWorkspace}
                 inputProps={{
                     autoCapitalize: 'none',
                     autoCorrect: false,
                     keyboardType: Platform.OS === 'android' ? 'visible-password' : 'default',
-                    onSubmitEditing: handleLeaveWorkspace,
+                    onSubmitEditing: leave.handleLeaveWorkspace,
                 }}
             />
 
             <BasicDialog
-                visible={ownerFlowVisible}
+                visible={leave.ownerFlowVisible}
                 onDismiss={() => {
-                    setOwnerFlowVisible(false);
-                    setOwnerPassword("");
-                    setOwnerPasswordError(false);
-                    setOwnerPasswordErrorMessage("");
-                    setSelectedNewOwner("");
+                    leave.setOwnerFlowVisible(false);
+                    leave.setOwnerPassword("");
+                    leave.setOwnerPasswordError(false);
+                    leave.setOwnerPasswordErrorMessage("");
+                    leave.setSelectedNewOwner("");
                 }}
                 title="You're the owner"
                 message="To leave, you must transfer ownership to another user or delete the workspace."
                 showInput
                 inputLabel="Password"
                 inputPlaceholder="Enter your password"
-                inputValue={ownerPassword}
+                inputValue={leave.ownerPassword}
                 inputOnChangeText={(text) => {
-                    setOwnerPassword(text);
-                    if (text) setOwnerPasswordError(false);
+                    leave.setOwnerPassword(text);
+                    if (text) leave.setOwnerPasswordError(false);
                 }}
-                inputError={ownerPasswordError}
-                inputErrorMessage={ownerPasswordErrorMessage}
+                inputError={leave.ownerPasswordError}
+                inputErrorMessage={leave.ownerPasswordErrorMessage}
                 secureTextEntry
                 leftActionLabel="Delete Workspace"
                 leftDanger
-                handleLeftAction={handleOwnerDeleteWorkspace}
+                handleLeftAction={leave.handleOwnerDeleteWorkspace}
                 rightActionLabel="Transfer & Leave"
                 rightDanger
-                rightDisabled={!ownerPassword || !selectedNewOwner}
-                handleRightAction={handleOwnerTransferAndLeave}
+                rightDisabled={!leave.ownerPassword || !leave.selectedNewOwner}
+                handleRightAction={leave.handleOwnerTransferAndLeave}
                 inputProps={{
                     autoCapitalize: 'none',
                     autoCorrect: false,
                     keyboardType: Platform.OS === 'android' ? 'visible-password' : 'default',
-                    onSubmitEditing: handleOwnerTransferAndLeave,
+                    onSubmitEditing: leave.handleOwnerTransferAndLeave,
                 }}
             >
                 <View style={{ marginTop: 12 }}>
                     <Text style={{ marginBottom: 6 }}>Select new owner</Text>
                     <DropDown
                         title="Choose user"
-                        items={users.map(u => ({
+                        items={leave.users.map(u => ({
                             label: `${u.given_name ?? ''} ${u.family_name ?? ''}`.trim() || u.email,
                             value: u.userId
                         }))}
-                        value={selectedNewOwner}
-                        onSelect={setSelectedNewOwner}
+                        value={leave.selectedNewOwner}
+                        onSelect={leave.setSelectedNewOwner}
                         showRouterButton={false}
                     />
                 </View>
@@ -413,4 +208,3 @@ const styles = StyleSheet.create({
 })
 
 export default Account;
-

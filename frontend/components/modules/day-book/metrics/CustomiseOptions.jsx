@@ -28,12 +28,20 @@ export default function CustomiseOptions({
     rawGraphData,
     boxUseRawData,
     setBoxUseRawData,
+    xAxisDateFormat,
+    setXAxisDateFormat,
+    xAxisChronological,
+    setXAxisChronological,
     alerts,
     setAlerts,
+    thresholds,
+    setThresholds,
     dependentVariables,
     userId,
     workspaceId,
     workspaceUsers,
+    graphData,
+    yKeys,
 }) {
     const [view, setView] = useState("menu");
 
@@ -66,6 +74,10 @@ export default function CustomiseOptions({
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    xAxisDateFormat={xAxisDateFormat}
+                    setXAxisDateFormat={setXAxisDateFormat}
+                    xAxisChronological={xAxisChronological}
+                    setXAxisChronological={setXAxisChronological}
                 />
             );
         }
@@ -75,10 +87,15 @@ export default function CustomiseOptions({
             onNavigate={setView}
             alerts={alerts}
             setAlerts={setAlerts}
+            thresholds={thresholds}
+            setThresholds={setThresholds}
             dependentVariables={dependentVariables}
             userId={userId}
             workspaceId={workspaceId}
             workspaceUsers={workspaceUsers}
+            graphData={graphData}
+            yKeys={yKeys}
+            rawGraphData={rawGraphData}
         />;
     }
 
@@ -93,6 +110,7 @@ export default function CustomiseOptions({
                 fullWidth
                 label="Advanced Options"
                 onPress={() => setView("advancedOptions")}
+                style={{ marginTop: 16 }}
             />
         </View>
     );

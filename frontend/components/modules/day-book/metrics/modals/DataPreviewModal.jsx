@@ -34,7 +34,7 @@ export default function DataPreviewModal({ visible, onDismiss, data, variableNam
 
     return (
         <Portal>
-            <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={sharedModalStyles.modalContainer}>
+            <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.modalContainer}>
                 <Card style={[sharedModalStyles.card, dataPreviewStyles.card]}>
                     <Card.Content>
                         <ScrollView horizontal showsHorizontalScrollIndicator>
@@ -77,3 +77,12 @@ export default function DataPreviewModal({ visible, onDismiss, data, variableNam
         </Portal>
     );
 }
+
+const styles = StyleSheet.create({
+    modalContainer: {
+        alignSelf: "center",
+        width: "90%",
+        maxWidth: 900,
+        padding: 20,
+    },
+});

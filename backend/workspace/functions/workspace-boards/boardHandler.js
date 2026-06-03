@@ -4,6 +4,7 @@ const {
   deleteBoardInWorkspace,
   getBoardInWorkspace,
   getBoardsInWorkspace,
+  getDashboardInWorkspace,
 } = require("./boardService");
 const axios = require("axios");
 
@@ -179,6 +180,23 @@ exports.handler = async (event) => {
         }
 
         body = await getBoardsInWorkspace(authUserId, pathParams.workspaceId);
+        break;
+      }
+
+      // GET ACTIVE DASHBOARD (no view_boards permission required)
+      case "GET /workspace/{workspaceId}/dashboard": {
+        if (!pathParams.workspaceId) {
+          throw new Error("Missing required path parameters");
+        }
+
+        if (typeof pathParams.workspaceId !== "string") {
+          throw new Error("workspaceId must be a UUID, 'string'");
+        }
+
+        body = await getDashboardInWorkspace(
+          authUserId,
+          pathParams.workspaceId
+        );
         break;
       }
 

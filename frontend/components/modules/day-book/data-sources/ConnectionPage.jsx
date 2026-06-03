@@ -14,9 +14,7 @@ import ConnectionDialog from "../../../overlays/ConnectionDialog";
 
 import { commonStyles } from "../../../../assets/styles/stylesheets/common";
 import { useDataSourceContext } from "../../../../contexts/DataSourceContext";
-import { createDataAdapter } from "../../../../adapters/day-book/data-sources";
 import { apiPost } from "../../../../utils/api/apiClient";
-import endpoints from "../../../../utils/api/endpoints";
 import { getCurrentUser, fetchAuthSession, signOut } from "aws-amplify/auth";
 import ResponsiveScreen from "../../../layout/ResponsiveScreen";
 
@@ -58,6 +56,7 @@ const TestConnectionSection = ({
 const ConnectionPage = ({
   connectionType,
   title,
+  createAdapter,
   FormComponent,
   formValidator,
   connectionDataBuilder,
@@ -85,7 +84,10 @@ const ConnectionPage = ({
   // Adapter setup
   useEffect(() => {
     try {
-  console.log('[ConnectionPage] creating adapter', { connectionType });
+      console.log('[ConnectionPage] creating adapter', { connectionType });
+      if (typeof createAdapter !== 'function') {
+        throw new Error('No adapter factory was supplied to ConnectionPage');
+      }
       const apiClient = {
         post: apiPost,
         get: async () => ({ data: [] }),
@@ -93,23 +95,18 @@ const ConnectionPage = ({
         delete: async () => ({ data: {} })
       };
       const authService = { getCurrentUser, fetchAuthSession, signOut };
-    const newAdapter = createDataAdapter(connectionType, {
-        authService,
-        apiClient,
-        endpoints,
-        options: {
-      // Do not allow automatic fallback to demo when creating a UI adapter
-      fallbackToDemo: false
-        }
+      const newAdapter = createAdapter(authService, apiClient, {
+        // Do not allow automatic fallback to demo when creating a UI adapter
+        fallbackToDemo: false
       });
       if (!newAdapter) throw new Error('Failed to create adapter - adapter is null');
       setAdapter(newAdapter);
       setAdapterError(null);
     } catch (err) {
       setAdapterError(`Failed to create adapter: ${err.message}`);
-  console.error('[ConnectionPage] Adapter creation error:', err);
+      console.error('[ConnectionPage] Adapter creation error:', err);
     }
-  }, [connectionType]);
+  }, [connectionType, createAdapter]);
 
   // Expand test section when form valid
   const formIsValid = useMemo(() => formValidator ? formValidator(formData) : true, [formData, formValidator]);

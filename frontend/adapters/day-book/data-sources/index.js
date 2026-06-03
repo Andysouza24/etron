@@ -15,13 +15,14 @@ export { createCustomFtpAdapter } from "./ftpAdapter";
 export { createMySqlAdapter } from "./mySqlAdapter";
 export { createMicromaxDashboardAdapter } from "./micromaxDashboardAdapter";
 export { createMicromaxDashboardFileAdapter } from "./micromaxDashboardFileAdapter";
+export { createTestConnectionAdapter } from "./testConnectionAdapter";
+export { createTestConnectionFileAdapter } from "./testConnectionFileAdapter";
 
 export {
   createDataAdapter,
   getSupportedTypes,
   isTypeSupported,
   getAdapterInfo,
-  getConnectionScreen,
   getCategoryDisplayName,
   getAdaptersForUI,
 } from "./DataAdapterFactory";

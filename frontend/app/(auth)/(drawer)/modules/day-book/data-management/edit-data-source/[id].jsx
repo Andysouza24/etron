@@ -17,7 +17,7 @@ const UpdateDataSourceScreen = () => {
 	const { id } = useLocalSearchParams();
 	const sourceId = Array.isArray(id) ? id[0] : id;
 
-	const { getDataSource, updateDataSource } = useDataSources();
+	const { getDataSource, updateDataSource, refreshFromDefaultSchema } = useDataSources();
 	const { refreshDashboardRawData } = useDataSourceContext();
 	const { allowed: canManageDataSources } = useHasPermission(MANAGE_DATASOURCES_PERMISSION);
 	const { allowed: canManageColumnDisplay } = useHasPermission(MANAGE_COLUMN_DISPLAY_PERMISSION);
@@ -25,6 +25,7 @@ const UpdateDataSourceScreen = () => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [refreshing, setRefreshing] = useState(false);
+	const [refreshingDefault, setRefreshingDefault] = useState(false);
 	const [error, setError] = useState(null);
 	const [source, setSource] = useState(null);
 
@@ -108,6 +109,25 @@ const UpdateDataSourceScreen = () => {
 			Alert.alert('Refresh failed', e?.message || 'Unable to refresh this data source.');
 		} finally {
 			setRefreshing(false);
+		}
+	};
+
+	const handleRefreshFromDefault = async () => {
+		if (!sourceId) return;
+		setRefreshingDefault(true);
+		try {
+			await refreshFromDefaultSchema(sourceId);
+			Alert.alert(
+				'Schema refreshed',
+				'The data source is reprocessing against its default schema.'
+			);
+		} catch (e) {
+			Alert.alert(
+				'Refresh failed',
+				e?.message || 'Unable to refresh from default schema.'
+			);
+		} finally {
+			setRefreshingDefault(false);
 		}
 	};
 
@@ -234,6 +254,23 @@ const UpdateDataSourceScreen = () => {
 								icon="refresh"
 							>
 								Refresh now
+							</Button>
+							<Text
+								variant="bodySmall"
+								style={{ color: theme.colors.onSurfaceVariant, marginTop: 12, marginBottom: 8 }}
+							>
+								Refreshing from the default schema restores any columns shipped
+								with this dashboard file. Existing column settings are preserved
+								where possible.
+							</Text>
+							<Button
+								mode="outlined"
+								onPress={handleRefreshFromDefault}
+								loading={refreshingDefault}
+								disabled={refreshingDefault || !canManageDataSources}
+								icon="file-refresh"
+							>
+								Refresh from default schema
 							</Button>
 						</View>
 					)}

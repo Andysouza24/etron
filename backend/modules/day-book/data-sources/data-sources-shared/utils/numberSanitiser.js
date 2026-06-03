@@ -40,16 +40,25 @@ function sanitiseNumberString(value, numberFormat = DEFAULT_NUMBER_FORMAT) {
 }
 
 
+// Unicode currency symbols plus common ASCII ones used as prefixes/suffixes, excludes bare letters
+const CURRENCY_SYMBOL_REGEX = /([$€£¥₹₩₽¢₺₪฿₫₦₱₲₴₵₸₡₭])/;
+
+
 // Check whether a raw value looks numeric after sanitisation.
 function isNumericString(value, numberFormat = DEFAULT_NUMBER_FORMAT) {
     if (value == null) return false;
+    const fmt = NUMBER_FORMATS[numberFormat] || NUMBER_FORMATS[DEFAULT_NUMBER_FORMAT];
+    let raw = String(value).trim();
+    if (raw === '') return false;
+    raw = raw.replace(new RegExp(CURRENCY_SYMBOL_REGEX.source, 'g'), '').replace(/\s+/g, ''); // strip currency symbols and internal whitespace before validating chars
+    if (raw === '') return false;
+    const allowed = new Set(['-', '+', 'e', 'E', fmt.decimalSep, fmt.thousandSep]);
+    for (const ch of raw) {
+        if (!/\d/.test(ch) && !allowed.has(ch)) return false;
+    }
     const sanitised = sanitiseNumberString(value, numberFormat);
     return /^-?\d+(\.\d+)?$/.test(sanitised);
 }
-
-
-// Unicode currency symbols plus common ASCII ones used as prefixes/suffixes, excludes bare letters
-const CURRENCY_SYMBOL_REGEX = /([$€£¥₹₩₽¢₺₪฿₫₦₱₲₴₵₸₡₭])/;
 
 
 // Inspect a single raw value and return the first currency symbol found, or null

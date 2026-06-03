@@ -19,8 +19,15 @@ export const useBoardData = (boardId) => {
         setBoard(boardData);
         await BoardService.markAsViewed(boardId);
       } else {
+        const handleDismiss = () => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/home');
+          }
+        };
         Alert.alert("Error", "Board not found", [
-          { text: "OK", onPress: () => router.back() },
+          { text: "OK", onPress: handleDismiss },
         ]);
       }
     } catch (error) {

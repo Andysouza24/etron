@@ -8,6 +8,7 @@ const schema = require("./service/schema");
 const query = require("./service/query");
 const remote = require("./service/remote");
 const dashboardRawData = require("./service/dashboardRawData");
+const errorReview = require("./service/errorReview");
 
 module.exports = {
     // crud
@@ -18,6 +19,7 @@ module.exports = {
     getDataSourceInWorkspace: crud.getDataSourceInWorkspace,
     getDataSourcesInWorkspace: crud.getDataSourcesInWorkspace,
     deleteDataSourceInWorkspace: crud.deleteDataSourceInWorkspace,
+    toggleDataSourceEnabled: crud.toggleDataSourceEnabled,
 
     // update
     updateDataSourceInWorkspace: update.updateDataSourceInWorkspace,
@@ -27,9 +29,15 @@ module.exports = {
     previewSchemaForSource: schema.previewSchemaForSource,
     confirmSchemaAndProcess: schema.confirmSchemaAndProcess,
 
+    // error review
+    getErrorContext: errorReview.getErrorContext,
+    resolveError: errorReview.resolveError,
+    refreshFromDefaultSchema: errorReview.refreshFromDefaultSchema,
+
     // data queries
     viewData: query.viewData,
     viewDataForMetric: query.viewDataForMetric,
+    previewMetricData: query.previewMetricData,
     updatePartitionedData: query.updatePartitionedData,
 
     // remote diagnostics / previews
@@ -40,5 +48,6 @@ module.exports = {
     // micromax-dashboard manual triggers
     refreshMicromaxDashboardFile: dashboardRawData.refreshMicromaxDashboardFile,
     backfillMicromaxDashboardParent: dashboardRawData.backfillMicromaxDashboardParent,
+    discoverMicromaxDashboardChildren: dashboardRawData.discoverMicromaxDashboardChildren,
     cascadeDeleteMicromaxDashboardChildren: dashboardRawData.cascadeDeleteMicromaxDashboardChildren,
 };

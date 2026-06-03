@@ -41,6 +41,20 @@ const themeColors = {
     darkBackground: '#181C1F',
 }
 
+const trend = {
+    positiveSurface: '#AFEDDD', // chip background for positive trend
+    positiveOnSurface: '#00916B', // onSurface (icon) color for positive trend
+    positiveOnSurfaceText: '#007154', // text color for positive trend
+
+    negativeSurface: '#F6D4DC', // chip background for negative trend
+    negativeOnSurface: '#E23B63', // onSurface (icon) color for negative trend
+    negativeOnSurfaceText: '#BB1E43', // text color for negative trend
+
+    flatSurface: themeColors.lightNeutral, // chip background for no/neutral trend
+    flatOnSurface: themeColors.darkNeutral, // onSurface (icon) color for no/neutral trend
+    flatOnSurfaceText: themeColors.darkNeutral, // text color for no/neutral trend
+}
+
 
 const LightTheme = {
     ...MD3LightTheme,
@@ -83,8 +97,19 @@ const LightTheme = {
         metricsLightBlue: themeColors.lightBlue,
         metricsPurple: themeColors.purple,
 
+        metricsPinkObverse: themeColors.brightPinkObverse,
+        metricsOrangeObverse: themeColors.orangeObverse,
+        metricsYellowObverse: themeColors.yellowObverse,
+        metricsLimeObverse: themeColors.limeObverse,
+        metricsGreenObverse: themeColors.greenObverse,
+        metricsBlueObverse: themeColors.blueObverse,
+        metricsLightBlueObverse: themeColors.lightBlueObverse,
+        metricsPurpleObverse: themeColors.purpleObverse,
+
         lightNeutral: themeColors.lightNeutral,
         darkNeutral: themeColors.darkNeutral,
+
+        trend,
 
         // ---- generated (from M3 Theme Builder) ----
 
@@ -177,6 +202,17 @@ const DarkTheme = {
         metricsBlue: themeColors.blue,
         metricsLightBlue: themeColors.lightBlue,
         metricsPurple: themeColors.purple,
+
+        metricsPinkObverse: themeColors.brightPinkObverse,
+        metricsOrangeObverse: themeColors.orangeObverse,
+        metricsYellowObverse: themeColors.yellowObverse,
+        metricsLimeObverse: themeColors.limeObverse,
+        metricsGreenObverse: themeColors.greenObverse,
+        metricsBlueObverse: themeColors.blueObverse,
+        metricsLightBlueObverse: themeColors.lightBlueObverse,
+        metricsPurpleObverse: themeColors.purpleObverse,
+
+        trend,
 
         // ---- generated (from M3 Theme Builder) ----
         primary: "#FFFFFF",

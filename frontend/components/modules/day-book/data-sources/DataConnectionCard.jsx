@@ -1,35 +1,29 @@
 // Author(s): Holly Wyatt, Noah Bradley
+// Card for non-dashboard data sources (API, database, local CSV, etc.).
+// Per data-source UX refactor:
+//   - test-connection lives on the view-data-source / edit screens only
+//   - settings (cog) lives on the view-data-source screen only
+//   - refresh/rescan is dashboard-only (see DashboardConnectionCard)
+//   - subtitle shows last sync time instead of source type
 
 import { View } from "react-native";
-import { Card, IconButton, Text, useTheme } from "react-native-paper";
+import { Card, IconButton } from "react-native-paper";
 import PermissionGate from "../../../common/PermissionGate";
 import StatusChip from "../../../common/StatusChip";
-import CircularProgress from "../../../common/CircularProgress";
 
 const DataConnectionCard = ({
     label,
     subtitle,
     status,
-    progressStage,
     progressPercent,
     onNavigate,
-    onSync,
     onDelete,
-    onTest,
-    onSettings,
     onViewData,
     onUpload,
     uploading = false,
     viewDataAllowed = false,
     manageDataSourceAllowed = false,
 }) => {
-    const theme = useTheme();
-    const isProcessing = (status || "").toLowerCase() === "processing";
-    const showProgress = false; // moved into the StatusChip; keep section here for future re-enable
-    const fraction = typeof progressPercent === "number"
-        ? Math.max(0, Math.min(1, progressPercent / 100))
-        : undefined;
-
     return (
         <Card style={{ borderRadius: 12, overflow: "hidden" }} onPress={onNavigate}>
             <Card.Title
@@ -43,44 +37,13 @@ const DataConnectionCard = ({
                     />
                 )}
             />
-            {showProgress && (
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 }}>
-                    <CircularProgress
-                        progress={fraction}
-                        size={36}
-                        strokeWidth={4}
-                        accessibilityLabel={progressStage ? `Processing: ${progressStage}` : "Processing"}
-                    />
-                    <View style={{ marginLeft: 12, flex: 1 }}>
-                        <Text variant="labelMedium" style={{ color: theme.colors.onSurface }}>
-                            {progressStage || "Processing"}
-                        </Text>
-                        {typeof progressPercent === "number" && (
-                            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                                {Math.round(progressPercent)}%
-                            </Text>
-                        )}
-                    </View>
-                </View>
-            )}
             <Card.Actions style={{ justifyContent: "space-between", paddingHorizontal: 8, paddingBottom: 8 }}>
                 <View style={{ flexDirection: "row" }}>
-                    {onSync && (status !== "processing" || status !== "pending") &&
-                        <IconButton icon="play-circle" accessibilityLabel="Sync" onPress={onSync} />
-                    }
-                    <PermissionGate allowed={manageDataSourceAllowed}>
-                        <IconButton icon="cog" accessibilityLabel="Settings" onPress={onSettings} />
-                    </PermissionGate>
-                    { status !== "processing" && status !== "pending" &&
-                        <PermissionGate allowed={manageDataSourceAllowed}>
-                            <IconButton icon="lan-pending" accessibilityLabel="Test Connection" onPress={onTest} />
-                        </PermissionGate>
-                    }
-                    { status === "active" &&
+                    {status === "active" && (
                         <PermissionGate allowed={viewDataAllowed} onAllowed={onViewData}>
                             <IconButton icon="table-eye" accessibilityLabel="View Data" />
                         </PermissionGate>
-                    }
+                    )}
                     {onUpload && (
                         <IconButton
                             icon={uploading ? "progress-upload" : "upload"}
@@ -90,9 +53,11 @@ const DataConnectionCard = ({
                         />
                     )}
                 </View>
-                <PermissionGate allowed={manageDataSourceAllowed}>
-                    <IconButton icon="delete-outline" accessibilityLabel="Delete" onPress={onDelete} />
-                </PermissionGate>
+                {onDelete && (
+                    <PermissionGate allowed={manageDataSourceAllowed}>
+                        <IconButton icon="delete-outline" accessibilityLabel="Delete" onPress={onDelete} />
+                    </PermissionGate>
+                )}
             </Card.Actions>
         </Card>
     );

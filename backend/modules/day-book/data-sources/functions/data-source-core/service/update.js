@@ -5,10 +5,12 @@ const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRe
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
 const { getDataSchema, saveSchema } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
+const { notifyDataSourceUpdate } = require("@etron/day-book-shared/utils/notifyDataSourceUpdate");
 
 const {
     PERMISSIONS,
     requirePermission,
+    requireEnabled,
     resolveAndValidateAdapter,
     auditDataSource,
 } = require("./helpers");
@@ -45,6 +47,8 @@ async function updateDataSourceInWorkspace(authUserId, dataSourceId, payload) {
         if (!updated) throw new Error("The data source does not exist");
     }
 
+    await notifyDataSourceUpdate(updated, "UPDATE");
+
     return { ...updated, secrets };
 }
 
@@ -55,9 +59,10 @@ async function updateDataSourceMetadata(authUserId, dataSourceId, { workspaceId,
     if (!dataSource) {
         throw new Error("The data source does not exist");
     }
+    requireEnabled(dataSource);
 
-    if (method && !["overwrite", "extend"].includes(method)) {
-        throw new Error("Please specify the method 'overwrite' or 'extend'");
+    if (method && !["overwrite", "extend", "append-new"].includes(method)) {
+        throw new Error("Please specify the method 'overwrite', 'extend' or 'append-new'");
     }
     if (method === "extend" && expiry && typeof expiry !== "object") {
         throw new Error("Expiry is not in the correct format");
@@ -100,6 +105,7 @@ async function updateColumnDisplaySettings(authUserId, dataSourceId, { workspace
     if (!dataSource) {
         throw new Error("The data source does not exist");
     }
+    requireEnabled(dataSource);
 
     const existingSchema = await getDataSchema(workspaceId, dataSourceId);
     if (Array.isArray(existingSchema) && existingSchema.length > 0) {

@@ -12,7 +12,7 @@ async function streamToString(stream) {
     });
 }
 
-// SQS-triggered handler. Each message body is JSON: { bucket, key, workspaceId, dataSourceId }
+// SQS-triggered handler. Each message body is JSON: { bucket, key, workspaceId, dataSourceId, defaultSchema?, parentDataSourceId?, silent? }
 // fetches the raw JSON file from S3 and runs the standard data-source transform pipeline
 exports.handler = async (event) => {
     const failures = [];
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
             continue;
         }
 
-        const { bucket, key, workspaceId, dataSourceId } = payload;
+        const { bucket, key, workspaceId, dataSourceId, defaultSchema, parentDataSourceId, silent } = payload;
         if (!bucket || !key || !workspaceId || !dataSourceId) {
             console.error('[DashboardRawDataTransform] Missing required fields in payload:', payload);
             failures.push({ itemIdentifier: record.messageId });
@@ -40,7 +40,11 @@ exports.handler = async (event) => {
             const obj = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
             const rawData = await streamToString(obj.Body);
 
-            await processUploadedFile(workspaceId, dataSourceId, rawData);
+            await processUploadedFile(workspaceId, dataSourceId, rawData, {
+                defaultSchema,
+                parentDataSourceId,
+                silent: Boolean(silent),
+            });
 
             console.log(`[DashboardRawDataTransform] Done for ${workspaceId}/${dataSourceId}`);
         } catch (err) {

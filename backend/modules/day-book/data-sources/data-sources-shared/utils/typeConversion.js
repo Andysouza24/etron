@@ -1,7 +1,28 @@
 const parquet = require('parquetjs-lite');
+const parquetTypes = require('parquetjs-lite/lib/types');
 const { Writable } = require('stream');
 const { parseDate, parseWithUserFormat } = require('./dateParser');
 const { sanitiseNumberString } = require('./numberSanitiser');
+
+// parquetjs-lite decodes timestamps as BigInt but its built-in Date conversion crashes on BigInt - patch it to coerce to Number first
+(function patchParquetTimestampDecoding() {
+    const logicalTypes = parquetTypes && parquetTypes.PARQUET_LOGICAL_TYPES;
+    if (!logicalTypes) return;
+
+    const toNumber = (value) => (typeof value === 'bigint' ? Number(value) : +value);
+
+    if (logicalTypes.TIMESTAMP_MILLIS) {
+        logicalTypes.TIMESTAMP_MILLIS.fromPrimitive = function (value) {
+            return new Date(toNumber(value));
+        };
+    }
+    if (logicalTypes.TIMESTAMP_MICROS) {
+        logicalTypes.TIMESTAMP_MICROS.fromPrimitive = function (value) {
+            const micros = typeof value === 'bigint' ? value : BigInt(value);
+            return new Date(Number(micros / 1000n));
+        };
+    }
+})();
 
 // Parquet INT64 range: signed 64-bit. Writing a value outside this range throws ERR_OUT_OF_RANGE.
 const INT64_MAX = 9223372036854775807n; // 2^63 - 1
@@ -58,87 +79,101 @@ async function toParquet(data, schema) {
 
     const writer = await parquet.ParquetWriter.openStream(parquetSchema, writable);
 
-    for (const row of data) {
+    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+        const row = data[rowIndex];
         const castedRow = {};
-        for (const column of schema) {
-            const name = column.name;
-            const type = column.type;
-            let value = row[name];
+        let currentColumn = null;
+        try {
+            for (const column of schema) {
+                const name = column.name;
+                const type = column.type;
+                currentColumn = name;
+                let value = row[name];
 
-            if (value == null) {
-                castedRow[name] = null;
-                continue;
-            }
+                if (value == null) {
+                    castedRow[name] = null;
+                    continue;
+                }
 
-            switch (type) {
-                case "bigint":
-                    const sanitisedBI = sanitiseNumberString(String(value));
-                    const bigintVal = Number.isNaN(Number(sanitisedBI)) ? null : Number(sanitisedBI);
-                    if (bigintVal !== null && Number.isNaN(bigintVal)) {
-                        console.warn(`Warning: NaN detected in bigint column "${name}" with value: ${value}, converting to null`);
-                        castedRow[name] = null;
-                    } else if (bigintVal !== null && !fitsInInt64(sanitisedBI)) {
-                        // Value exceeds INT64 range; cannot be encoded as parquet INT64.
-                        // Null it out instead of crashing the entire batch.
-                        console.warn(`Warning: value out of INT64 range in bigint column "${name}" (value: ${value}), converting to null`);
-                        castedRow[name] = null;
-                    } else {
-                        castedRow[name] = bigintVal;
-                    }
-                    break;
-                case "double":
-                case "decimal(18,2)":
-                    const sanitisedDB = sanitiseNumberString(String(value));
-                    const doubleVal = Number.isNaN(Number(sanitisedDB)) ? null : Number(sanitisedDB);
-                    if (doubleVal !== null && Number.isNaN(doubleVal)) {
-                        console.warn(`Warning: NaN detected in double column "${name}" with value: ${value}, converting to null`);
-                        castedRow[name] = null;
-                    } else {
-                        castedRow[name] = doubleVal;
-                    }
-                    break;
-                case "boolean":
-                    castedRow[name] = Boolean(value);
-                    break;
-                case "timestamp":
-                    // Data arriving here is typically already ISO strings from castDataToSchema.
-                    // Try native Date first (handles ISO strings, epoch numbers, Date objects).
-                    // Only fall back to format-specific parsers for raw data edge cases.
-                    let dateObj;
-
-                    if (value instanceof Date) {
-                        dateObj = value;
-                    } else if (typeof value === 'bigint') {
-                        dateObj = new Date(Number(value));
-                    } else if (typeof value === 'string' || typeof value === 'number') {
-                        dateObj = new Date(value);
-                    }
-
-                    // If native parse failed and we have format hints, try them
-                    if ((!dateObj || isNaN(dateObj.getTime())) && typeof value === 'string') {
-                        dateObj = null;
-                        if (column.userDateFormat) {
-                            const parsed = parseWithUserFormat(value, column.userDateFormat);
-                            if (parsed) dateObj = new Date(parsed);
+                switch (type) {
+                    case "bigint":
+                        const sanitisedBI = sanitiseNumberString(String(value));
+                        const bigintVal = Number.isNaN(Number(sanitisedBI)) ? null : Number(sanitisedBI);
+                        if (bigintVal !== null && Number.isNaN(bigintVal)) {
+                            console.warn(`Warning: NaN detected in bigint column "${name}" with value: ${value}, converting to null`);
+                            castedRow[name] = null;
+                        } else if (bigintVal !== null && !fitsInInt64(sanitisedBI)) {
+                            // Value exceeds INT64 range; cannot be encoded as parquet INT64.
+                            // Null it out instead of crashing the entire batch.
+                            console.warn(`Warning: value out of INT64 range in bigint column "${name}" (value: ${value}), converting to null`);
+                            castedRow[name] = null;
+                        } else {
+                            castedRow[name] = bigintVal;
                         }
-                        if (!dateObj && column.dateFormat) {
-                            const parsed = parseDate(value, column.dateFormat);
-                            if (parsed) dateObj = new Date(parsed);
+                        break;
+                    case "double":
+                    case "decimal(18,2)":
+                        const sanitisedDB = sanitiseNumberString(String(value));
+                        const doubleVal = Number.isNaN(Number(sanitisedDB)) ? null : Number(sanitisedDB);
+                        if (doubleVal !== null && Number.isNaN(doubleVal)) {
+                            console.warn(`Warning: NaN detected in double column "${name}" with value: ${value}, converting to null`);
+                            castedRow[name] = null;
+                        } else {
+                            castedRow[name] = doubleVal;
                         }
-                    }
+                        break;
+                    case "boolean":
+                        castedRow[name] = Boolean(value);
+                        break;
+                    case "timestamp":
+                        // Data arriving here is typically already ISO strings from castDataToSchema.
+                        // Try native Date first (handles ISO strings, epoch numbers, Date objects).
+                        // Only fall back to format-specific parsers for raw data edge cases.
+                        let dateObj;
 
-                    if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
-                        castedRow[name] = dateObj;
-                    } else {
-                        castedRow[name] = null;
-                    }
-                    break;
-                case "string":
-                default:
-                    castedRow[name] = String(value);
+                        if (value instanceof Date) {
+                            dateObj = value;
+                        } else if (typeof value === 'bigint') {
+                            dateObj = new Date(Number(value));
+                        } else if (typeof value === 'string' || typeof value === 'number') {
+                            dateObj = new Date(value);
+                        }
+
+                        // If native parse failed and we have format hints, try them
+                        if ((!dateObj || isNaN(dateObj.getTime())) && typeof value === 'string') {
+                            dateObj = null;
+                            if (column.userDateFormat) {
+                                const parsed = parseWithUserFormat(value, column.userDateFormat);
+                                if (parsed) dateObj = new Date(parsed);
+                            }
+                            if (!dateObj && column.dateFormat) {
+                                const parsed = parseDate(value, column.dateFormat);
+                                if (parsed) dateObj = new Date(parsed);
+                            }
+                        }
+
+                        if (dateObj instanceof Date && !isNaN(dateObj.getTime())) {
+                            castedRow[name] = dateObj;
+                        } else {
+                            castedRow[name] = null;
+                        }
+                        break;
+                    case "string":
+                    default:
+                        castedRow[name] = String(value);
+                }
             }
+            currentColumn = null;
+            await writer.appendRow(castedRow);
+        } catch (originalError) {
+            // Surface row (and column when known) context so callers can produce a user-friendly error message.
+            const baseMessage = originalError && originalError.message ? originalError.message : String(originalError);
+            const wrapped = new Error(baseMessage);
+            wrapped.rowIndex = rowIndex;
+            if (currentColumn) wrapped.columnName = currentColumn;
+            wrapped.cause = originalError;
+            throw wrapped;
         }
-        await writer.appendRow(castedRow);
     }
 
     await writer.close();

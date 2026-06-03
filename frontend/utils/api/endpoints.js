@@ -61,6 +61,7 @@ const endpoints = {
 			delete: (workspaceId, boardId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards/${boardId}`,
 			getBoard: (workspaceId, boardId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards/${boardId}`,
 			getBoards: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards`,
+			getDashboard: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/dashboard`,
 		},
 
 		modules: {
@@ -114,14 +115,22 @@ const endpoints = {
 				previewSchema: `${DATASOURCES_BASE_URL}/preview-schema`,
 				previewSchemaForSource: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/preview-schema`,
 				confirmSchema: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/confirm-schema`,
+				errorContext: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/error-context`,
+				resolveError: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/resolve-error`,
+				refreshDefaultSchema: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/refresh-default-schema`,
 				activate: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/activate`,
+				toggleEnabled: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/toggle-enabled`,
 				viewData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data`,
 				viewDataForMetric: (dataSourceId, metricId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data-for-metric/${metricId}`,
+				previewMetricData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/preview-metric-data`,
 				getUploadUrl: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/upload`,
 				getAvailableSheets: `${DATASOURCES_BASE_URL}/available-sheets`,
 				updateData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/update-data`,
 				refreshDashboardRawData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/dashboard-raw-data/refresh`,
 				rescanMicromaxDashboard: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/micromax-dashboard/rescan`,
+				discoverMicromaxDashboard: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/micromax-dashboard/discover`,
+				rescanTestConnection: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/test-connection/rescan`,
+				discoverTestConnection: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/test-connection/discover`,
 				
 				// google sheets specific endpoints
 				integrations: {

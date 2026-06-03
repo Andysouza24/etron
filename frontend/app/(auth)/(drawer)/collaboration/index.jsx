@@ -60,7 +60,7 @@ const Collaboration = () => {
             label: "Workspace Log",
             description: "Audit log of actions within the workspace",
             onPress: () => router.navigate("collaboration/workspace-log"),
-            permKey: "app.collaboration.app.audit.view_workspace_audit_log"
+            permKey: "app.audit.view_workspace_audit_log"
         }
     ];  
 

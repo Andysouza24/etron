@@ -67,24 +67,27 @@ function generateSchema(data) {
     // for efficently sample a small amount of data
     const sampleData = data.slice(0, 100);
 
+    // for each column, deduce a type from every non-null value in the sample and reconcile mismatches:
+    /*  - compatible numeric types (bigint + double / decimal) widen to the broader numeric type rather than collapsing to string
+        - genuinely mixed types (number + free text) fall back to string. */
     const schema = {};
     for (const row of sampleData) {
         for (const [column, value] of Object.entries(row)) {
             if (value == null || value === "") continue;
-
             const deducedType = deduceType(value, column);
-
             if (!schema[column]) {
                 schema[column] = deducedType;
             } else if (schema[column] !== deducedType) {
-                // fallback to string
-                schema[column] = "string";
+                schema[column] = unifyTypes(schema[column], deducedType, column);
             }
         }
     }
 
-    for (const key of Object.keys(schema)) {
-        if (!schema[key]) schema[key] = "string";
+    // any column that was present but only ever null/empty falls back to string
+    for (const row of sampleData) {
+        for (const column of Object.keys(row)) {
+            if (!schema[column]) schema[column] = "string";
+        }
     }
 
     const result = Object.entries(schema).map(([name, type]) => ({ name, type }));
@@ -150,8 +153,8 @@ function deduceType(value, columnName = "") {
         }
 
         // check for numeric (including comma-formatted like 1,234 or 1,234.56)
-        const sanitised = sanitiseNumberString(trimmed);
-        if (/^-?\d+(\.\d+)?$/.test(sanitised)) {
+        if (isNumericString(trimmed)) {
+            const sanitised = sanitiseNumberString(trimmed);
             if (sanitised.includes(".")) {
                 return isMoneyField(columnName) ? "decimal(18,2)" : "double";
             }
@@ -170,6 +173,26 @@ function deduceType(value, columnName = "") {
 function isMoneyField(columnName) {
     const moneyKeywords = ["balance", "price", "amount", "cost", "total"];
     return moneyKeywords.some(keyword => columnName.toLowerCase().includes(keyword));
+}
+
+// resolve two deduced types for the same column
+// numeric types widen (bigint < double; decimal stays decimal for money fields)
+// any mismatch involving a non-numeric type falls back to string
+function unifyTypes(a, b, columnName = "") {
+    if (a === b) return a;
+
+    const NUMERIC = new Set(["bigint", "double", "decimal(18,2)"]);
+    if (NUMERIC.has(a) && NUMERIC.has(b)) {
+        // any decimal seen, prefer decimal if the column looks like money,
+        // otherwise widen to double - which is the default float type
+        if (a === "decimal(18,2)" || b === "decimal(18,2)") {
+            return isMoneyField(columnName) ? "decimal(18,2)" : "double";
+        }
+        // bigint + double -> double (float covers both)
+        return "double";
+    }
+
+    return "string";
 }
 
 

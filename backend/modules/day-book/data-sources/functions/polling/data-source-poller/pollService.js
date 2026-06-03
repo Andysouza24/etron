@@ -2,105 +2,57 @@
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
-const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
 const adapterFactory = require("@etron/data-sources-shared/adapters/adapterFactory");
-const { saveStoredData, getDataSchema } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
-const { translateData } = require("@etron/data-sources-shared/utils/translateData");
-const { toParquet } = require("@etron/data-sources-shared/utils/typeConversion");
-const { generateSchema } = require("@etron/data-sources-shared/utils/schema");
-const { saveSchemaAndUpdateTable } = require("@etron/data-sources-shared/utils/schema");
-const { appendToStoredData, replaceStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataToSchema");
+const { safeProcessIngest } = require("@etron/data-sources-shared/utils/ingestPipeline");
 
 async function pollDataSource(workspace, dataSource) {
     const allowedTypes = adapterFactory.getAllowedPollingTypes();
 
-    // check if the data source is active and an allowed type
+    // only poll allowed adapter types
     if (!allowedTypes.includes(dataSource.sourceType)) {
         return;
     }
+    // active sources keep polling. Errored sources also poll so they can
+    // recover automatically when the upstream is fixed, and any drift /
+    // processing failure gets tracked in the temp store via safeProcessIngest.
     if (dataSource.status !== "active" && dataSource.status !== "error") {
         return;
     }
 
-    // mark processing so the UI can render a progress bar while the
-    // poll cycle runs. Cleared by the active/error update below.
-    await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
-        status: "processing",
-        errorMessage: null,
-        progressStage: "Polling source",
-        progressPercent: 5,
-    });
+    const workspaceId = workspace.workspaceId;
+    const dataSourceId = dataSource.dataSourceId;
 
+    // adapter failures are routed straight to error - the data never arrived,
+    // so the temp store flow does not apply. Once we have rows, safeProcessIngest
+    // handles translate/validate/drift/parquet/store with full error tracking.
+    let newData;
     try {
-        // get sources secrets
-        const secrets = await dataSourceSecretsRepo.getSecrets(workspace.workspaceId, dataSource.dataSourceId);
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "processing",
+            errorMessage: null,
+            errorType: null,
+            progressStage: "Polling source",
+            progressPercent: 5,
+        });
 
-        // create adapter
+        const secrets = await dataSourceSecretsRepo.getSecrets(workspaceId, dataSourceId);
         const adapter = adapterFactory.getAdapter(dataSource.sourceType);
 
-        // try polling
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Fetching data", percent: 15 });
-        const newData = await retryPoll(adapter, dataSource.config, secrets);
-
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Translating data", percent: 25 });
-        const translatedData = translateData(newData);
-
-        if (translatedData.length === 0) {
-            await dataSourceRepo.updateDataSourceStatus(
-                workspace.workspaceId, 
-                dataSource.dataSourceId, 
-                { status: "no_data", errorMessage: "No data existent" }
-            );
-            return;
-        }
-
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Validating format", percent: 40 });
-        const {valid, error } = validateFormat(translatedData);
-        if (!valid) throw new Error(`Invalid data format: ${error}`);
-
-        // create the schema or honour the user-confirmed schema saved during activateDataSource for the wizard flow
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Generating schema", percent: 55 });
-        const existingSchema = await getDataSchema(workspace.workspaceId, dataSource.dataSourceId);
-        const schema = (Array.isArray(existingSchema) && existingSchema.length)
-            ? existingSchema
-            : generateSchema(translatedData.slice(0, 100));
-
-        // cast rows to the schema
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Casting rows", percent: 70 });
-        const castedData = castDataToSchema(translatedData, schema);
-
-        // convert the data to parquet file
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Writing parquet", percent: 80 });
-        const parquetBuffer = await toParquet(castedData, schema);
-
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Saving data", percent: 90 });
-        if (dataSource.method === "extend") {
-            // extend the data source
-            await appendToStoredData(workspace.workspaceId, dataSource.dataSourceId, castedData, schema);
-        } else {
-            // replace data
-            await replaceStoredData(workspace.workspaceId, dataSource.dataSourceId, parquetBuffer);
-        }
-
-        // save the schema to S3
-        await dataSourceRepo.updateDataSourceProgress(workspace.workspaceId, dataSource.dataSourceId, { stage: "Finalising", percent: 95 });
-        await saveSchemaAndUpdateTable(workspace.workspaceId, dataSource.dataSourceId, schema);
-
-        // update status. Always overwrite because we set "processing" above so
-        // the progress bar would otherwise stay stuck at 95%.
-        await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
-            status: "active",
-            errorMessage: null
-        });
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Fetching data", percent: 15 });
+        newData = await retryPoll(adapter, dataSource.config, secrets);
     } catch (err) {
-        await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
+        console.error(`[Poll] adapter poll failed for ${workspaceId}/${dataSourceId}:`, err.message);
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
             status: "error",
             errorMessage: err.message,
+            errorType: "poll",
         });
         throw err;
     }
+
+    return safeProcessIngest(workspaceId, dataSource, newData, {
+        logPrefix: "[Poll]",
+    });
 }
 
 async function retryPoll(adapter, config, secrets) {

@@ -1,0 +1,65 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesTeam",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesBaseLine",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "gpBaseLine",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "gPPercent",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "salesBudget",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "gpBudget",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "year1",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "YYYY"
+  },
+  {
+    "name": "year2",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "YYYY"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "additionalCOGS",
+    "type": "decimal(18,2)",
+    "category": "value"
+  }
+]

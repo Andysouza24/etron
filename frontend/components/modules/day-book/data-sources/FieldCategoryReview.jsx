@@ -67,6 +67,29 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
         [schema]
     );
 
+    // group contiguous fields sharing the same `group` hint (set by the dashboard sanitiser for flattened nested objects)
+    // ungrouped fields render as their own single-field section so the existing flat layout is unchanged when no hints are present
+    const fieldGroups = useMemo(() => {
+        const seen = new Map();
+        const ordered = [];
+        for (const f of nonSystemFields) {
+            const key = f.group || null;
+            if (!key) {
+                ordered.push({ key: null, label: null, fields: [f] });
+                continue;
+            }
+            const existing = seen.get(key);
+            if (existing) {
+                existing.fields.push(f);
+            } else {
+                const entry = { key, label: humaniseGroupLabel(key), fields: [f] };
+                seen.set(key, entry);
+                ordered.push(entry);
+            }
+        }
+        return ordered;
+    }, [nonSystemFields]);
+
     const getSampleValue = (fieldName) => {
         if (!sampleData || sampleData.length === 0) return "";
         const row = sampleData.find(r => r[fieldName] != null && String(r[fieldName]).trim() !== "");
@@ -206,6 +229,169 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
         return found ? found.label : "Decimal";
     };
 
+    const renderField = (field, showDivider) => {
+        const fieldState = fields[field.name];
+        if (!fieldState) return null;
+        const rawSample = getSampleValue(field.name);
+        const showSymbol =
+            fieldState.category === "value" &&
+            fieldState.currencySymbol &&
+            fieldState.displayCurrencySymbol;
+        const sample = rawSample && showSymbol && !rawSample.includes(fieldState.currencySymbol)
+            ? `${fieldState.currencySymbol}${rawSample}`
+            : rawSample;
+        // strip the `group_` prefix from the display name when the field belongs to a group; the header already conveys the group
+        const displayName = field.group && field.name.startsWith(`${field.group}_`)
+            ? field.name.slice(field.group.length + 1)
+            : field.name;
+
+        return (
+            <View key={field.name}>
+                {showDivider && <Divider style={styles.fieldDivider} />}
+
+                {/* Field name & sample */}
+                <View style={styles.fieldHeader}>
+                    <Text variant="bodyMedium" style={[styles.fieldName, { color: theme.colors.onSurface }]}>
+                        {displayName}
+                    </Text>
+                    {sample ? (
+                        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={1}>
+                            e.g. {sample}
+                        </Text>
+                    ) : null}
+                </View>
+
+                {/* Category chips */}
+                <View style={styles.categoryRow}>
+                    {CATEGORIES.map(cat => (
+                        <Chip
+                            key={cat.key}
+                            selected={fieldState.category === cat.key}
+                            showSelectedOverlay
+                            onPress={() => changeCategory(field.name, cat.key)}
+                            icon={cat.icon}
+                            compact
+                            mode={fieldState.category === cat.key ? "flat" : "outlined"}
+                            style={[
+                                styles.categoryChip,
+                                fieldState.category === cat.key && { backgroundColor: theme.colors.primaryContainer },
+                            ]}
+                            accessibilityLabel={`Set ${field.name} category to ${cat.label}`}
+                        >
+                            {cat.label}
+                        </Chip>
+                    ))}
+                </View>
+
+                {/* Date format picker */}
+                {fieldState.category === "date" && (
+                    <View style={styles.optionsContainer}>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+                            Date format:
+                        </Text>
+                        <Menu
+                            visible={!!formatMenuVisible[field.name]}
+                            onDismiss={() => setFormatMenuVisible(p => ({ ...p, [field.name]: false }))}
+                            contentStyle={{ maxHeight: 350 }}
+                            anchor={
+                                <Pressable
+                                    onPress={() => setFormatMenuVisible(p => ({ ...p, [field.name]: true }))}
+                                    style={[styles.pickerButton, { borderColor: theme.colors.outline }]}
+                                >
+                                    <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
+                                        {getFormatLabel(field.name)}
+                                    </Text>
+                                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>▼</Text>
+                                </Pressable>
+                            }
+                        >
+                            <ScrollView style={{ maxHeight: 340 }} keyboardShouldPersistTaps="always" nestedScrollEnabled>
+                                <Menu.Item title="Auto-detect" leadingIcon="auto-fix" onPress={() => selectDateFormat(field.name, "__auto__")} />
+                                <Divider />
+                                {COMMON_DATE_FORMATS.map(fmt => (
+                                    <Menu.Item key={fmt.value} title={fmt.label} onPress={() => selectDateFormat(field.name, fmt.value)} />
+                                ))}
+                                <Divider />
+                                <Menu.Item title="Custom..." leadingIcon="pencil-outline" onPress={() => selectDateFormat(field.name, "__custom__")} />
+                            </ScrollView>
+                        </Menu>
+
+                        {showCustomFormat[field.name] && (
+                            <View style={styles.customRow}>
+                                <TextInput
+                                    mode="outlined"
+                                    dense
+                                    placeholder="e.g. DD/MM/YYYY HH:mm"
+                                    value={customFormatText[field.name] || ""}
+                                    onChangeText={text => setCustomFormatText(p => ({ ...p, [field.name]: text }))}
+                                    onSubmitEditing={() => applyCustomFormat(field.name)}
+                                    style={styles.customInput}
+                                />
+                                <Pressable
+                                    onPress={() => applyCustomFormat(field.name)}
+                                    style={[styles.applyButton, { backgroundColor: theme.colors.primary }]}
+                                >
+                                    <Text variant="labelSmall" style={{ color: theme.colors.onPrimary }}>Apply</Text>
+                                </Pressable>
+                            </View>
+                        )}
+
+                        {sample ? (
+                            <Text variant="bodySmall" style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]}>
+                                Sample: &quot;{sample}&quot;
+                            </Text>
+                        ) : null}
+                    </View>
+                )}
+
+                {/* Value type picker */}
+                {fieldState.category === "value" && (
+                    <View style={styles.optionsContainer}>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+                            Data type:
+                        </Text>
+                        <Menu
+                            visible={!!typeMenuVisible[field.name]}
+                            onDismiss={() => setTypeMenuVisible(p => ({ ...p, [field.name]: false }))}
+                            anchor={
+                                <Pressable
+                                    onPress={() => setTypeMenuVisible(p => ({ ...p, [field.name]: true }))}
+                                    style={[styles.pickerButton, { borderColor: theme.colors.outline }]}
+                                >
+                                    <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
+                                        {getTypeLabel(field.name)}
+                                    </Text>
+                                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>▼</Text>
+                                </Pressable>
+                            }
+                        >
+                            {VALUE_TYPES.map(t => (
+                                <Menu.Item key={t.value} title={t.label} onPress={() => changeValueType(field.name, t.value)} />
+                            ))}
+                        </Menu>
+
+                        {fieldState.currencySymbol ? (
+                            <View style={styles.currencyToggleRow}>
+                                <Text
+                                    variant="bodySmall"
+                                    style={{ color: theme.colors.onSurface, flex: 1 }}
+                                    numberOfLines={2}
+                                >
+                                    Show {fieldState.currencySymbol} in preview
+                                </Text>
+                                <Switch
+                                    value={!!fieldState.displayCurrencySymbol}
+                                    onValueChange={() => toggleDisplayCurrencySymbol(field.name)}
+                                    accessibilityLabel={`Toggle currency symbol display for ${field.name}`}
+                                />
+                            </View>
+                        ) : null}
+                    </View>
+                )}
+            </View>
+        );
+    };
+
     return (
         <View style={styles.container}>
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
@@ -216,167 +402,37 @@ const FieldCategoryReview = ({ schema, onChange, sampleData = [] }) => {
                 and Dimension. For date fields, choose the format. For value fields, choose the data type.
             </Text>
 
-            {nonSystemFields.map((field, index) => {
-                const fieldState = fields[field.name];
-                if (!fieldState) return null;
-                const rawSample = getSampleValue(field.name);
-                const showSymbol =
-                    fieldState.category === "value" &&
-                    fieldState.currencySymbol &&
-                    fieldState.displayCurrencySymbol;
-                const sample = rawSample && showSymbol && !rawSample.includes(fieldState.currencySymbol)
-                    ? `${fieldState.currencySymbol}${rawSample}`
-                    : rawSample;
-
-                return (
-                    <View key={field.name}>
-                        {index > 0 && <Divider style={styles.fieldDivider} />}
-
-                        {/* Field name & sample */}
-                        <View style={styles.fieldHeader}>
-                            <Text variant="bodyMedium" style={[styles.fieldName, { color: theme.colors.onSurface }]}>
-                                {field.name}
-                            </Text>
-                            {sample ? (
-                                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }} numberOfLines={1}>
-                                    e.g. {sample}
-                                </Text>
-                            ) : null}
-                        </View>
-
-                        {/* Category chips */}
-                        <View style={styles.categoryRow}>
-                            {CATEGORIES.map(cat => (
-                                <Chip
-                                    key={cat.key}
-                                    selected={fieldState.category === cat.key}
-                                    showSelectedOverlay
-                                    onPress={() => changeCategory(field.name, cat.key)}
-                                    icon={cat.icon}
-                                    compact
-                                    mode={fieldState.category === cat.key ? "flat" : "outlined"}
-                                    style={[
-                                        styles.categoryChip,
-                                        fieldState.category === cat.key && { backgroundColor: theme.colors.primaryContainer },
-                                    ]}
-                                    accessibilityLabel={`Set ${field.name} category to ${cat.label}`}
-                                >
-                                    {cat.label}
-                                </Chip>
-                            ))}
-                        </View>
-
-                        {/* Date format picker */}
-                        {fieldState.category === "date" && (
-                            <View style={styles.optionsContainer}>
-                                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
-                                    Date format:
-                                </Text>
-                                <Menu
-                                    visible={!!formatMenuVisible[field.name]}
-                                    onDismiss={() => setFormatMenuVisible(p => ({ ...p, [field.name]: false }))}
-                                    contentStyle={{ maxHeight: 350 }}
-                                    anchor={
-                                        <Pressable
-                                            onPress={() => setFormatMenuVisible(p => ({ ...p, [field.name]: true }))}
-                                            style={[styles.pickerButton, { borderColor: theme.colors.outline }]}
-                                        >
-                                            <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
-                                                {getFormatLabel(field.name)}
-                                            </Text>
-                                            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>▼</Text>
-                                        </Pressable>
-                                    }
-                                >
-                                    <ScrollView style={{ maxHeight: 340 }} keyboardShouldPersistTaps="always" nestedScrollEnabled>
-                                        <Menu.Item title="Auto-detect" leadingIcon="auto-fix" onPress={() => selectDateFormat(field.name, "__auto__")} />
-                                        <Divider />
-                                        {COMMON_DATE_FORMATS.map(fmt => (
-                                            <Menu.Item key={fmt.value} title={fmt.label} onPress={() => selectDateFormat(field.name, fmt.value)} />
-                                        ))}
-                                        <Divider />
-                                        <Menu.Item title="Custom..." leadingIcon="pencil-outline" onPress={() => selectDateFormat(field.name, "__custom__")} />
-                                    </ScrollView>
-                                </Menu>
-
-                                {showCustomFormat[field.name] && (
-                                    <View style={styles.customRow}>
-                                        <TextInput
-                                            mode="outlined"
-                                            dense
-                                            placeholder="e.g. DD/MM/YYYY HH:mm"
-                                            value={customFormatText[field.name] || ""}
-                                            onChangeText={text => setCustomFormatText(p => ({ ...p, [field.name]: text }))}
-                                            onSubmitEditing={() => applyCustomFormat(field.name)}
-                                            style={styles.customInput}
-                                        />
-                                        <Pressable
-                                            onPress={() => applyCustomFormat(field.name)}
-                                            style={[styles.applyButton, { backgroundColor: theme.colors.primary }]}
-                                        >
-                                            <Text variant="labelSmall" style={{ color: theme.colors.onPrimary }}>Apply</Text>
-                                        </Pressable>
-                                    </View>
-                                )}
-
-                                {sample ? (
-                                    <Text variant="bodySmall" style={[styles.previewText, { color: theme.colors.onSurfaceVariant }]}>
-                                        Sample: &quot;{sample}&quot;
-                                    </Text>
-                                ) : null}
-                            </View>
-                        )}
-
-                        {/* Value type picker */}
-                        {fieldState.category === "value" && (
-                            <View style={styles.optionsContainer}>
-                                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
-                                    Data type:
-                                </Text>
-                                <Menu
-                                    visible={!!typeMenuVisible[field.name]}
-                                    onDismiss={() => setTypeMenuVisible(p => ({ ...p, [field.name]: false }))}
-                                    anchor={
-                                        <Pressable
-                                            onPress={() => setTypeMenuVisible(p => ({ ...p, [field.name]: true }))}
-                                            style={[styles.pickerButton, { borderColor: theme.colors.outline }]}
-                                        >
-                                            <Text variant="bodySmall" style={{ color: theme.colors.onSurface, flex: 1 }}>
-                                                {getTypeLabel(field.name)}
-                                            </Text>
-                                            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>▼</Text>
-                                        </Pressable>
-                                    }
-                                >
-                                    {VALUE_TYPES.map(t => (
-                                        <Menu.Item key={t.value} title={t.label} onPress={() => changeValueType(field.name, t.value)} />
-                                    ))}
-                                </Menu>
-
-                                {fieldState.currencySymbol ? (
-                                    <View style={styles.currencyToggleRow}>
-                                        <Text
-                                            variant="bodySmall"
-                                            style={{ color: theme.colors.onSurface, flex: 1 }}
-                                            numberOfLines={2}
-                                        >
-                                            Show {fieldState.currencySymbol} in preview
-                                        </Text>
-                                        <Switch
-                                            value={!!fieldState.displayCurrencySymbol}
-                                            onValueChange={() => toggleDisplayCurrencySymbol(field.name)}
-                                            accessibilityLabel={`Toggle currency symbol display for ${field.name}`}
-                                        />
-                                    </View>
-                                ) : null}
-                            </View>
-                        )}
-                    </View>
-                );
-            })}
+            {fieldGroups.map((group, groupIndex) => (
+                <View key={group.key || `__ungrouped_${groupIndex}`}>
+                    {group.key ? (
+                        <Text
+                            variant="titleSmall"
+                            style={[styles.groupHeader, { color: theme.colors.onSurfaceVariant }]}
+                        >
+                            {group.label}
+                        </Text>
+                    ) : null}
+                    {group.fields.map((field, fieldIndex) => {
+                        // first field overall has no divider; first field inside a labelled group has no divider (header acts as separator)
+                        const isFirstOverall = groupIndex === 0 && fieldIndex === 0;
+                        const isFirstInGroup = !!group.key && fieldIndex === 0;
+                        return renderField(field, !isFirstOverall && !isFirstInGroup);
+                    })}
+                </View>
+            ))}
         </View>
     );
 };
+
+// humanise an envelope/object key into a section header label e.g. "overdue" -> "Overdue", "accountManager" -> "Account Manager"
+function humaniseGroupLabel(key) {
+    if (!key) return "";
+    const withSpaces = key
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+    return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
 
 function inferCategory(type) {
     const DATE_TYPES = ["timestamp", "date", "datetime", "time"];
@@ -399,6 +455,14 @@ const styles = StyleSheet.create({
     description: {
         marginBottom: 16,
         lineHeight: 18,
+    },
+    groupHeader: {
+        fontWeight: "600",
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        marginTop: 16,
+        marginBottom: 8,
+        paddingHorizontal: 4,
     },
     fieldHeader: {
         paddingHorizontal: 4,

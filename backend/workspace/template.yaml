@@ -409,6 +409,13 @@ Resources:
             Method: get
             RestApiId: !Ref eTRONApi
 
+        GetDashboard:
+          Type: Api 
+          Properties:
+            Path: /workspace/{workspaceId}/dashboard
+            Method: get
+            RestApiId: !Ref eTRONApi
+
   # Workspace Deletion Lambda 
   WorkspaceRemovalFunction:
     Type: AWS::Serverless::Function

@@ -100,6 +100,7 @@ const Header = ({
                     <PermissionGate
                         allowed={rightIconPermission}
                         onAllowed={onRightIconPress}
+                        preserveLayoutWhenHidden
                     >
                         <Appbar.Action
                             icon={

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { apiGet } from "../utils/api/apiClient";
-import { endpoints } from "../utils/api/endpoints";
+import endpoints from "../utils/api/endpoints";
 import {
     savePermissionsCache,
     getCachedVersion,
@@ -22,7 +22,7 @@ export function usePermissionSync(workspaceId) {
 
     const checkAndRefresh = useCallback(async (force = false) => {
         if (!workspaceId) return;
-        if (!isCheckingRef.current) return;
+        if (isCheckingRef.current) return;
 
         const now = Date.now();
         if (!force && (now - lastCheckTime) < CHECK_COOLDOWN_MS) return;
@@ -34,19 +34,23 @@ export function usePermissionSync(workspaceId) {
         try {
             // lightweight version check
             const versionResponse = await apiGet(endpoints.workspace.core.getPermissionsVersion(workspaceId));
+            const remote = versionResponse?.data;
 
             // compare with local cache
             const localVersion = await getCachedVersion();
-            if (remote.version === localVersion) return;
+            if (remote?.version === localVersion) return;
 
             // version mismatch -> full fetch
             const fullResponse = await apiGet(endpoints.workspace.core.getEffectivePermissions(workspaceId));
+            const full = fullResponse?.data;
+            if (!full) return;
 
             // update local cache
             await savePermissionsCache({
                 permissions: full.permissions,
                 isOwner: full.isOwner,
-                version: full.version
+                version: full.version,
+                hideGatedComponents: full.hideGatedComponents === true
             });
 
         } catch (error) {

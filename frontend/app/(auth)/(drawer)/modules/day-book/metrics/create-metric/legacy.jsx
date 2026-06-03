@@ -7,7 +7,7 @@ import BasicButton from "../../../../../../../components/common/buttons/BasicBut
 import DataSourceSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/DataSourceSelector";
 import VariableSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/VariableSelector";
 import RowSelector from "../../../../../../../components/modules/day-book/metrics/Selectors/RowSelector";
-import GraphPreview from "../../../../../../../components/modules/day-book/metrics/GraphPreview";
+import MetricGraph from "../../../../../../../components/modules/day-book/metrics/MetricGraph";
 import CustomiseMetricStep from "../../../../../../../components/modules/day-book/metrics/CustomiseMetricStep";
 import DataPreviewModal from "../../../../../../../components/modules/day-book/metrics/modals/DataPreviewModal";
 import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
@@ -16,17 +16,7 @@ import useMetricSubmission from "../../../../../../../hooks/modules/day_book/met
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
 import { legacyStyles } from "../../../../../../../assets/styles/stylesheets/day-book/modules/metrics/legacyMetric";
 import ExistingMetricsModal from "../../../../../../../components/modules/day-book/metrics/modals/ExistingMetricsModal";
-
-function convertToGraphData(rows) {
-    return rows.map((row) => {
-        const newRow = {};
-        for (const [key, value] of Object.entries(row)) {
-            const num = Number(value);
-            newRow[key] = !isNaN(num) ? num : value;
-        }
-        return newRow;
-    });
-}
+import { buildMetricGraphData } from "../../../../../../../utils/metricGraphData";
 
 const CreateLegacyMetric = () => {
     const router = useRouter();
@@ -86,13 +76,21 @@ const CreateLegacyMetric = () => {
         (form.step === 1 && !form.metricName);
 
     // --- graph data for preview ---
-    const graphData = useMemo(() => {
-        const rows =
-            selectedRows.length > 0
-                ? ds.dataSourceData.filter((row) => selectedRows.includes(row[ds.dataSourceVariableNames[0]]))
-                : ds.dataSourceData;
-        return convertToGraphData(rows);
-    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows]);
+    // Mirror the view-metric pipeline so the preview matches the saved metric exactly.
+    const previewConfig = useMemo(() => ({
+        type: selectedMetric,
+        metricType: form.metricType,
+        independentVariable: Array.isArray(chosenIndependentVariable)
+            ? chosenIndependentVariable[0]
+            : chosenIndependentVariable,
+        dependentVariables: dependentArray,
+        selectedRows,
+    }), [selectedMetric, form.metricType, chosenIndependentVariable, dependentArray, selectedRows]);
+
+    const { data: graphData, yKeys: graphYKeys } = useMemo(
+        () => buildMetricGraphData(ds.dataSourceData, previewConfig, ds.dataSourceSchema),
+        [ds.dataSourceData, ds.dataSourceSchema, previewConfig]
+    );
 
     // --- render ---
     const renderConfigStep = () => (
@@ -152,13 +150,15 @@ const CreateLegacyMetric = () => {
         <CustomiseMetricStep
             form={form}
             dependentVariables={dependentArray}
+            independentVariable={Array.isArray(chosenIndependentVariable)
+                ? chosenIndependentVariable[0]
+                : chosenIndependentVariable}
             viewShotRef={viewShotRef}
             graphPreview={({ colours }) => (
-                <GraphPreview
-                    graphType={selectedMetric}
+                <MetricGraph
+                    config={previewConfig}
                     data={graphData}
-                    xKey={chosenIndependentVariable}
-                    yKeys={dependentArray}
+                    yKeys={graphYKeys}
                     colours={colours}
                 />
             )}

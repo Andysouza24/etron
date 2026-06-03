@@ -23,7 +23,7 @@ function translateData(rawData) {
             }
 
         } else if (Array.isArray(rawData)) {
-            if (rawData.length === 0) throw new Error("Empty array received");
+            if (rawData.length === 0) return [];
             if (Array.isArray(rawData[0])) {
                 // 2d array; spreadsheets
                 const headers = rawData[0];

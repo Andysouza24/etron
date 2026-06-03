@@ -4,6 +4,8 @@ import { useTheme } from "react-native-paper";
 import ShimmerPlaceholder from "react-native-shimmer-placeholder";
 import LinearGradient from "react-native-linear-gradient";
 
+// Shimmer placeholder for a board/list card while data loads.
+// The "large" size scales the card height, icons, and text lines up.
 const PlaceholderBoard = ({ size = "small" }) => {
   const theme = useTheme();
   const isLarge = size === "large";

@@ -70,9 +70,9 @@ const Settings = () => {
             scroll={true}
         >
             <StackLayout spacing={12}>
-                {settingButtonMap.map((item) => {
-                    <SettingsItem item={item} />
-                })}
+                {settingButtonMap.map((item) => (
+                    <SettingsItem key={item.label} item={item} />
+                ))}
                 <Text>More options will be added to this page in the future.</Text>
             </StackLayout>
         </ResponsiveScreen>

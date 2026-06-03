@@ -1,0 +1,95 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "call_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "serviceCallSubject",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "jobStatus",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "callType",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesEmployeeName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "quotedAmount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "totalInvoicedAmount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "dateCreated",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "dueDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "managedBy",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "State",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "amountToBeInvoiced",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

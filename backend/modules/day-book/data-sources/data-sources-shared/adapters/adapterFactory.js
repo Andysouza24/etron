@@ -5,6 +5,8 @@ const mysqlAdapter = require("./mysqlAdapter");
 const localCsvAdapter = require("./localCsvAdapter");
 const micromaxDashboardAdapter = require("./micromaxDashboardAdapter");
 const micromaxDashboardFileAdapter = require("./micromaxDashboardFileAdapter");
+const testConnectionAdapter = require("./testConnectionAdapter");
+const testConnectionFileAdapter = require("./testConnectionFileAdapter");
 
 const adapters = {
     "api": customApiAdapter,
@@ -13,7 +15,9 @@ const adapters = {
     "local-csv": localCsvAdapter,
     "micromax-dashboard": micromaxDashboardAdapter,
     "micromax-dashboard-file": micromaxDashboardFileAdapter,
-    
+    "test-connection": testConnectionAdapter,
+    "test-connection-file": testConnectionFileAdapter,
+
 };
 
 function getAdapter(type) {

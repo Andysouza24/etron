@@ -19,7 +19,7 @@ async function uploadReportToS3(filePath, fileUploadUrl) {
             console.log("File uploaded successfully to S3");
             return true;
         } else {
-            console.error(`Upload to S3 failed with response status: ${uploadResult.status}`);
+            console.error(`Upload to S3 failed with response status: ${response.status}`);
             return false;
         }
     } catch (error) {

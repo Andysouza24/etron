@@ -1,19 +1,34 @@
 // Author(s): Holly Wyatt, Noah Bradley
 
 import { SectionList, View, Pressable, StyleSheet } from "react-native";
-import { Text, IconButton, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 
 import ProgressSummary from "../../../common/ProgressSummary";
 import ThemedRefreshControl from "../../../common/ThemedRefreshControl";
 import DataConnectionCard from "./DataConnectionCard";
+import DashboardConnectionCard from "./DashboardConnectionCard";
 import DataSourcesSummary from "./DataSourcesSummary";
 import DataSourcesEmptyState from "./DataSourcesEmptyState";
 
 import formatRelativeTime from "../../../../utils/format/formatRelativeTime";
 import { getAdapterInfo, getCategoryDisplayName } from "../../../../adapters/day-book/data-sources/DataAdapterFactory";
+import featureFlags from "../../../../adapters/day-book/data-sources/featureFlags";
 
-const MICROMAX_PARENT_TYPE = "micromax-dashboard";
-const MICROMAX_FILE_TYPE = "micromax-dashboard-file";
+// Dashboard adapter pairs: each entry pairs a parent source type with its
+// child file source type. Adding a new parent/file pipeline only requires
+// extending this list (and creating the matching adapter on the backend).
+// Pairs can be gated behind a feature flag so they can be hidden from the UI
+// without removing the underlying adapter code.
+const DASHBOARD_PAIRS = [
+	{ parent: "micromax-dashboard", file: "micromax-dashboard-file" },
+	...(featureFlags.testConnection
+		? [{ parent: "test-connection", file: "test-connection-file" }]
+		: []),
+];
+const DASHBOARD_PARENT_TYPES = DASHBOARD_PAIRS.map((p) => p.parent);
+const DASHBOARD_FILE_TYPES = DASHBOARD_PAIRS.map((p) => p.file);
+const isDashboardParentType = (type) => DASHBOARD_PARENT_TYPES.includes(type);
+const isDashboardFileType = (type) => DASHBOARD_FILE_TYPES.includes(type);
 
 const DataSourcesList = ({
 	dataSources,
@@ -27,22 +42,35 @@ const DataSourcesList = ({
 	viewDataAllowed,
 	manageDataSourcesAllowed,
 	onNavigateToView,
-	onNavigateToEdit,
 	onDisconnect,
-	onTest,
 	onPreview,
-	onRescan,
-	onOpenMicromaxSettings,
+	onToggleEnabled,
+	onOpenDashboardSettings,
 }) => {
-	const theme = useTheme();
 
-	const micromaxParent = dataSources.find(
-		(source) => (source.sourceType || source.type) === MICROMAX_PARENT_TYPE
+	// dashboard parents are rendered as single cards that summarise all of their
+	// file children - the children themselves are hidden from this screen and
+	// shown inside the dashboard settings page instead.
+	const dashboardParents = dataSources.filter((source) =>
+		isDashboardParentType(source.sourceType || source.type)
 	);
 
-	const visibleSources = dataSources.filter(
-		(source) => (source.sourceType || source.type) !== MICROMAX_PARENT_TYPE
-	);
+	const childrenByParentId = dataSources.reduce((acc, source) => {
+		const parentId = source.config?.parentDataSourceId;
+		if (parentId) {
+			if (!acc[parentId]) acc[parentId] = [];
+			acc[parentId].push(source);
+		}
+		return acc;
+	}, {});
+
+	// every non-dashboard / non-file-child source feeds the regular sectioned list
+	const visibleSources = dataSources.filter((source) => {
+		const type = source.sourceType || source.type;
+		if (isDashboardParentType(type)) return false;
+		if (isDashboardFileType(type)) return false;
+		return true;
+	});
 
 	const groupedSources = visibleSources.reduce((acc, source) => {
 		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
@@ -52,29 +80,16 @@ const DataSourcesList = ({
 		return acc;
 	}, {});
 
-	if (micromaxParent && !groupedSources[MICROMAX_PARENT_TYPE]) {
-		groupedSources[MICROMAX_PARENT_TYPE] = [];
-	}
-
 	const sections = Object.entries(groupedSources).map(([category, sources]) => {
-		const isMicromax = category === MICROMAX_PARENT_TYPE;
-		const showSettings = isMicromax && !!micromaxParent && manageDataSourcesAllowed;
-		const emptyMessage = isMicromax
-			? "No files have been received yet. Files uploaded to the export bucket will appear here automatically."
-			: null;
 		const processingCount = sources.filter(
 			(s) => (s.status || "").toLowerCase() === "processing"
 		).length;
-		const data = sources.length === 0 && emptyMessage
-			? [{ __empty: true, emptyMessage, dataSourceId: `${category}-empty` }]
-			: sources;
 		return {
 			key: category,
 			category,
 			totalCount: sources.length,
 			processingCount,
-			showSettings,
-			data,
+			data: sources,
 		};
 	});
 
@@ -82,17 +97,17 @@ const DataSourcesList = ({
 		const adapterInfo = getAdapterInfo(source.sourceType || source.type);
 		if (!adapterInfo) return null;
 
-		const sourceType = source.sourceType || source.type;
-		const isMicromaxFile = sourceType === MICROMAX_FILE_TYPE;
 		const isRefreshingThis = refreshingSourceId === source.dataSourceId;
+		const isEnabled = source.enabled !== false;
 
-		const typeLabel = adapterInfo.displayName || adapterInfo.name || sourceType;
-		const lastSyncText = source.lastUpdate ? `Last sync: ${formatRelativeTime(source.lastUpdate)}` : undefined;
+		// per spec: cards show last updated/synced time instead of the type label
 		const subtitle = isRefreshingThis
-			? `${typeLabel} - Refreshing...`
-			: lastSyncText
-				? `${typeLabel} - ${lastSyncText}`
-				: typeLabel;
+			? "Refreshing..."
+			: !isEnabled
+				? "Disabled"
+				: source.lastUpdate
+					? `Last sync: ${formatRelativeTime(source.lastUpdate)}`
+					: "Not synced yet";
 
 		return (
 			<View style={styles.cardSpacing}>
@@ -100,18 +115,10 @@ const DataSourcesList = ({
 					label={source.name}
 					subtitle={subtitle}
 					status={source.status}
-					progressStage={source.progressStage}
 					progressPercent={source.progressPercent}
 					onNavigate={() => onNavigateToView(source)}
-					onDelete={isMicromaxFile ? undefined : () => onDisconnect(source)}
-					onTest={isMicromaxFile ? undefined : () => onTest(source)}
-					onSettings={() => onNavigateToEdit(source)}
+					onDelete={() => onDisconnect(source)}
 					onViewData={() => onPreview(source)}
-					onSync={
-						isMicromaxFile && manageDataSourcesAllowed && !isRefreshingThis
-							? () => onRescan(source)
-							: undefined
-					}
 					viewDataAllowed={viewDataAllowed}
 					manageDataSourceAllowed={manageDataSourcesAllowed}
 				/>
@@ -119,18 +126,33 @@ const DataSourcesList = ({
 		);
 	};
 
-	const renderItem = ({ item }) => {
-		if (item?.__empty) {
-			return (
-				<Pressable>
-					<Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
-						{item.emptyMessage}
-					</Text>
-				</Pressable>
-			);
-		}
-		return renderDataSourceCard(item);
+	const renderDashboardParentCard = (parent) => {
+		const children = childrenByParentId[parent.dataSourceId] || [];
+		const isEnabled = parent.enabled !== false;
+		const fileLabel = `${children.length} file${children.length === 1 ? "" : "s"}`;
+		const subtitle = !isEnabled
+			? "Disabled"
+			: parent.lastUpdate
+				? `${fileLabel} · Last sync ${formatRelativeTime(parent.lastUpdate)}`
+				: fileLabel;
+
+		return (
+			<View key={parent.dataSourceId} style={styles.cardSpacing}>
+				<DashboardConnectionCard
+					label={parent.name || getCategoryDisplayName(parent.sourceType)}
+					subtitle={subtitle}
+					status={parent.status}
+					progressPercent={parent.progressPercent}
+					enabled={isEnabled}
+					onNavigate={() => onOpenDashboardSettings?.(parent)}
+					onToggleEnabled={(next) => onToggleEnabled?.(parent, next)}
+					manageDataSourceAllowed={manageDataSourcesAllowed}
+				/>
+			</View>
+		);
 	};
+
+	const renderItem = ({ item }) => renderDataSourceCard(item);
 
 	const renderSectionHeader = ({ section }) => {
 		const showProgress = section.totalCount > 0 && section.processingCount > 0;
@@ -141,14 +163,6 @@ const DataSourcesList = ({
 					<Text variant="titleMedium" style={styles.sectionTitle}>
 						{getCategoryDisplayName(section.category)} ({section.totalCount})
 					</Text>
-					{section.showSettings && (
-						<IconButton
-							icon="cog-outline"
-							size={20}
-							onPress={onOpenMicromaxSettings}
-							accessibilityLabel={`${getCategoryDisplayName(section.category)} settings`}
-						/>
-					)}
 				</View>
 				{showProgress && (
 					<ProgressSummary
@@ -160,6 +174,22 @@ const DataSourcesList = ({
 			</Pressable>
 		);
 	};
+
+	const ListHeader = (
+		<>
+			{dataSources.length > 0 ? (
+				<Pressable>
+					<DataSourcesSummary
+						total={dataSources.length}
+						activeCount={activeCount}
+						errorCount={errorCount}
+						lastRefreshAt={lastRefreshAt}
+					/>
+				</Pressable>
+			) : null}
+			{dashboardParents.map(renderDashboardParentCard)}
+		</>
+	);
 
 	return (
 		<SectionList
@@ -183,23 +213,14 @@ const DataSourcesList = ({
 					title="Pull to refresh"
 				/>
 			}
-			ListHeaderComponent={
-				dataSources.length > 0 ? (
-					<Pressable>
-						<DataSourcesSummary
-							total={dataSources.length}
-							activeCount={activeCount}
-							errorCount={errorCount}
-							lastRefreshAt={lastRefreshAt}
-						/>
+			ListHeaderComponent={ListHeader}
+			ListEmptyComponent={
+				!loading && dashboardParents.length === 0 ? (
+					<Pressable style={styles.emptyContainer}>
+						<DataSourcesEmptyState />
 					</Pressable>
 				) : null
 			}
-			ListEmptyComponent={!loading ? (
-				<Pressable style={styles.emptyContainer}>
-					<DataSourcesEmptyState />
-				</Pressable>
-			) : null}
 		/>
 	);
 };

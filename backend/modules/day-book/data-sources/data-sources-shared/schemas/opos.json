@@ -1,0 +1,64 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "itemNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "itemDescription",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "purchaseOrder",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "dueDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "supplierCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "supplierName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "outstandingQty",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "rowNumber",
+    "type": "string",
+    "category": "dimension"
+  }
+]

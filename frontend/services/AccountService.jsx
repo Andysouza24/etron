@@ -79,13 +79,13 @@ class AccountService {
                     this.showMessage(`Successfully linked ${userInfo.email}`);
                 }
                 } catch (storageError) {
-                console.error('Failed to store linked account:', storageError);
+                console.error('[AccountService] Failed to store linked account:', storageError);
                 this.showMessage('Account linked but failed to save locally', true);
                 }
                 this.isLinking = false;
             }
         } catch (error) {
-            console.error('Error handling auth success:', error);
+            console.error('[AccountService] Error handling auth success:', error);
             this.showMessage('Authentication successful but failed to update account info', true);
         }
     }
@@ -99,7 +99,7 @@ class AccountService {
             console.log("User signed out successfully.");
             return { success: true };
         } catch (error) {
-            console.error("Error signing out:", error);
+            console.error('[AccountService] Error signing out:', error);
             this.showMessage("Error signing out previous user. Please try again.", true);
             return { success: false, error: error.message };
         }
@@ -115,7 +115,7 @@ class AccountService {
             // Handle auth success and account linking
             await this.handleAuthSuccess('Cognito');
             
-            this.navigate("(auth)/dashboard");
+            this.navigate("(auth)/home");
             return { success: true, result };
         } catch (error) {
             console.log('Error signing in:', error);
@@ -287,7 +287,7 @@ class AccountService {
                             // Handle auth success and account linking (will also fetch workspace)
                             await this.handleAuthSuccess(provider);
                             
-                            this.navigate("(auth)/dashboard");
+                            this.navigate("(auth)/home");
                             resolve({ success: true, user });
                         } catch (error) {
                             console.log('No authenticated user found after social sign-in');
@@ -356,7 +356,7 @@ class AccountService {
             });
             return { success: true };
         } catch (error) {
-            console.error('Error switching account:', error);
+            console.error('[AccountService] Error switching account:', error);
             this.showMessage('Error switching accounts', true);
             return { success: false, error: error.message };
         }

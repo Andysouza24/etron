@@ -2,6 +2,8 @@ import { getAdapterInfo, createDataAdapter } from "../adapters/day-book/data-sou
 import endpoints from "../utils/api/endpoints";
 import AuthService from "./AuthService";
 import { getWorkspaceId as getSavedWorkspaceId } from "../storage/workspaceStorage";
+import { sanitize } from "./dataSource/dataSourceConfig";
+import { testConnection as testConnectionWorkflow, connectDataSource as connectDataSourceWorkflow } from "./dataSource/dataSourceConnections";
 
 
 class DataSourceService {
@@ -66,18 +68,26 @@ class DataSourceService {
             console.log('[DataSourceService] getConnectedDataSources data preview', preview);
           } catch {}
         } catch (error) {
-          // Error details for the outgoing request
-          console.error('[DataSourceService] getConnectedDataSources GET failed', {
-            endpointUrl,
-            params,
-            status: error?.response?.status,
-            message: error?.message,
-            responseDataType: typeof error?.response?.data,
-          });
-          try {
-            const errPreview = (() => { const d = error?.response?.data; try { return JSON.stringify(d)?.slice(0, 400); } catch { return String(d)?.slice(0, 400); } })();
-            console.error('[DataSourceService] getConnectedDataSources error data preview', errPreview);
-          } catch {}
+          const status = error?.response?.status;
+          const isPermissionError = status === 400 && (
+            error?.response?.data?.error?.includes('permission') ||
+            error?.response?.data?.message?.includes('permission') ||
+            error?.message?.includes('permission')
+          );
+          if (!isPermissionError) {
+            // Error details for the outgoing request
+            console.error('[DataSourceService] getConnectedDataSources GET failed', {
+              endpointUrl,
+              params,
+              status,
+              message: error?.message,
+              responseDataType: typeof error?.response?.data,
+            });
+            try {
+              const errPreview = (() => { const d = error?.response?.data; try { return JSON.stringify(d)?.slice(0, 400); } catch { return String(d)?.slice(0, 400); } })();
+              console.error('[DataSourceService] getConnectedDataSources error data preview', errPreview);
+            } catch {}
+          }
           let backendMsg = '';
           if (error?.response?.data) {
             if (typeof error.response.data === 'string') {
@@ -87,7 +97,6 @@ class DataSourceService {
             }
           }
           if (!backendMsg) backendMsg = error?.message || 'Unknown error';
-          const status = error?.response?.status;
           if (status === 400) {
             throw new Error(`Server error 400: ${backendMsg}`);
           }
@@ -347,248 +356,12 @@ class DataSourceService {
   }
 
   async connectDataSource(type, config, name) {
-    const key = `${type}::${name}::${config?.url || config?.connectionString || ''}`;
-    if (this._connectInFlight.has(key)) {
-      console.log('[DataSourceService] connectDataSource deduped (in-flight)', { key });
-      return this._connectInFlight.get(key);
-    }
-  const run = async () => {
-  // Always real connection, no demo branch
-  try {
-      console.log('[DataSourceService] connectDataSource calling testConnection', { type, name });
-      let connectionData;
-      try {
-        connectionData = await this.testConnection(type, config, name);
-      } catch (e) {
-        console.warn('[DataSourceService] testConnection failed, proceeding to create anyway', { message: e?.message });
-        connectionData = { status: 'skipped', error: e?.message };
-      }
-
-      console.log('[DataSourceService] connectDataSource - test result', {
-        type,
-        connectionDataSummary: {
-          status: connectionData?.status,
-          testResultKeys: connectionData?.testResult ? Object.keys(connectionData.testResult) : null,
-          sampleDataDemoFlag: connectionData?.testResult?.sampleData?.demoMode,
-          demoModeFlag: connectionData?.testResult?.demoMode,
-        }
-      });
-
-  // prepare payload matching backend contract
-      // query param: workspaceId
-      // body: { name, type, config }
-      // NOTE: endpoints file exposes addRemote / addLocal (no generic 'add')
-      const dataSourceEndpoints = endpoints?.modules?.day_book?.data_sources || {};
-      let endpointUrl = null;
-      // choose local vs remote creation endpoint (defaults to remote)
-      if (config?.isLocal || config?.mode === 'local') {
-        endpointUrl = this.resolveEndpoint(dataSourceEndpoints.addLocal);
-      } else {
-        endpointUrl = this.resolveEndpoint(dataSourceEndpoints.addRemote);
-      }
-      if (!endpointUrl) {
-        console.error('[DataSourceService] connectDataSource no add endpoint configured', { availableKeys: Object.keys(dataSourceEndpoints) });
-        throw new Error('Data source add endpoint not configured');
-      }
-  const sanitize = (obj) => {
-        if (!obj || typeof obj !== 'object') return obj;
-        const out = Array.isArray(obj) ? [] : {};
-        Object.entries(obj).forEach(([k, v]) => {
-          if (v === undefined) return; // drop undefined
-          if (v && typeof v === 'object') out[k] = sanitize(v);
-          else out[k] = v;
-        });
-        return out;
-      };
-
-      // Normalize adapter type to API contract (e.g., 'custom-api' -> 'api')
-      // TODO: fix this, so it is just api
-      const normalizeType = (t) => {
-        if (!t) return t;
-        const map = { 'custom-api': 'api', 'csv-file': 'csv', 'custom-ftp': 'ftp' };
-        return map[t] || t;
-      };
-
-  // build config + secrets payload per backend contract:
-  // remote create expects: { name, sourceType, method, expiry, config, secrets }
-  const buildConfigAndSecrets = (cfg, srcType) => {
-        const clone = cfg ? { ...cfg } : {};
-        // Try to parse possible stringified fields
-        const parseMaybeJSON = (val) => {
-          if (val == null) return val;
-          if (typeof val !== 'string') return val;
-          try { return JSON.parse(val); } catch { return val; }
-        };
-        const authRaw = parseMaybeJSON(clone.authentication);
-        // Normalize auth: allow plain string to represent an API key
-        let auth = null;
-        if (authRaw && typeof authRaw === 'object') auth = authRaw;
-        else if (typeof authRaw === 'string' && authRaw.trim()) auth = { type: 'apiKey', value: authRaw.trim() };
-
-        // Derive authType per contract (map 'apikey' -> 'apiKey')
-        const authType = (() => {
-          const t = auth?.type || clone.authType;
-          if (!t) return undefined; // allow no-auth
-          const lc = String(t).toLowerCase();
-          if (lc === 'apikey') return 'apiKey';
-          if (lc === 'jwt' || lc === 'jwt bearer' || lc === 'jwt-bearer') return 'bearer';
-          return String(t);
-        })();
-
-  // Dashboard raw data: simple { fileName, description } config, no secrets.
-  if ((srcType || '').toLowerCase() === 'dashboard-raw-data') {
-          const fileName = clone.fileName?.trim();
-          const description = clone.description?.trim();
-          const configOut = sanitize({ fileName, description });
-          return { configOut, secrets: {} };
-        }
-
-  // parent connection - no config, no secrets
-  // pipeline auto discovers files in bucket and creates child data sources for each
-  if ((srcType || '').toLowerCase() === 'micromax-dashboard') {
-          return { configOut: {}, secrets: {} };
-        }
-
-  // MySQL: include hostname and database fields; keep password in secrets only
-  if ((srcType || '').toLowerCase() === 'mysql') {
-          const hostname = clone.hostname || clone.host || clone.server;
-          const port = clone.port != null ? String(clone.port) : '3306';
-          const username = clone.username;
-          const database = clone.databaseName || clone.database;
-
-          const secrets = {};
-          const user = clone.secrets?.username ?? clone.username;
-          if (user != null) secrets.username = String(user);
-          const pw = clone.password ?? clone.secrets?.password;
-          if (pw != null) secrets.password = String(pw);
-
-          const configOut = sanitize({ hostname, port, username, database, databaseName: database });
-          return { configOut, secrets };
-        }
-
-        // FTP: include hostname, port, filePath in config; secrets include username/password (+ optional keyFile)
-        if ((srcType || '').toLowerCase() === 'ftp') {
-          const hostname = clone.hostname || clone.host;
-          const port = clone.port != null ? String(clone.port) : '21';
-          const filePath = clone.filePath || clone.directory || '/';
-          const configOut = sanitize({ hostname, port, filePath });
-
-          const secrets = {};
-          const user = clone.secrets?.username ?? clone.username;
-          const pw = clone.secrets?.password ?? clone.password;
-          const keyFile = clone.secrets?.keyFile ?? clone.keyFile;
-          if (user != null) secrets.username = String(user);
-          if (pw != null) secrets.password = String(pw);
-          if (keyFile != null) secrets.keyFile = String(keyFile);
-          return { configOut, secrets };
-        }
-
-        // Default API-like case
-        // endpoint is optional in contract -- default to empty string to match example
-        const endpoint = clone.endpoint ?? clone.url ?? '';
-
-        const secrets = {};
-        switch ((authType || '').toLowerCase()) {
-          case 'apikey': {
-            // Use provided authentication value as apiKey; do not infer from URL/connectionString
-            const apiKeyValue = (auth && auth.value != null)
-              ? auth.value
-              : (typeof authRaw === 'string' && authRaw.trim())
-                ? authRaw.trim()
-                : (clone.apiKey ?? clone.secrets?.apiKey);
-            if (apiKeyValue != null) secrets.apiKey = String(apiKeyValue);
-            break;
-          }
-          case 'bearer': {
-            if (auth?.token != null) secrets.token = String(auth.token);
-            else if (clone.token != null) secrets.token = String(clone.token);
-            else if (clone.secrets?.token != null) secrets.token = String(clone.secrets.token);
-            break;
-          }
-          case 'basic': {
-            if (auth?.username != null) secrets.username = String(auth.username);
-            if (auth?.password != null) secrets.password = String(auth.password);
-            if (clone.username != null) secrets.username = String(clone.username);
-            if (clone.password != null) secrets.password = String(clone.password);
-            if (clone.secrets?.username != null) secrets.username = String(clone.secrets.username);
-            if (clone.secrets?.password != null) secrets.password = String(clone.secrets.password);
-            break;
-          }
-          case 'query': {
-            if (auth?.value != null) secrets.token = String(auth.value);
-            else if (clone.secrets?.token != null) secrets.token = String(clone.secrets.token);
-            break;
-          }
-          default: {
-            // No secrets
-          }
-        }
-        const configOut = sanitize({ authType, endpoint });
-        return { configOut, secrets };
-      };
-
-      const normalizedType = normalizeType(type);
-      const { configOut, secrets } = buildConfigAndSecrets(config, normalizedType);
-
-      const payload = sanitize({
-        name,
-        sourceType: normalizedType,
-        method: config?.method || 'overwrite',
-        config: configOut || {},
-        secrets: secrets && Object.keys(secrets).length ? secrets : undefined,
-      });
-
-  const workspaceId = await getSavedWorkspaceId();
-  console.log('[DataSourceService] DEBUG workspaceId for add:', workspaceId);
-  console.log('[DataSourceService] DEBUG payload for add:', JSON.stringify(payload));
-  if (!workspaceId) throw new Error('No workspace selected');
-  // include workspaceId in body as fallback
-  payload.workspaceId = workspaceId;
-  console.log('[DataSourceService] createDataSource POST', { endpointUrl, workspaceId, payloadSummary: { name: payload.name, sourceType: payload.sourceType, hasSecrets: !!payload.secrets, hasPassword: !!(payload.secrets && payload.secrets.password), endpoint: payload.config?.endpoint, hostname: payload.config?.hostname, databaseName: payload.config?.databaseName || payload.config?.database, filePath: payload.config?.filePath } });
-  try {
-    const response = await this.apiClient.post(endpointUrl, payload, { params: { workspaceId } });
-        // Normalize response in case server returns raw object vs { data }
-        const created = response?.data ?? response;
-        if (!created || typeof created !== 'object') {
-          throw new Error('Backend did not return a created resource');
-        }
-        const normalize = (s) => {
-          const typeVal = s?.type || s?.sourceType || s?.adapterType || payload.sourceType;
-          const nameVal = s?.name || payload.name;
-          const status = s?.status || 'active';
-          const id = s?.id || s?._id || s?.dataSourceId || null;
-          const configVal = s?.config || payload.config || {};
-          return { ...s, id, type: typeVal, name: nameVal, status, config: configVal };
-        };
-        const normalized = normalize(created);
-        if (!normalized.id) {
-          throw new Error('Backend did not return a resource id');
-        }
-        return normalized;
-      } catch (postErr) {
-        // Surface full error details for debugging
-        console.error('[DataSourceService] createDataSource POST failed', {
-          endpointUrl,
-          payload,
-          errorMessage: postErr?.message,
-          errorResponse: postErr?.response || null,
-          fullError: postErr
-        });
-        if (postErr?.response) {
-          console.error('[DataSourceService] POST error response data:', postErr.response.data);
-        }
-        throw postErr;
-      }
-  } catch (error) {
-      throw error;
-    }
-    };
-    const promise = run().finally(() => {
-      // Clear in-flight key after completion
-      this._connectInFlight.delete(key);
-    });
-    this._connectInFlight.set(key, promise);
-    return promise;
+    return connectDataSourceWorkflow({
+      apiClient: this.apiClient,
+      resolveEndpoint: (epOrFn, ...args) => this.resolveEndpoint(epOrFn, ...args),
+      connectInFlight: this._connectInFlight,
+      testConnection: (t, c, n) => this.testConnection(t, c, n),
+    }, type, config, name);
   }
 
   async updateDataSource(sourceId, updates) {
@@ -606,17 +379,6 @@ class DataSourceService {
       throw new Error(`Demo source ${sourceId} not found`);
     }
     try {
-      // Log the outgoing update payload and target endpoint
-      const sanitize = (obj) => {
-        if (!obj || typeof obj !== 'object') return obj;
-        const out = Array.isArray(obj) ? [] : {};
-        Object.entries(obj).forEach(([k, v]) => {
-          if (v === undefined) return; // drop undefined
-          if (v && typeof v === 'object') out[k] = sanitize(v);
-          else out[k] = v;
-        });
-        return out;
-      };
       const workspaceId = await getSavedWorkspaceId();
       if (!workspaceId) throw new Error('No workspace selected');
   const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.update, sourceId);
@@ -649,17 +411,24 @@ class DataSourceService {
     }
   }
 
-  async rescanMicromaxDashboard(parentSourceId) {
+  async rescanMicromaxDashboard(parentSourceId, sourceType = "micromax-dashboard") {
     try {
       const workspaceId = await getSavedWorkspaceId();
       if (!workspaceId) throw new Error('No workspace selected');
-      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.rescanMicromaxDashboard, parentSourceId);
-      console.log('[DataSourceService] rescanMicromaxDashboard POST', { endpointUrl, workspaceId, parentSourceId });
+      // pick the rescan endpoint based on the parent connection's source type
+      // (micromax-dashboard and test-connection share the same rescan/discover
+      // behaviour but live under different URL prefixes)
+      const endpointBuilder =
+        sourceType === "test-connection"
+          ? endpoints.modules.day_book.data_sources.rescanTestConnection
+          : endpoints.modules.day_book.data_sources.rescanMicromaxDashboard;
+      const endpointUrl = this.resolveEndpoint(endpointBuilder, parentSourceId);
+      console.log('[DataSourceService] rescanMicromaxDashboard POST', { endpointUrl, workspaceId, parentSourceId, sourceType });
       const response = await this.apiClient.post(endpointUrl, { workspaceId });
       return response.data;
     } catch (err) {
       console.error('[DataSourceService] rescanMicromaxDashboard:', err);
-      throw new Error(err?.response?.data?.error || 'Failed to rescan Micromax Dashboard files');
+      throw new Error(err?.response?.data?.error || 'Failed to rescan dashboard files');
     }
   }
 
@@ -678,143 +447,77 @@ class DataSourceService {
     }
   }
 
-  async testConnection(type, config, name) {
+  async toggleDataSourceEnabled(sourceId, enabled) {
     try {
-      // Build payload per backend contract
-      const sanitize = (obj) => {
-        if (!obj || typeof obj !== 'object') return obj;
-        const out = Array.isArray(obj) ? [] : {};
-        Object.entries(obj).forEach(([k, v]) => {
-          if (v === undefined) return;
-          if (v && typeof v === 'object') out[k] = sanitize(v);
-          else out[k] = v;
-        });
-        return out;
-      };
-      const normalizeType = (t) => {
-        if (!t) return t;
-        const map = { 'custom-api': 'api', 'csv-file': 'csv', 'custom-ftp': 'ftp' };
-        return map[t] || t;
-      };
-  const buildConfigAndSecrets = (cfg, srcType) => {
-        const clone = cfg ? { ...cfg } : {};
-        const parseMaybeJSON = (val) => {
-          if (val == null) return val;
-          if (typeof val !== 'string') return val;
-          try { return JSON.parse(val); } catch { return val; }
-        };
-        const authRaw = parseMaybeJSON(clone.authentication);
-        let auth = null;
-        if (authRaw && typeof authRaw === 'object') auth = authRaw;
-        else if (typeof authRaw === 'string' && authRaw.trim()) auth = { type: 'apiKey', value: authRaw.trim() };
-        const authType = (() => {
-          const t = auth?.type || clone.authType;
-          if (!t) return undefined; // allow no-auth
-          const lc = String(t).toLowerCase();
-          if (lc === 'apikey') return 'apiKey';
-          if (lc === 'jwt' || lc === 'jwt bearer' || lc === 'jwt-bearer') return 'bearer';
-          return String(t);
-        })();
-  // MySQL specific mapping first
-  if ((srcType || '').toLowerCase() === 'mysql') {
-          const hostname = clone.hostname || clone.host || clone.server;
-          const port = clone.port != null ? String(clone.port) : '3306';
-          const username = clone.username;
-          const database = clone.databaseName || clone.database;
-          const secrets = {};
-          const user = clone.secrets?.username ?? clone.username;
-          if (user != null) secrets.username = String(user);
-          const pw = clone.password ?? clone.secrets?.password;
-          if (pw != null) secrets.password = String(pw);
-          const configOut = { hostname, port, username, database, databaseName: database };
-          return { configOut, secrets };
-        }
-
-        // FTP mapping
-        if ((srcType || '').toLowerCase() === 'ftp') {
-          const hostname = clone.hostname || clone.host;
-          const port = clone.port != null ? String(clone.port) : '21';
-          const filePath = clone.filePath || clone.directory || '/';
-          const configOut = { hostname, port, filePath };
-          const secrets = {};
-          const user = clone.secrets?.username ?? clone.username;
-          const pw = clone.secrets?.password ?? clone.password;
-          const keyFile = clone.secrets?.keyFile ?? clone.keyFile;
-          if (user != null) secrets.username = String(user);
-          if (pw != null) secrets.password = String(pw);
-          if (keyFile != null) secrets.keyFile = String(keyFile);
-          return { configOut, secrets };
-        }
-        const endpoint = clone.endpoint ?? clone.url ?? '';
-        const secrets = {};
-        switch ((authType || '').toLowerCase()) {
-          case 'apikey': {
-            const apiKeyValue = (auth && auth.value != null)
-              ? auth.value
-              : (typeof authRaw === 'string' && authRaw.trim())
-                ? authRaw.trim()
-        : (clone.apiKey ?? clone.secrets?.apiKey);
-            if (apiKeyValue != null) secrets.apiKey = String(apiKeyValue);
-            break;
-          }
-          case 'bearer': {
-      if (auth?.token != null) secrets.token = String(auth.token);
-      else if (clone.token != null) secrets.token = String(clone.token);
-      else if (clone.secrets?.token != null) secrets.token = String(clone.secrets.token);
-            break;
-          }
-          case 'basic': {
-      if (auth?.username != null) secrets.username = String(auth.username);
-      if (auth?.password != null) secrets.password = String(auth.password);
-      if (clone.username != null) secrets.username = String(clone.username);
-      if (clone.password != null) secrets.password = String(clone.password);
-      if (clone.secrets?.username != null) secrets.username = String(clone.secrets.username);
-      if (clone.secrets?.password != null) secrets.password = String(clone.secrets.password);
-            break;
-          }
-          case 'query': {
-      if (auth?.value != null) secrets.token = String(auth.value);
-      else if (clone.secrets?.token != null) secrets.token = String(clone.secrets.token);
-            break;
-          }
-          default: {}
-        }
-        const configOut = sanitize({ authType, endpoint });
-        return { configOut, secrets };
-      };
-
-      const { configOut, secrets } = buildConfigAndSecrets(config, normalizeType(type));
-      const payload = sanitize({
-        name,
-        sourceType: normalizeType(type),
-        config: configOut || {},
-        secrets: secrets && Object.keys(secrets).length ? secrets : undefined,
-      });
-
       const workspaceId = await getSavedWorkspaceId();
       if (!workspaceId) throw new Error('No workspace selected');
-      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.testConnection);
-      console.log(payload);
-  console.log('[DataSourceService] testConnection POST', { endpointUrl, workspaceId, payloadSummary: { type: payload.sourceType, hasConfig: !!payload.config, hasPassword: !!(payload.secrets && payload.secrets.password), endpoint: payload.config?.endpoint, hostname: payload.config?.hostname, databaseName: payload.config?.databaseName || payload.config?.database, filePath: payload.config?.filePath } });
-      const response = await this.apiClient.post(endpointUrl, payload, { params: { workspaceId } });
-      const testResult = response?.data ?? response;
-      console.log('[DataSourceService] testConnection success', { status: response?.status });
-      return {
-        type: payload.sourceType,
-        name,
-        config: payload.config,
-        status: 'success',
-        testResult,
-        createdAt: new Date().toISOString(),
-        lastTested: new Date().toISOString(),
-      };
-    } catch (error) {
-      // Surface server-provided message when available
-      const serverMsg = error?.response?.data?.message || error?.response?.data?.error;
-      const msg = serverMsg || error?.message || 'Connection test failed';
-      console.error('[DataSourceService] testConnection failed', { status: error?.response?.status, msg });
-      throw new Error(`Connection test failed: ${msg}`);
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.toggleEnabled, sourceId);
+      console.log('[DataSourceService] toggleDataSourceEnabled POST', { endpointUrl, workspaceId, sourceId, enabled });
+      const response = await this.apiClient.post(endpointUrl, { workspaceId, enabled: !!enabled });
+      return response?.data;
+    } catch (err) {
+      console.error('[DataSourceService] toggleDataSourceEnabled:', err);
+      throw new Error(err?.response?.data?.error || err?.message || 'Failed to toggle data source');
     }
+  }
+
+  // Returns { status, errorType, errorMessage, oldSchema, tempSchema, suggestedSchema, sampleRows, tempRowCount }
+  // Used by the "revise schema" flow to compare the stored schema with what the
+  // pending temp data looks like and pre-populate the user's revision form.
+  async getErrorContext(sourceId) {
+    try {
+      const workspaceId = await getSavedWorkspaceId();
+      if (!workspaceId) throw new Error('No workspace selected');
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.errorContext, sourceId);
+      const response = await this.apiClient.get(endpointUrl, { params: { workspaceId } });
+      return response?.data || null;
+    } catch (err) {
+      console.error('[DataSourceService] getErrorContext:', err);
+      return null;
+    }
+  }
+
+  // Apply a user-confirmed schema to an errored data source, merging existing
+  // and pending data into the new shape.
+  async resolveError(sourceId, confirmedSchema) {
+    try {
+      const workspaceId = await getSavedWorkspaceId();
+      if (!workspaceId) throw new Error('No workspace selected');
+      if (!Array.isArray(confirmedSchema) || confirmedSchema.length === 0) {
+        throw new Error('confirmedSchema must be a non-empty array');
+      }
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.resolveError, sourceId);
+      const response = await this.apiClient.post(endpointUrl, { workspaceId, confirmedSchema });
+      return response?.data;
+    } catch (err) {
+      console.error('[DataSourceService] resolveError:', err);
+      throw new Error(err?.response?.data?.error || err?.message || 'Failed to apply revised schema');
+    }
+  }
+
+  // Re-apply the bundled default schema for this data source, merged with the
+  // currently-stored schema (existing column types win), and rebuild the
+  // partitions. Used to recover data sources created before the default
+  // schema feature existed that are now hitting schema drift for fields the
+  // default already declares.
+  async refreshFromDefaultSchema(sourceId) {
+    try {
+      const workspaceId = await getSavedWorkspaceId();
+      if (!workspaceId) throw new Error('No workspace selected');
+      const endpointUrl = this.resolveEndpoint(endpoints.modules.day_book.data_sources.refreshDefaultSchema, sourceId);
+      const response = await this.apiClient.post(endpointUrl, { workspaceId });
+      return response?.data;
+    } catch (err) {
+      console.error('[DataSourceService] refreshFromDefaultSchema:', err);
+      throw new Error(err?.response?.data?.error || err?.message || 'Failed to refresh from default schema');
+    }
+  }
+
+  async testConnection(type, config, name) {
+    return testConnectionWorkflow({
+      apiClient: this.apiClient,
+      resolveEndpoint: (epOrFn, ...args) => this.resolveEndpoint(epOrFn, ...args),
+    }, type, config, name);
   }
 
   async updateLastSync(sourceId) {

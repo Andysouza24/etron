@@ -2,6 +2,8 @@ import { View, StyleSheet } from "react-native";
 import { Button, useTheme, Text, Icon} from "react-native-paper";
 import { router } from "expo-router";
 
+// Empty state shown when a requested item can't be found.
+// Offers Back and a link to the item's list route.
 export default function ItemNotFound ({
     icon = "alert-circle-outline",
     item = "item",

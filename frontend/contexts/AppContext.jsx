@@ -1,10 +1,13 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// App-level context providing workspace state and action stubs.
+// Mounted in the root layout; consumed by login-signup and the auth layout.
+// Action stubs are intentional placeholders for future wiring.
+
+import React, { createContext, useContext, useState } from 'react';
 
 const AppContext = createContext({});
 
 
 export function AppProvider({ children }) {
-    // app level state
     const [workspaceId, setWorkspaceId] = useState(null);
 
     return (

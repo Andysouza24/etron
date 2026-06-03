@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Text, IconButton, useTheme } from 'react-native-paper';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import Header from '../../../../components/layout/Header';
 import BoardService from '../../../../services/BoardService';
 import ResponsiveScreen from '../../../../components/layout/ResponsiveScreen';
@@ -11,6 +11,7 @@ import BoardCard from '../../../../components/boards/BoardCard';
 import { formatTimeAgo } from '../../../../utils/boards/dateUtils';
 import { useHasPermission } from '../../../../hooks/useHasPermission';
 import { useBoardContext } from '../../../../contexts/BoardContext';
+import useFocusRefresh from '../../../../hooks/system/useFocusRefresh';
 
 const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
@@ -21,26 +22,15 @@ const BoardsManagement = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeBoardId, setActiveBoardId] = useState(null);
 
-    const loadBoards = useCallback(async () => {
-        const loadedBoards = await refresh();
-        const activeId = await BoardService.getActiveDashboardId(loadedBoards || boards);
+    // First focus uses cached boards (or fetches); later focuses refresh to
+    // pick up changes from other screens. The loaded list drives the active
+    // dashboard highlight.
+    const handleBoardsLoaded = useCallback(async (loadedBoards) => {
+        const activeId = await BoardService.getActiveDashboardId(loadedBoards);
         setActiveBoardId(activeId);
-    }, [refresh]);
+    }, []);
 
-    useEffect(() => {
-        ensureBoards().then(async (loadedBoards) => {
-            if (loadedBoards) {
-                const activeId = await BoardService.getActiveDashboardId(loadedBoards);
-                setActiveBoardId(activeId);
-            }
-        });
-    }, [ensureBoards]);
-
-    useFocusEffect(
-        useCallback(() => {
-            loadBoards();
-        }, [loadBoards])
-    );
+    useFocusRefresh({ ensure: ensureBoards, refresh, currentData: boards, onResult: handleBoardsLoaded });
 
     const filteredBoards = useMemo(() => {
         const trimmedQuery = searchQuery.trim().toLowerCase();

@@ -11,13 +11,15 @@ import DataSourcesErrorState from "../../../../../../components/modules/day-book
 import DataSourcesList from "../../../../../../components/modules/day-book/data-sources/DataSourcesList";
 
 import endpoints from "../../../../../../utils/api/endpoints";
-import { apiPost, apiDelete } from "../../../../../../utils/api/apiClient";
+import { apiDelete } from "../../../../../../utils/api/apiClient";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage";
 import { useDataSourceContext } from "../../../../../../contexts/DataSourceContext";
 import { useHasPermission } from "../../../../../../hooks/useHasPermission";
 import useDataPreview from "../../../../../../hooks/modules/day_book/data-sources/useDataPreview";
 
-const MICROMAX_PARENT_TYPE = "micromax-dashboard";
+// settings screen handles any dashboard parent type (micromax-dashboard,
+// test-connection, ...). every parent navigates to the same generic route.
+const DASHBOARD_SETTINGS_ROUTE = "/modules/day-book/data-management/micromax-dashboard-settings";
 
 const DataManagement = () => {
 	const {
@@ -25,6 +27,7 @@ const DataManagement = () => {
 		system,
 		refreshDataSources: ctxRefresh,
 		refreshDashboardRawData,
+		toggleDataSourceEnabled,
 	} = useDataSourceContext();
 	const dataSourcesList = ctxDataSources.list;
 	const loading = system.isLoading && dataSourcesList.length === 0;
@@ -118,48 +121,20 @@ const DataManagement = () => {
 		);
 	}, [fetchDataSources, workspaceId]);
 
-	const handleTestConnection = useCallback(async (source) => {
-		try {
-			const body = {
-				sourceType: source.sourceType || source.type,
-				config: source.config ?? {},
-				secrets: source.secrets ?? {},
-			};
-			await apiPost(endpoints.modules.day_book.data_sources.testConnection, body);
-			Alert.alert("Test Connection", "Connection test requested.");
-		} catch (err) {
-			console.error("[DataManagement] handleTestConnection:", err);
-			Alert.alert("Error", String(err));
-		}
-	}, []);
-
 	const navigateToViewSource = useCallback((source) => {
 		router.navigate(`/modules/day-book/data-management/view-data-source/${source.dataSourceId}`);
 	}, []);
 
-	const navigateToEditSource = useCallback((source) => {
-		router.navigate(`/modules/day-book/data-management/edit-data-source/${source.dataSourceId}`);
+	const openDashboardSettings = useCallback((parent) => {
+		if (!parent?.dataSourceId) return;
+		router.navigate(`${DASHBOARD_SETTINGS_ROUTE}/${parent.dataSourceId}`);
 	}, []);
-
-	const openMicromaxSettings = useCallback(() => {
-		const micromaxParent = dataSourcesList.find(
-			(source) => (source.sourceType || source.type) === MICROMAX_PARENT_TYPE
-		);
-		if (!micromaxParent) return;
-		router.navigate(
-			`/modules/day-book/data-management/micromax-dashboard-settings/${micromaxParent.dataSourceId}`
-		);
-	}, [dataSourcesList]);
 
 	const handleRescanFile = useCallback(async (source) => {
 		if (!source?.dataSourceId) return;
 		setRefreshingSourceId(source.dataSourceId);
 		try {
 			await refreshDashboardRawData(source.dataSourceId);
-			Alert.alert(
-				"Refresh started",
-				`${source.name} will update once processing completes.`
-			);
 		} catch (err) {
 			console.error("[DataManagement] handleRescanFile:", err);
 			Alert.alert("Refresh failed", err?.message || "Unable to refresh this file.");
@@ -167,6 +142,19 @@ const DataManagement = () => {
 			setRefreshingSourceId(null);
 		}
 	}, [refreshDashboardRawData]);
+
+	const handleToggleEnabled = useCallback(async (source, nextEnabled) => {
+		if (!source?.dataSourceId) return;
+		try {
+			await toggleDataSourceEnabled(source.dataSourceId, nextEnabled);
+		} catch (err) {
+			console.error("[DataManagement] handleToggleEnabled:", err);
+			Alert.alert(
+				nextEnabled ? "Unable to enable" : "Unable to disable",
+				err?.message || "Please try again."
+			);
+		}
+	}, [toggleDataSourceEnabled]);
 
 	const body = hasError ? (
 		<DataSourcesErrorState message={error} onRetry={handleRefresh} />
@@ -183,12 +171,10 @@ const DataManagement = () => {
 			viewDataAllowed={viewDataPermission}
 			manageDataSourcesAllowed={manageDataSourcesPermission}
 			onNavigateToView={navigateToViewSource}
-			onNavigateToEdit={navigateToEditSource}
 			onDisconnect={handleDisconnectSource}
-			onTest={handleTestConnection}
 			onPreview={openPreview}
-			onRescan={handleRescanFile}
-			onOpenMicromaxSettings={openMicromaxSettings}
+			onToggleEnabled={handleToggleEnabled}
+			onOpenDashboardSettings={openDashboardSettings}
 		/>
 	);
 

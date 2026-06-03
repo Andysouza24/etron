@@ -12,13 +12,15 @@ const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataT
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const { detectDateFormat } = require("@etron/data-sources-shared/utils/dateParser");
 
-const { PERMISSIONS, requirePermission, resolveAndValidateAdapter } = require("./helpers");
+const { PERMISSIONS, requirePermission, requireEnabled, resolveAndValidateAdapter } = require("./helpers");
 
 // build schema preview from already-translated row data
-// ({ schema, sampleData, totalRows })
+// ({ schema, sampleData, totalRows, isEmpty })
+// an empty file is not an error - the wizard surfaces an empty state so the user can still create the data source
+// fields will be reviewed when data appears
 function buildSchemaPreviewFromTranslated(translatedData) {
     if (!Array.isArray(translatedData) || translatedData.length === 0) {
-        throw new Error("The provided data is empty");
+        return { schema: [], sampleData: [], totalRows: 0, isEmpty: true };
     }
 
     const { valid, error } = validateFormat(translatedData);
@@ -41,6 +43,7 @@ function buildSchemaPreviewFromTranslated(translatedData) {
         schema,
         sampleData: translatedData.slice(0, 10),
         totalRows: translatedData.length,
+        isEmpty: false,
     };
 }
 
@@ -75,6 +78,31 @@ async function previewSchemaForSource(authUserId, dataSourceId, payload) {
 
     const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
     if (!dataSource) throw new Error(`Data source not found: ${dataSourceId}`);
+    requireEnabled(dataSource);
+
+    // dashboard file children (micromax-dashboard-file, test-connection-file)
+    // don't expose a poll() method - the file is delivered to S3 by an
+    // external pipeline and the wizard reads the raw JSON directly for the
+    // schema preview
+    const { isFileSourceType } = require("./dashboardRawData");
+    if (isFileSourceType(dataSource.sourceType)) {
+        const { readMicromaxDashboardFileRawData } = require("./dashboardRawData");
+        const { normaliseHeterogeneousRows } = require("@etron/data-sources-shared/utils/normaliseRows");
+        const { sanitiseMicromaxDashboardData } = require("@etron/data-sources-shared/utils/sanitiseMicromaxDashboardData");
+        const rawData = await readMicromaxDashboardFileRawData(workspaceId, dataSource);
+        // mirror the transform pipeline:
+        // unwrap dashboard envelopes / flatten nested objects, then normalise to the union of keys before schema inference
+        const { rows: sanitisedRows, groupHints } = sanitiseMicromaxDashboardData(rawData);
+        const translatedData = normaliseHeterogeneousRows(translateData(sanitisedRows));
+        const preview = buildSchemaPreviewFromTranslated(translatedData);
+        // stamp the original parent key on every column that came from a flattened nested object so the field-review UI can group them
+        if (groupHints && Object.keys(groupHints).length > 0 && Array.isArray(preview.schema)) {
+            for (const column of preview.schema) {
+                if (groupHints[column.name]) column.group = groupHints[column.name];
+            }
+        }
+        return preview;
+    }
 
     const secrets = await dataSourceSecretsRepo.getSecrets(workspaceId, dataSourceId);
     const adapter = resolveAndValidateAdapter(dataSource.sourceType, {
@@ -144,6 +172,26 @@ function resolveColumnForCategory(col, userCol, translatedData) {
     return col;
 }
 
+// re-resolve types/dateFormat against fresh data so date columns get cast to timestamp
+function buildResolvedSchemaFromConfirmed(translatedData, confirmedSchema) {
+    if (!Array.isArray(translatedData) || translatedData.length === 0) {
+        return Array.isArray(confirmedSchema) ? confirmedSchema : [];
+    }
+    const autoSchema = generateSchema(translatedData.slice(0, 100));
+    return autoSchema.map(col => {
+        const userCol = Array.isArray(confirmedSchema)
+            ? confirmedSchema.find(c => c.name === col.name)
+            : null;
+        const resolved = resolveColumnForCategory(col, userCol, translatedData);
+        // carry the field-grouping hint (set by the sanitiser during preview) through to the saved schema
+        const group = userCol?.group || col.group;
+        if (group && resolved && typeof resolved === "object" && !resolved.group) {
+            resolved.group = group;
+        }
+        return resolved;
+    });
+}
+
 // Confirm and process the schema after the user has reviewed/adjusted field categories.
 // Takes the user's confirmed schema (with category overrides) and processes the upload.
 async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
@@ -155,6 +203,7 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
     if (!dataSource) {
         throw new Error(`Data source not found: ${dataSourceId}`);
     }
+    requireEnabled(dataSource);
 
     if (!confirmedSchema || !Array.isArray(confirmedSchema) || confirmedSchema.length === 0) {
         throw new Error("Confirmed schema is required");
@@ -186,13 +235,7 @@ async function confirmSchemaAndProcess(authUserId, dataSourceId, payload) {
         if (!valid) throw new Error(`Invalid data format: ${error}`);
 
         await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Generating schema", percent: 45 });
-        const autoSchema = generateSchema(translatedData.slice(0, 100));
-
-        // build final schema from user-confirmed categories
-        const finalSchema = autoSchema.map(col => {
-            const userCol = confirmedSchema.find(c => c.name === col.name);
-            return resolveColumnForCategory(col, userCol, translatedData);
-        });
+        const finalSchema = buildResolvedSchemaFromConfirmed(translatedData, confirmedSchema);
 
         await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Casting rows", percent: 60 });
         const castedData = castDataToSchema(translatedData, finalSchema);
@@ -230,4 +273,5 @@ module.exports = {
     previewSchemaForSource,
     confirmSchemaAndProcess,
     resolveColumnForCategory,
+    buildResolvedSchemaFromConfirmed,
 };

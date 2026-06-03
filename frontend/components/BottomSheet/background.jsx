@@ -10,7 +10,7 @@ import { useTheme } from 'react-native-paper';
 const Background = ({ style, animatedIndex }) => {
   const theme = useTheme();
   const colors = theme?.colors ?? {};
-  const endColor = colors.background || colors.surface || '#383838';
+  const endColor = colors.surface || colors.background || '#383838';
   const startColor = colors.focusedBackground || colors.surface || '#4c5063';
 
   const colorAnimatedStyle = useAnimatedStyle(() => ({

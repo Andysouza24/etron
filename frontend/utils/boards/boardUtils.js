@@ -98,6 +98,23 @@ export const resolveAppearance = (appearance) => ({
   xAxisLabelAngle: parseAxisLabelAngle(appearance?.xAxisLabelAngle),
 });
 
+// Layer multiple sparse appearance objects: later layers override earlier
+// ones, but keys whose value is `undefined` or `null` are skipped so they
+// don't shadow values from earlier layers. Used to merge a metric's
+// appearance with a board item's per-instance overrides.
+export const mergeAppearance = (...layers) => {
+  const result = {};
+  layers.forEach((layer) => {
+    if (!layer || typeof layer !== "object") return;
+    Object.entries(layer).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (typeof value === "string" && value.trim() === "") return;
+      result[key] = value;
+    });
+  });
+  return result;
+};
+
 export const buildAxisOptionsFromAppearance = (appearance) => {
   const xAxisLabelAngle = parseAxisLabelAngle(appearance?.xAxisLabelAngle);
   const axisStyle = {

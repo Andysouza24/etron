@@ -24,11 +24,13 @@
     "@aws-amplify/ui-react": "^6.11.2",
     "@aws-amplify/ui-react-native": "^2.5.3",
     "@aws-sdk/client-cognito-identity-provider": "^3.825.0",
+    "@babel/runtime": "^7.29.2",
     "@expo/vector-icons": "^14.1.0",
     "@gorhom/bottom-sheet": "^5.2.6",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-google-signin/google-signin": "^16.0.0",
+    "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/drawer": "^7.3.9",
     "@react-navigation/elements": "^2.3.8",
@@ -37,6 +39,7 @@
     "@shopify/react-native-skia": "2.0.0-next.4",
     "aws-amplify": "^6.15.5",
     "axios": "^1.10.0",
+    "dayjs": "^1.11.20",
     "expo": "~53.0.27",
     "expo-auth-session": "~6.2.1",
     "expo-blur": "~14.1.5",
@@ -64,6 +67,7 @@
     "jest": "~29.7.0",
     "jest-expo": "~53.0.10",
     "oidc-client-ts": "^3.2.1",
+    "prop-types": "^15.8.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.6",
@@ -91,9 +95,12 @@
     "react-oidc-context": "^3.3.0",
     "uuid": "^11.0.0",
     "victory": "37.3.6",
-    "victory-native": "37.3.6"
+    "victory-native": "^37.3.6"
   },
   "overrides": {
+    "uuid": "^11.0.0"
+  },
+  "resolutions": {
     "uuid": "^11.0.0"
   },
   "devDependencies": {
@@ -105,12 +112,27 @@
     "@types/react": "~19.0.10",
     "aws-cdk-lib": "^2.204.0",
     "constructs": "^10.4.2",
-    "eas-build-cache-provider": "^18.0.2",
     "esbuild": "^0.25.9",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "react-test-renderer": "19.0.0",
     "tsx": "^4.20.4",
     "typescript": "~5.8.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false,
+        "exclude": [
+          "react-native-file-viewer",
+          "react-native-fs",
+          "react-native-keyboard-aware-scroll-view",
+          "react-native-pell-rich-editor",
+          "react-native-shimmer-placeholder",
+          "react-native-wheel-color-picker"
+        ]
+      }
+    }
+  }
 }

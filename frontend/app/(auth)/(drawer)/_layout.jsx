@@ -6,10 +6,15 @@ import { useTheme, Appbar, Icon, Divider } from "react-native-paper";
 import { View, StyleSheet } from "react-native";
 import { Drawer } from "expo-router/drawer"
 import PermissionGate from "../../../components/common/PermissionGate";
+import RouteGuard from "../../../components/common/RouteGuard";
 import { usePermissionSync } from "../../../hooks/usePermissionSync";
 import { getWorkspaceId } from "../../../storage/workspaceStorage";
 import { useHasPermission } from "../../../hooks/useHasPermission";
+import { getPermissionForRoute } from "../../../utils/routePermissions";
 
+// drawer entries no longer hold a `permKey` — the required permission is
+// looked up via `getPermissionForRoute(name)` against the central route map
+// in utils/routePermissions.js so there's a single source of truth.
 const generalOptions = [
     {
         name: "notifications",
@@ -25,7 +30,6 @@ const generalOptions = [
         name: "collaboration",
         label: "Collaboration",
         icon: "account-group",
-        permKey: "app.workspace.view_collaboration_settings",
     },
     {
         name: "settings",
@@ -39,19 +43,16 @@ const dayBookOptions = [
         name: "modules/day-book/reports",
         label: "Reports",
         icon: "file-chart",
-        permKey: "modules.daybook.reports.view_reports"
     },
     {
         name: "modules/day-book/data-management",
         label: "Data Management",
         icon: "database",
-        permKey: "modules.daybook.datasources.view_dataSources"
     },
     {
         name: "modules/day-book/metrics",
         label: "Metrics",
         icon: "chart-line",
-        permKey: "modules.daybook.metrics.view_metrics"
     },
     /*{
         name: "modules/day-book/notifications",
@@ -62,8 +63,8 @@ const dayBookOptions = [
 
 const boardOptions = [
     {
-        name: "dashboard",
-        label: "Dashboard",
+        name: "home",
+        label: "Home",
         icon: "view-compact",
     },
     {
@@ -102,13 +103,18 @@ const CustomDrawer = (props) => {
 
     const activeRouteName = state?.routes?.[state.index]?.name;
 
+    // boards drawer entry is hardcoded in the default view (not driven by
+    // boardOptions) so we need to gate it explicitly using the central map
+    const { allowed: canViewBoards } = useHasPermission(getPermissionForRoute("boards"));
+
     let generalRoutes = [];
     let dayBookRoutes = [];
     let boardRoutes = [];
     state.routes.forEach((route) => {
         const name = route.name;
-        const option = [...generalOptions, ...dayBookOptions, ...boardOptions].find((o) => o.name === name);
-        const permKey = option?.permKey || null;
+        // central map returns undefined for unknown routes; in that case the
+        // route guard handles redirect, and we treat the entry as gated.
+        const permKey = getPermissionForRoute(name) ?? null;
         if (generalOptions.some((page) => page.name === name)) {
             generalRoutes.push({ route, permKey });
         } else if (dayBookOptions.some((page) => page.name === name)) {
@@ -138,35 +144,40 @@ const CustomDrawer = (props) => {
                 {drawerState === "default" ? (
                     <View>
                         <DrawerItem
-                            label="Dashboard"
-                            icon={({ color, size }) => <Icon source="view-dashboard" size={size} color={color} />}
-                            focused={activeRouteName === "dashboard"}
+                            label="Home"
+                            icon={({ color, size }) => <Icon source="home" size={size} color={color} />}
+                            focused={activeRouteName === "home"}
                             activeTintColor={theme.colors.onSecondaryContainer}
                             activeBackgroundColor={theme.colors.secondaryContainer}
                             inactiveTintColor={theme.colors.onSurfaceVariant}
                             onPress={() => {
                                 setDrawerState("default");
-                                navigation.jumpTo("dashboard");
+                                navigation.jumpTo("home");
                                 navigation.closeDrawer();
                             }}
                             style={[styles.itemContainer, { marginTop: 6 }]}
                             labelStyle={styles.itemLabel}
                         />
-                        <DrawerItem
-                            label="Boards"
-                            icon={({ color, size }) => <Icon source="view-grid-plus" size={size} color={color} />}
-                            focused={activeRouteName === "boards"}
-                            activeTintColor={theme.colors.onSecondaryContainer}
-                            activeBackgroundColor={theme.colors.secondaryContainer}
-                            inactiveTintColor={theme.colors.onSurfaceVariant}
-                            onPress={() => {
+                        <PermissionGate
+                            allowed={canViewBoards}
+                            onAllowed={() => {
                                 setDrawerState("default");
                                 navigation.jumpTo("boards");
                                 navigation.closeDrawer();
                             }}
-                            style={styles.itemContainer}
-                            labelStyle={styles.itemLabel}
-                        />
+                        >
+                            <DrawerItem
+                                label="Boards"
+                                icon={({ color, size }) => <Icon source="view-grid-plus" size={size} color={color} />}
+                                focused={activeRouteName === "boards"}
+                                activeTintColor={theme.colors.onSecondaryContainer}
+                                activeBackgroundColor={theme.colors.secondaryContainer}
+                                inactiveTintColor={theme.colors.onSurfaceVariant}
+                                onPress={() => {}}
+                                style={styles.itemContainer}
+                                labelStyle={styles.itemLabel}
+                            />
+                        </PermissionGate>
                         <Divider />
                         <DrawerItem
                             label="Day Book"
@@ -222,6 +233,8 @@ export default function DrawerLayout() {
     const { forceRefresh } = usePermissionSync(workspaceId);
 
     return (
+        <>
+        <RouteGuard />
         <Drawer
             drawerContent={(props) => (
                 <CustomDrawer
@@ -286,6 +299,7 @@ export default function DrawerLayout() {
                 />
             ))}
         </Drawer>
+        </>
     );
 }
 

@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
-import { View } from "react-native";
-import { useTheme, Text } from "react-native-paper";
 import metricService from "../../../../../services/MetricService";
-import DropDown from "../../../../common/input/DropDown";
+import GenericSelector from "./GenericSelector";
 
 
 // TODO: update show router button in drop down component to navigate to creating a new simple metric from this data source
 
 export default function MetricSelector({ dataSourceId, onMetricSelect, selectedMetricId}){
-    const theme = useTheme();
     const [loading, setLoading] = useState(false);
     const [metrics, setMetrics] = useState([]);
 
@@ -31,17 +28,13 @@ export default function MetricSelector({ dataSourceId, onMetricSelect, selectedM
         }
     }
     return (
-        <View>
-            <Text variant="labelLarge">Select an Existing Metric</Text>
-            <DropDown
-                title="Select an Existing Metric"
-                items={metrics.map((m) => ({
-                    value: m.metricId, label: m.name
-                }))}
-                showRouterButton={false}
-                onSelect={onMetricSelect}
-                value={selectedMetricId}
-            />
-        </View>
+        <GenericSelector
+            wrapInView
+            label="Select an Existing Metric"
+            title="Select an Existing Metric"
+            items={metrics.map((m) => ({ value: m.metricId, label: m.name }))}
+            value={selectedMetricId}
+            onChange={onMetricSelect}
+        />
     );
 }

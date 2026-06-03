@@ -9,10 +9,10 @@ import { apiPost } from "../../../utils/api/apiClient";
 import endpoints from "../../../utils/api/endpoints";
 import { getWorkspaceId } from "../../../storage/workspaceStorage";
 
-import CsvConnectStep from "../../../components/modules/day-book/data-sources/wizard/steps/CSV/CsvConnectStep";
+import CsvConnectStep from "./csv/wizard-steps/CsvConnectStep";
 import FieldCategoryReviewStep from "../../../components/modules/day-book/data-sources/wizard/steps/FieldCategoryReviewStep";
 import GeneralSettingsStep from "../../../components/modules/day-book/data-sources/wizard/steps/GeneralSettingsStep";
-import CsvSettingsExtra from "../../../components/modules/day-book/data-sources/wizard/steps/CSV/CsvSettingsExtra";
+import CsvSettingsExtra from "./csv/wizard-steps/CsvSettingsExtra";
 
 const TYPE = "local-csv";
 

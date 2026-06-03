@@ -5,6 +5,7 @@
 import { aggregateData } from "./aggregation";
 import { parseNumericOrOriginal } from "./numberParser";
 
+// Coerce every cell to a number where possible, leaving non-numeric values intact.
 function coerceRows(rows) {
     return rows.map((row) => {
         const newRow = {};
@@ -15,6 +16,8 @@ function coerceRows(rows) {
     });
 }
 
+// Keep only rows whose id column is in selectedRows, matching the creation flow.
+// The id column is the first schema field; without it all rows pass through.
 function filterSelectedRows(rows, selectedRows, schema) {
     if (!Array.isArray(selectedRows) || selectedRows.length === 0) return rows;
     const idKey = Array.isArray(schema) && schema.length > 0

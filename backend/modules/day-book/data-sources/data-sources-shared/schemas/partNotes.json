@@ -1,0 +1,88 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "brand",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "stockOnHand",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "inventoryUOM",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "committed",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "ordered",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "available",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "procurementMethod",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "longDescription",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "storageLocation",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "category",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "subCategory",
+    "type": "string",
+    "category": "dimension"
+  }
+]

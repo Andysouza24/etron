@@ -39,7 +39,7 @@ const ViewUser = () => {
     const [loading, setLoading] = useState(true);
     const [userExists, setUserExists] = useState(true);
     const { allowed: manageUserPermission } = useHasPermission("app.collaboration.manage_users");
-    const { allowed: viewUserLogPermission } = useHasPermission("app.collaboration.view_user_log");
+    const { allowed: viewUserLogPermission } = useHasPermission("app.audit.view_user_audit_log");
 
     useFocusEffect(
         useCallback(() => {
@@ -125,7 +125,7 @@ const ViewUser = () => {
                         </List.Section>
 
                         <PermissionGate
-                            allowed={false}
+                            allowed={viewUserLogPermission}
                             onAllowed={() => router.navigate(`/collaboration/user-log/${userId}`)}
                         >
                             <DescriptiveButton label="User Activity Log" />

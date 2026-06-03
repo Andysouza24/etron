@@ -1,7 +1,9 @@
+// Filter rows to a recent time window and map them to {x, y} points for charting.
+
 export default function transformData(rawData, options) {
   const { valueToTrack, dateField, dimensions, timeFrame } = options;
 
-  // Parse timestamps with plain Date()
+  // Drop rows outside the requested time frame, measured back from now.
   const filteredData = rawData.filter(row => {
     const ts = new Date(row[dateField]);
 

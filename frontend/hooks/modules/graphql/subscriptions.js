@@ -16,6 +16,7 @@ export const onMetricUpdate = /* GraphQL */ `
       createdAt
       createdBy
       updatedAt
+      action
     }
   }
 `;
@@ -48,6 +49,7 @@ export const onDataSourceUpdate = /* GraphQL */ `
     createdAt
     updatedAt
     createdBy
+    action
   }
 }
 `;

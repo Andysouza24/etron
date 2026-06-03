@@ -1,6 +1,6 @@
 // posts `notifyDataSourceUpdate` mutation
-// subscription receives status/progress changes in real time
-// can be consumed by any lambda without adding axios to its package.json
+// subscription delivers data source create/update/delete events to all clients in the workspace so other devices/users see changes in real time
+// `action` is one of "CREATE" | "UPDATE" | "DELETE" (mirrors the Boards/Metrics pattern). status/progress-only broadcasts may omit it.
 const NOTIFY_DATA_SOURCE_UPDATE_MUTATION = `
     mutation NotifyDataSourceUpdate(
         $workspaceId: ID!,
@@ -19,7 +19,8 @@ const NOTIFY_DATA_SOURCE_UPDATE_MUTATION = `
         $updatedAt: AWSDateTime,
         $createdBy: ID,
         $progressStage: String,
-        $progressPercent: Int
+        $progressPercent: Int,
+        $action: String
     ) {
         notifyDataSourceUpdate(
             workspaceId: $workspaceId,
@@ -38,7 +39,8 @@ const NOTIFY_DATA_SOURCE_UPDATE_MUTATION = `
             updatedAt: $updatedAt,
             createdBy: $createdBy,
             progressStage: $progressStage,
-            progressPercent: $progressPercent
+            progressPercent: $progressPercent,
+            action: $action
         ) {
             workspaceId
             dataSourceId
@@ -57,11 +59,12 @@ const NOTIFY_DATA_SOURCE_UPDATE_MUTATION = `
             createdBy
             progressStage
             progressPercent
+            action
         }
     }
 `;
 
-function buildVariables(dataSource) {
+function buildVariables(dataSource, action) {
     return {
         workspaceId: dataSource.workspaceId,
         dataSourceId: dataSource.dataSourceId,
@@ -80,10 +83,11 @@ function buildVariables(dataSource) {
         createdBy: dataSource.createdBy ?? null,
         progressStage: dataSource.progressStage ?? null,
         progressPercent: typeof dataSource.progressPercent === "number" ? dataSource.progressPercent : null,
+        action: action ?? null,
     };
 }
 
-async function notifyDataSourceUpdate(dataSource) {
+async function notifyDataSourceUpdate(dataSource, action) {
     if (!dataSource || !dataSource.workspaceId || !dataSource.dataSourceId) return;
 
     const url = process.env.APP_SYNC_URL || process.env.APPSYNC_URL;
@@ -102,7 +106,7 @@ async function notifyDataSourceUpdate(dataSource) {
             },
             body: JSON.stringify({
                 query: NOTIFY_DATA_SOURCE_UPDATE_MUTATION,
-                variables: buildVariables(dataSource),
+                variables: buildVariables(dataSource, action),
             }),
         });
         if (!response.ok) {

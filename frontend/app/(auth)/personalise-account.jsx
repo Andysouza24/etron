@@ -9,8 +9,9 @@ import { useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import StackLayout from '../../components/layout/StackLayout';
 import AvatarButton from '../../components/common/buttons/AvatarButton';
-import { loadProfilePhoto, removeProfilePhotoFromLocalStorage, getPhotoFromDevice, saveProfilePhoto } from '../../utils/profilePhoto';
-import { fetchUserAttributes, signOut, updateUserAttribute } from 'aws-amplify/auth';
+import { fetchUserAttributes, signOut } from 'aws-amplify/auth';
+import useProfilePhoto from '../../hooks/system/useProfilePhoto';
+import { updateUserAttributeWithStep } from '../../utils/userAttributes';
 import DecisionDialog from '../../components/overlays/DecisionDialog';
 import ResponsiveScreen from '../../components/layout/ResponsiveScreen';
 import Header from '../../components/layout/Header';
@@ -21,28 +22,26 @@ const PersonaliseAccount = () => {
 	const [firstName, setFirstName] = useState('');
 	const [lastName, setLastName] = useState('');
 	const [phoneNumber, setPhoneNumber] = useState('');
-	const [profilePicture, setProfilePicture] = useState(null);
 	const [saving, setSaving] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [showWorkspaceModal, setWorkspaceModal] = useState(false);
-	const [pictureChanged, setPictureChanged] = useState(false);
 	const [needsPhoneConfirmation, setNeedsPhoneConfirmation] = useState(false);
+	const [message, setMessage] = useState('');
 	const [errors, setErrors] = useState({
 		firstName: false,
 		lastName: false,
 		phoneNumber: false,
 	});
 
-	async function handleChoosePhoto() {
-		const uri = await getPhotoFromDevice();
-		setProfilePicture(uri);
-		setPictureChanged(true);
-	}
-
-	const handleRemovePhoto = () => {
-		setProfilePicture(null);
-		setPictureChanged(true);
-	};
+	const {
+		profilePicture,
+		pictureChanged,
+		choosePhoto: handleChoosePhoto,
+		removePhoto: handleRemovePhoto,
+		loadPhoto,
+		uploadPhoto,
+		clearStoredPhoto,
+	} = useProfilePhoto();
 
 	useEffect(() => {
 		loadProfileData();
@@ -61,9 +60,8 @@ const PersonaliseAccount = () => {
 					phoneNumber.substring(3) : phoneNumber;
 			setPhoneNumber(cleanPhone);
 
-			const profilePhotoUri = await loadProfilePhoto();
-			setProfilePicture(profilePhotoUri || null);
-			
+			await loadPhoto();
+
 		} catch (error) {
 			console.error("Error loading personal details: ", error);
 			setMessage("Error loading personal details");
@@ -71,40 +69,16 @@ const PersonaliseAccount = () => {
 		setLoading(false);
 	}
 
-	// updates user details, including verification code if needed (shouldn't be) 
+	// updates user details, requesting a phone confirmation code if Cognito asks for one
 	async function handleUpdateUserAttribute(attributeKey, value) {
-		try {
-			const output = await updateUserAttribute({
-				userAttribute: {
-					attributeKey,
-					value
+		return updateUserAttributeWithStep(attributeKey, value, {
+			onError: setMessage,
+			onCodeRequired: (key) => {
+				if (key === 'phone_number') {
+					setNeedsPhoneConfirmation(true);
 				}
-			});
-
-			const { nextStep } = output;
-
-			switch (nextStep.updateAttributeStep) {
-				case 'CONFIRM_ATTRIBUTE_WITH_CODE':
-					const codeDeliveryDetails = nextStep.codeDeliveryDetails;
-					console.log(`Confirmation code was sent to ${codeDeliveryDetails?.deliveryMedium} at ${codeDeliveryDetails?.destination}`);
-					if (attributeKey === 'phone_number') {
-							setNeedsPhoneConfirmation(true);
-					}
-					return { needsConfirmation: true };
-				case 'DONE':
-					const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-					console.log(`${fieldName} updated successfully`);
-					return { needsConfirmation: false };
-				default:
-					console.log(`${attributeKey.replace('_', ' ')} update completed`);
-					return { needsConfirmation: false };
-			}
-		} catch (error) {
-			console.error("Error updating user attribute:", error);
-			const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-			setMessage(`Error updating ${fieldName}: ${error.message}`);
-			return { needsConfirmation: false, error: true };
-		}
+			},
+		});
 	}
 
 
@@ -126,13 +100,13 @@ const PersonaliseAccount = () => {
 
 			if (pictureChanged) {
 				if (profilePicture) {
-					const s3Url = await saveProfilePhoto(profilePicture);
+					const s3Url = await uploadPhoto();
 					if (s3Url) {
 						await handleUpdateUserAttribute('picture', s3Url);
 					}
 				} else {
 					await handleUpdateUserAttribute('picture', "");
-					await removeProfilePhotoFromLocalStorage();
+					await clearStoredPhoto();
 				}
 			}
 

@@ -91,6 +91,18 @@ function getAvailableThousandsItems(decimalSeparator) {
 // chart types that support the universal rounding selector
 const ROUNDING_CHART_TYPES = ["line", "bar", "pie", "area", "scatter", "box", "progressBar", "progressCircle", "numbers"];
 
+// chart types that plot dates on the X axis
+const TIME_SERIES_CHART_TYPES = ["line", "bar", "area", "scatter"];
+
+const X_AXIS_DATE_FORMAT_ITEMS = [
+    { value: "auto", label: "Auto (DD/MM)" },
+    { value: "DD", label: "DD (≤ 7 days only)" },
+    { value: "DD/MM", label: "DD/MM" },
+    { value: "DD/MM/YY", label: "DD/MM/YY" },
+    { value: "DD/MM/YYYY", label: "DD/MM/YYYY" },
+    { value: "timestamp", label: "Timestamp" },
+];
+
 export default function Appearance({
     onBack,
     selectedMetric,
@@ -116,11 +128,16 @@ export default function Appearance({
     rawGraphData,
     boxUseRawData,
     setBoxUseRawData,
+    xAxisDateFormat,
+    setXAxisDateFormat,
+    xAxisChronological,
+    setXAxisChronological,
 }) {
     const theme = useTheme();
     const isProgress = selectedMetric === "progressBar" || selectedMetric === "progressCircle";
     const isBox = selectedMetric === "box";
     const isPie = selectedMetric === "pie";
+    const isTimeSeries = TIME_SERIES_CHART_TYPES.includes(selectedMetric);
     const showRounding = ROUNDING_CHART_TYPES.includes(selectedMetric);
     const usesSeparateAxis = axisNumberFormat != null;
 
@@ -257,6 +274,41 @@ export default function Appearance({
                                 Uses raw data before aggregation, giving multiple values per time period for a meaningful distribution.
                             </Text>
                         )}
+                    </>
+                )}
+
+                {isTimeSeries && (
+                    <>
+                        <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginTop: 12, marginBottom: 8, paddingHorizontal: 4 }}>
+                            X-Axis Dates
+                        </Text>
+
+                        <DropDown
+                            title="Date Format"
+                            items={X_AXIS_DATE_FORMAT_ITEMS}
+                            showRouterButton={false}
+                            onSelect={setXAxisDateFormat}
+                            value={xAxisDateFormat ?? "auto"}
+                        />
+
+                        <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 2, marginBottom: 8, paddingHorizontal: 4 }}>
+                            DD displays the month name above the graph. When the range is longer than 7 days, DD automatically switches to DD/MM.
+                        </Text>
+
+                        <TouchableOpacity
+                            onPress={() => setXAxisChronological(!(xAxisChronological !== false))}
+                            style={{ flexDirection: "row", alignItems: "center", marginTop: 4, paddingHorizontal: 4 }}
+                        >
+                            <Checkbox
+                                status={(xAxisChronological !== false) ? "checked" : "unchecked"}
+                                onPress={() => setXAxisChronological(!(xAxisChronological !== false))}
+                            />
+                            <Text style={{ fontSize: 14, color: theme.colors.text }}>Display chronologically</Text>
+                        </TouchableOpacity>
+
+                        <Text style={{ fontSize: 12, color: theme.colors.themeGrey, marginTop: 2, marginBottom: 8, paddingHorizontal: 4 }}>
+                            Spaces points proportionally to their dates. When more than 7 days are shown, only some ticks are labelled and the month name is shown when it changes.
+                        </Text>
                     </>
                 )}
 
@@ -431,9 +483,7 @@ export default function Appearance({
             <OptionsHeader onBack={onBack} />
 
             <BasicButton fullWidth label="Format Graph Display" onPress={() => setView("graphDisplay")} />
-            <BasicButton fullWidth label="Format Display Options" onPress={() => setView("displayOptions")} />
-
-            <BasicButton fullWidth label="Back" onPress={onBack} />
+            <BasicButton fullWidth label="Format Display Options" onPress={() => setView("displayOptions")} style={{ marginTop: 16 }} />
         </View>
     );
 }

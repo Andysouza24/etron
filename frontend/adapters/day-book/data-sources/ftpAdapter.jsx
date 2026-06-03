@@ -1,12 +1,3 @@
-import React from "react";
-import ConnectionPage from "../../../components/modules/day-book/data-sources/ConnectionPage";
-import { FtpFormSection } from "../../../components/layout/FormSelection";
-import {
-  validateFtpForm,
-  generateFtpNameFromHostname,
-  buildFtpConnectionData,
-} from "../../../utils/connectionValidators";
-
 import { delay, formatDate, createBaseAdapter } from "./baseAdapter";
 
 const TYPE = "custom-ftp";
@@ -122,20 +113,8 @@ export const createCustomFtpAdapter = (
   };
 };
 
-export const FtpConnectionScreen = () => (
-  <ConnectionPage
-    connectionType="custom-ftp"
-    title="Custom FTP"
-    FormComponent={FtpFormSection}
-    formValidator={validateFtpForm}
-    connectionDataBuilder={buildFtpConnectionData}
-    nameGenerator={generateFtpNameFromHostname}
-  />
-);
-
 export const adapterDescriptor = {
   type: TYPE,
   category: "file-transfer",
   factory: createCustomFtpAdapter,
-  ConnectionScreen: FtpConnectionScreen,
 };

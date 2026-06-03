@@ -7,7 +7,10 @@ import { adapterDescriptor as googleSheetsDescriptor } from "./googleSheetsAdapt
 import { adapterDescriptor as mySqlDescriptor } from "./mySqlAdapter";
 import { adapterDescriptor as micromaxDashboardDescriptor } from "./micromaxDashboardAdapter";
 import { adapterDescriptor as micromaxDashboardFileDescriptor } from "./micromaxDashboardFileAdapter";
+import { adapterDescriptor as testConnectionDescriptor } from "./testConnectionAdapter";
+import { adapterDescriptor as testConnectionFileDescriptor } from "./testConnectionFileAdapter";
 import { adapterDescriptor as localCsvDescriptor } from "./localCsvAdapter";
+import featureFlags from "./featureFlags";
 
 const DESCRIPTORS = [
   googleSheetsDescriptor,
@@ -17,12 +20,14 @@ const DESCRIPTORS = [
   mySqlDescriptor,
   micromaxDashboardDescriptor,
   micromaxDashboardFileDescriptor,
+  ...(featureFlags.testConnection
+    ? [testConnectionDescriptor, testConnectionFileDescriptor]
+    : []),
   localCsvDescriptor,
 ];
 
 // Build derived registries once at module load.
 const factoryByType = {};
-const screenByType = {};
 const categoryByType = {};
 const wizardByType = {};
 
@@ -30,9 +35,6 @@ DESCRIPTORS.forEach((descriptor) => {
   const keys = [descriptor.type, ...(descriptor.aliases || [])];
   keys.forEach((key) => {
     factoryByType[key] = descriptor.factory;
-    if (descriptor.ConnectionScreen) {
-      screenByType[key] = descriptor.ConnectionScreen;
-    }
     if (descriptor.wizard) {
       wizardByType[key] = descriptor.wizard;
     }
@@ -47,6 +49,7 @@ const CATEGORY_LABELS = {
   database: "Databases",
   "file-transfer": "File Transfer",
   "micromax-dashboard": "Micromax Dashboard",
+  "test-connection": "Test Connection",
 };
 
 export function getCategoryDisplayName(category) {
@@ -71,9 +74,6 @@ export function isTypeSupported(type) {
   return Object.prototype.hasOwnProperty.call(factoryByType, type);
 }
 
-export function getConnectionScreen(type) {
-  return screenByType[type] || null;
-}
 // returns wizard config for given source type
 // returns null if type not migrated to wizard yet
 // wizard config shape:
@@ -132,6 +132,26 @@ export function getAdaptersForUI() {
         },
       ],
     },
+    ...(featureFlags.testConnection
+      ? [
+          {
+            heading: "Test Connection",
+            category: "test-connection",
+            adapters: [
+              {
+                label: "Test Connection",
+                icon: "flask-outline",
+                type: "test-connection",
+                description:
+                  "Temporary test feed. Reads JSON files from the test-exports bucket folder. Each file becomes its own data source.",
+                iconColor: "#A855F7",
+                route:
+                  "/modules/day-book/data-management/data-connection-inputs/test-connection",
+              },
+            ],
+          },
+        ]
+      : []),
     {
       heading: "APIs",
       category: "api",

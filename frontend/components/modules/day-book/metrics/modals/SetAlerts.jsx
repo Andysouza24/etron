@@ -1,6 +1,5 @@
 import { View, ScrollView, StyleSheet } from "react-native";
-import { Modal, Portal, Card, Text, useTheme, RadioButton, Chip, Switch, IconButton, Dialog, List, Divider, Tooltip } from "react-native-paper";
-import { sharedModalStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/sharedModalStyles";
+import { Dialog, Portal, Text, useTheme, RadioButton, Chip, Switch, IconButton, List, Divider, Tooltip } from "react-native-paper";
 import BasicButton from "../../../../common/buttons/BasicButton";
 import TextField from "../../../../common/input/TextField";
 import DropDown from "../../../../common/input/DropDown";
@@ -107,9 +106,6 @@ function isAbsoluteChangeCondition(condition) {
 }
 
 const styles = StyleSheet.create({
-    card: {
-        padding: 4,
-    },
     sectionHeader: {
         marginTop: 16,
         marginBottom: 8,
@@ -128,9 +124,6 @@ const styles = StyleSheet.create({
         marginLeft: 48,
         marginBottom: 4,
     },
-    alertList: {
-        maxHeight: 250,
-    },
     alertRow: {
         paddingVertical: 4,
     },
@@ -138,30 +131,23 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
     },
-    addButton: {
-        marginTop: 12,
-    },
-    closeButton: {
-        marginTop: 8,
-        alignSelf: "center",
+    emptyText: {
+        marginBottom: 8,
     },
     formHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        width: "100%",
-        paddingHorizontal: 4,
+        paddingHorizontal: 8,
         paddingTop: 8,
         paddingBottom: 4,
     },
-    formContent: {
-        paddingTop: 4,
+    scrollArea: {
+        paddingHorizontal: 0,
     },
-    formScroll: {
-    },
-    formScrollContent: {
-        paddingTop: 4,
-        paddingBottom: 16,
+    scrollContent: {
+        paddingHorizontal: 24,
+        paddingVertical: 8,
     },
     fieldSpacing: {
         marginBottom: 8,
@@ -329,6 +315,12 @@ export default function SetAlerts({
         }
     }, [dependentVariables]);
 
+    // auto-select the only available delivery method (push) so the user
+    // doesn't have to tap the chip just to enable the save action.
+    useEffect(() => {
+        if (!method) setMethod("push");
+    }, [method]);
+
     const clearForm = useCallback(() => {
         setNotificationName("");
         setCondition("");
@@ -439,16 +431,17 @@ export default function SetAlerts({
         setList((prev) => prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]);
     };
 
-    const renderList = () => (
-        <View>
-            <Card.Title title="Set Alerts" />
-            <Card.Content>
-                {alerts.length === 0 ? (
-                    <Text style={[theme.fonts.bodyMedium, { color: theme.colors.themeGrey, marginBottom: 8 }]}>
-                        No alerts yet. Tap "Add Alert" to create one.
-                    </Text>
-                ) : (
-                    <ScrollView style={styles.alertList}>
+    const renderList = () => [
+        <Dialog.Title key="title">Set Alerts</Dialog.Title>,
+        alerts.length === 0 ? (
+            <Dialog.Content key="body">
+                <Text style={[theme.fonts.bodyMedium, styles.emptyText, { color: theme.colors.themeGrey }]}>
+                    No alerts yet. Tap &quot;Add Alert&quot; to create one.
+                </Text>
+            </Dialog.Content>
+        ) : (
+            <Dialog.ScrollArea key="body" style={styles.scrollArea}>
+                    <ScrollView contentContainerStyle={styles.scrollContent}>
                         {alerts.map((alert, index) => (
                             <List.Item
                                 key={index}
@@ -476,29 +469,14 @@ export default function SetAlerts({
                                 )}
                             />
                         ))}
-                    </ScrollView>
-                )}
-                <BasicButton fullWidth label="Add Alert" onPress={handleAdd} style={styles.addButton} />
-                <BasicButton label="Close" onPress={onDismiss} style={styles.closeButton} mode="outlined" />
-            </Card.Content>
-
-            {/* Delete confirmation dialog */}
-            <Portal>
-                <Dialog visible={deleteConfirmIndex !== null} onDismiss={cancelDelete}>
-                    <Dialog.Title>Delete alert</Dialog.Title>
-                    <Dialog.Content>
-                        <Text style={theme.fonts.bodyMedium}>
-                            Are you sure you want to delete this alert? This cannot be undone.
-                        </Text>
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <BasicButton label="Cancel" onPress={cancelDelete} mode="text" />
-                        <BasicButton label="Delete" onPress={confirmDelete} danger />
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
-        </View>
-    );
+                </ScrollView>
+            </Dialog.ScrollArea>
+        ),
+        <Dialog.Actions key="actions">
+            <BasicButton label="Close" onPress={onDismiss} mode="outlined" />
+            <BasicButton label="Add Alert" onPress={handleAdd} />
+        </Dialog.Actions>,
+    ];
 
     const sectionHeader = (label) => (
         <View style={styles.sectionHeader}>
@@ -556,36 +534,32 @@ export default function SetAlerts({
         const graphPeriodLabel = getLabel(TIME_PERIODS, graphTimePeriod);
         const canToggleGraphPeriod = !(requiresBoundedTimePeriod && graphTimePeriod === "all");
 
-        return (
-            <View>
-                <View style={styles.formHeader}>
-                    <IconButton
-                        icon="close"
-                        onPress={handleCancel}
-                        size={24}
-                        accessibilityLabel="Cancel and go back"
-                    />
-                    <Text style={[theme.fonts.titleMedium, { color: theme.colors.text }]}>
-                        {editingIndex != null ? "Edit Alert" : "New Alert"}
-                    </Text>
-                    <Tooltip title="Fill in all required fields to save">
-                        <View>
-                            <IconButton
-                                icon="check"
-                                onPress={handleSave}
-                                size={24}
-                                disabled={!isFormValid}
-                                accessibilityLabel="Save alert"
-                            />
-                        </View>
-                    </Tooltip>
-                </View>
-                <Divider />
-                <Card.Content style={styles.formContent}>
+        return [
+            <View key="header" style={styles.formHeader}>
+                <IconButton
+                    icon="close"
+                    onPress={handleCancel}
+                    size={24}
+                    accessibilityLabel="Cancel and go back"
+                />
+                <Text style={[theme.fonts.titleMedium, { color: theme.colors.text }]}>
+                    {editingIndex != null ? "Edit Alert" : "New Alert"}
+                </Text>
+                <Tooltip title="Fill in all required fields to save">
+                    <View>
+                        <IconButton
+                            icon="check"
+                            onPress={handleSave}
+                            size={24}
+                            disabled={!isFormValid}
+                            accessibilityLabel="Save alert"
+                        />
+                    </View>
+                </Tooltip>
+            </View>,
+            <Dialog.ScrollArea key="body" style={styles.scrollArea}>
                     <ScrollView
-                        style={styles.formScroll}
-                        contentContainerStyle={styles.formScrollContent}
-                        nestedScrollEnabled
+                        contentContainerStyle={styles.scrollContent}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* ── GENERAL ── */}
@@ -595,6 +569,7 @@ export default function SetAlerts({
                             placeholder="e.g. Revenue drop"
                             onChangeText={setNotificationName}
                             value={notificationName}
+                            noStyle={true}
                         />
 
                         {/* ── WHAT TO MONITOR ── */}
@@ -608,6 +583,7 @@ export default function SetAlerts({
                                     onSelect={setVariable}
                                     value={variable}
                                     maxVisibleItems={3}
+                                    noStyle
                                 />
                             </View>
                         )}
@@ -618,6 +594,7 @@ export default function SetAlerts({
                             onSelect={setCondition}
                             value={condition}
                             maxVisibleItems={3}
+                            noStyle
                         />
                         <View style={styles.fieldSpacingTop}>
                             <TextField
@@ -625,6 +602,7 @@ export default function SetAlerts({
                                 placeholder={isPercent ? "e.g. 10" : "e.g. 100"}
                                 onChangeText={setConditionValue}
                                 value={String(conditionValue)}
+                                noStyle={true}
                             />
                         </View>
 
@@ -632,7 +610,7 @@ export default function SetAlerts({
                         {sectionHeader("When to evaluate")}
                         {isPercent && (
                             <Text style={[theme.fonts.bodySmall, styles.helperItalic, { color: theme.colors.onSurfaceVariant }]}>
-                                Percentage conditions only work with date-based entries, so "Any row" is not available.
+                                Percentage conditions only work with date-based entries, so &quot;Any row&quot; is not available.
                             </Text>
                         )}
                         {renderRadioGroup(availableEvaluateOnOptions, evaluateOn, setEvaluateOn, true)}
@@ -662,8 +640,7 @@ export default function SetAlerts({
                                     showRouterButton={false}
                                     onSelect={setCompareAgainst}
                                     value={compareAgainst}
-                                    maxVisibleItems={4}
-                                />
+                                    maxVisibleItems={4}                                    noStyle                                />
                             </>
                         )}
 
@@ -692,6 +669,7 @@ export default function SetAlerts({
                                         onSelect={setAggregation}
                                         value={aggregation}
                                         maxVisibleItems={3}
+                                        noStyle
                                     />
                                 )}
                             </>
@@ -709,41 +687,12 @@ export default function SetAlerts({
                                     onSelect={setAggregation}
                                     value={aggregation}
                                     maxVisibleItems={3}
+                                    noStyle
                                 />
                             </>
                         )}
 
-                        {/* ── TIME PERIOD ── */}
-                        {sectionHeader("Time period")}
-                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>
-                            {`This alert uses ${graphPeriodLabel} by default. You can override it below.`}
-                        </Text>
-                        {canToggleGraphPeriod ? (
-                            <View style={styles.switchRow}>
-                                <Switch
-                                    value={useCustomTimePeriod}
-                                    onValueChange={setUseCustomTimePeriod}
-                                    accessibilityLabel="Override the default time period for this alert"
-                                />
-                                <Text style={[theme.fonts.bodyMedium, styles.switchLabel, { color: theme.colors.text }]}>
-                                    Override the default time period for this alert
-                                </Text>
-                            </View>
-                        ) : (
-                            <Text style={[theme.fonts.bodySmall, styles.helperSpacing, { color: theme.colors.error, fontStyle: "italic" }]}>
-                                Percentage conditions cannot use the entire data source. Please choose a time period below.
-                            </Text>
-                        )}
-                        {(useCustomTimePeriod || !canToggleGraphPeriod) && (
-                            <DropDown
-                                title="Time Period"
-                                items={timePeriodItems}
-                                showRouterButton={false}
-                                onSelect={setTimePeriod}
-                                value={timePeriod}
-                                maxVisibleItems={4}
-                            />
-                        )}
+                        {/* Time period section temporarily hidden */}
 
                         {/* ── COMPARISON PERIOD (% conditions only) ── */}
                         {showComparisonPeriod && (
@@ -758,8 +707,7 @@ export default function SetAlerts({
                                     showRouterButton={false}
                                     onSelect={setComparisonPeriod}
                                     value={comparisonPeriod}
-                                    maxVisibleItems={3}
-                                />
+                                    maxVisibleItems={3}                                    noStyle                                />
                             </>
                         )}
 
@@ -776,76 +724,37 @@ export default function SetAlerts({
                             Push notification
                         </Chip>
 
-                        {/* ── RECIPIENTS ── */}
-                        {sectionHeader("Recipients")}
-                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>
-                            Choose who can receive this alert.
-                        </Text>
-                        {renderRadioGroup(VISIBILITY_OPTIONS, visibility, setVisibility, false)}
-                        {visibility === "custom" && (
-                            <View style={styles.fieldSpacingTop}>
-                                {workspaceUsers.length > 0 && (
-                                    <>
-                                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>Users</Text>
-                                        {renderChipSelect(
-                                            workspaceUsers.filter((u) => u.userId !== userId),
-                                            readUsers,
-                                            (id) => toggleListItem(readUsers, setReadUsers, id)
-                                        )}
-                                    </>
-                                )}
-                                {roleItems.length > 0 && (
-                                    <View style={styles.fieldSpacingTop}>
-                                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>Roles</Text>
-                                        {renderChipSelect(roleItems, readRoles, (id) => toggleListItem(readRoles, setReadRoles, id))}
-                                    </View>
-                                )}
-                            </View>
-                        )}
-
-                        {/* ── EDITORS ── */}
-                        {sectionHeader("Editors")}
-                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>
-                            Choose who can edit or delete this alert.
-                        </Text>
-                        {renderRadioGroup(EDITOR_OPTIONS, editorVisibility, setEditorVisibility, false)}
-                        {editorVisibility === "custom" && (
-                            <View style={styles.fieldSpacingTop}>
-                                {workspaceUsers.length > 0 && (
-                                    <>
-                                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>Users</Text>
-                                        {renderChipSelect(
-                                            workspaceUsers.filter((u) => u.userId !== userId),
-                                            writeUsers,
-                                            (id) => toggleListItem(writeUsers, setWriteUsers, id)
-                                        )}
-                                    </>
-                                )}
-                                {roleItems.length > 0 && (
-                                    <View style={styles.fieldSpacingTop}>
-                                        <Text style={[theme.fonts.bodySmall, styles.helperSpacingSmall, { color: theme.colors.themeGrey }]}>Roles</Text>
-                                        {renderChipSelect(roleItems, writeRoles, (id) => toggleListItem(writeRoles, setWriteRoles, id))}
-                                    </View>
-                                )}
-                            </View>
-                        )}
-                    </ScrollView>
-                </Card.Content>
-            </View>
-        );
+                {/* Recipients and Editors sections temporarily hidden */}
+            </ScrollView>
+            </Dialog.ScrollArea>,
+        ];
     };
 
     return (
-        <Portal>
-            <Modal
-                visible={visible}
-                onDismiss={onDismiss}
-                contentContainerStyle={sharedModalStyles.modalContainer}
-            >
-                <Card style={[sharedModalStyles.card, styles.card]}>
+        <>
+            <Portal>
+                <Dialog
+                    visible={visible}
+                    onDismiss={onDismiss}
+                    style={{ backgroundColor: theme.colors.surface }}
+                >
                     {view === "form" ? renderForm() : renderList()}
-                </Card>
-            </Modal>
-        </Portal>
+                </Dialog>
+            </Portal>
+            <Portal>
+                <Dialog visible={deleteConfirmIndex !== null} onDismiss={cancelDelete}>
+                    <Dialog.Title>Delete alert</Dialog.Title>
+                    <Dialog.Content>
+                        <Text style={theme.fonts.bodyMedium}>
+                            Are you sure you want to delete this alert? This cannot be undone.
+                        </Text>
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <BasicButton label="Cancel" onPress={cancelDelete} mode="text" />
+                        <BasicButton label="Delete" onPress={confirmDelete} danger />
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
+        </>
     );
 }

@@ -194,6 +194,13 @@ Resources:
             Method: get
             RestApiId: !Ref eTRONApi
 
+        PreviewMetricData:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/preview-metric-data
+            Method: post
+            RestApiId: !Ref eTRONApi
+
         RemoveDataSource:
           Type: Api 
           Properties:
@@ -222,6 +229,27 @@ Resources:
             Method: post
             RestApiId: !Ref eTRONApi
 
+        GetErrorContext:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/error-context
+            Method: get
+            RestApiId: !Ref eTRONApi
+
+        ResolveError:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/resolve-error
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        RefreshDefaultSchema:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/refresh-default-schema
+            Method: post
+            RestApiId: !Ref eTRONApi
+
         PreviewSchemaForSource:
           Type: Api
           Properties:
@@ -233,6 +261,13 @@ Resources:
           Type: Api
           Properties:
             Path: /day-book/data-sources/{dataSourceId}/activate
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        ToggleDataSourceEnabled:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/toggle-enabled
             Method: post
             RestApiId: !Ref eTRONApi
 
@@ -254,6 +289,27 @@ Resources:
           Type: Api
           Properties:
             Path: /day-book/data-sources/{dataSourceId}/micromax-dashboard/rescan
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        DiscoverMicromaxDashboard:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/micromax-dashboard/discover
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        RescanTestConnection:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/test-connection/rescan
+            Method: post
+            RestApiId: !Ref eTRONApi
+
+        DiscoverTestConnection:
+          Type: Api
+          Properties:
+            Path: /day-book/data-sources/{dataSourceId}/test-connection/discover
             Method: post
             RestApiId: !Ref eTRONApi
 
@@ -805,6 +861,7 @@ Resources:
                 object:
                   key:
                     - wildcard: "exports/*.json"
+                    - wildcard: "test-exports/*.json"
         ObjectDeleted:
           Type: EventBridgeRule
           Properties:
@@ -820,6 +877,7 @@ Resources:
                 object:
                   key:
                     - wildcard: "exports/*.json"
+                    - wildcard: "test-exports/*.json"
 
   DashboardRawDataTransformFunction:
     Type: AWS::Serverless::Function

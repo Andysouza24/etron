@@ -1,7 +1,8 @@
 import { StyleSheet, View } from "react-native";
 import { Card, useTheme } from "react-native-paper";
 
-const SeachFilterCard = ({ child }) => {
+// Flat full-width card that frames a search/filter row passed in as `child`.
+const SearchFilterCard = ({ child }) => {
     const theme = useTheme();
 
     return (
@@ -34,4 +35,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default SeachFilterCard;
+export default SearchFilterCard;

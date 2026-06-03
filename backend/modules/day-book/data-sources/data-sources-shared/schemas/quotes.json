@@ -1,0 +1,107 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "quoterefno",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "accountmanager",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "closed",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "customercode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customername",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "lastfollowupdate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YYYY"
+  },
+  {
+    "name": "lost",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "notes",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "quotedate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YYYY"
+  },
+  {
+    "name": "quotevalue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "state",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "status",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "active",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "orderreceived",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YYYY"
+  },
+  {
+    "name": "won",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "expectedorderdate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YYYY"
+  },
+  {
+    "name": "supplier",
+    "type": "string",
+    "category": "dimension"
+  }
+]

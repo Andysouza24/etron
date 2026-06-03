@@ -1,6 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 
+// Full-screen error message with an optional Retry button.
 const ErrorRetry = ({ message = "Something went wrong.", onRetry }) => {
     return (
         <View style={styles.container}>

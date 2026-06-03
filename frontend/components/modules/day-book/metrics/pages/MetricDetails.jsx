@@ -1,13 +1,12 @@
-import { useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { Card, IconButton, useTheme } from "react-native-paper";
+import { useCallback, useMemo, useState } from "react";
+import { View, Text } from "react-native";
+import { Dialog, IconButton, Portal, useTheme } from "react-native-paper";
 import TextField from "../../../../common/input/TextField";
-import { metricStepStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/metricStep";
-import ColorPicker from "react-native-wheel-color-picker";
+import BasicButton from "../../../../common/buttons/BasicButton";
 import ViewShot from "react-native-view-shot";
-import GraphPreview from "../GraphPreview";
 import CustomiseOptions from "../CustomiseOptions";
-import VariableChipSelector from "../VariableChipSelector";
+import MetricViewer from "../MetricViewer";
+import useMetricPreview from "../../../../../hooks/modules/day_book/metrics/useMetricPreview";
 
 export default function MetricDetails({
     metricName,
@@ -22,6 +21,11 @@ export default function MetricDetails({
     graphData,
     xKey,
     yKeys,
+    dataSourceId,
+    aggregation,
+    dimensionField,
+    valueFields,
+    selectedRows,
     selectedMetric,
     setSelectedMetric,
     maxValue,
@@ -45,14 +49,97 @@ export default function MetricDetails({
     rawGraphData,
     boxUseRawData,
     setBoxUseRawData,
+    xAxisDateFormat,
+    setXAxisDateFormat,
+    xAxisChronological,
+    setXAxisChronological,
     alerts,
     setAlerts,
+    thresholds,
+    setThresholds,
     userId,
     workspaceId,
     workspaceUsers,
+    fieldAliases,
+    setFieldAliases,
 }) {
     const theme = useTheme();
     const [isNameSaved, setIsNameSaved] = useState(false);
+    const [aggregationPeriod, setAggregationPeriod] = useState("daily");
+
+    // Local rename dialog state. `field` is the underlying data-source
+    // column being aliased; `defaultLabel` is the fallback shown in the
+    // input placeholder when no alias is set yet.
+    const [renameTarget, setRenameTarget] = useState(null);
+    const [renameValue, setRenameValue] = useState("");
+
+    const aliases = fieldAliases ?? {};
+    const canEditAliases = typeof setFieldAliases === "function";
+
+    const openRenameDialog = useCallback((field, defaultLabel) => {
+        if (!canEditAliases || !field) return;
+        setRenameTarget({ field, defaultLabel: defaultLabel ?? field });
+        setRenameValue(aliases[field] ?? "");
+    }, [aliases, canEditAliases]);
+
+    const closeRenameDialog = useCallback(() => {
+        setRenameTarget(null);
+        setRenameValue("");
+    }, []);
+
+    const handleSaveAlias = useCallback(() => {
+        if (!renameTarget || !canEditAliases) {
+            closeRenameDialog();
+            return;
+        }
+        const trimmed = renameValue.trim();
+        setFieldAliases((prev) => {
+            const next = { ...(prev ?? {}) };
+            if (trimmed) {
+                next[renameTarget.field] = trimmed;
+            } else {
+                delete next[renameTarget.field];
+            }
+            return next;
+        });
+        closeRenameDialog();
+    }, [renameTarget, renameValue, canEditAliases, setFieldAliases, closeRenameDialog]);
+
+    // Build a config object in the same shape MetricGraph receives elsewhere
+    // so the wizard preview behaves identically to the saved metric.
+    const previewConfig = useMemo(() => ({
+        type: graphType,
+        chartType: graphType,
+        independentVariable: xKey,
+        // For dimensional metrics the backend needs the underlying value
+        // field (passed via `valueFields`); the chart yKeys are the pivoted
+        // dimension values (`yKeys`).
+        dependentVariables: Array.isArray(valueFields) && valueFields.length > 0 ? valueFields : yKeys,
+        aggregation: aggregation ?? null,
+        dimensionField: dimensionField ?? null,
+        selectedRows: selectedRows ?? [],
+        maxValue,
+        capPercentAt100,
+        boxGrouping,
+        boxTimePeriod,
+        pieLabelPlacement,
+        rounding,
+        numberFormat,
+        percentRounding,
+        axisNumberFormat,
+        rawGraphData,
+        boxUseRawData,
+        xAxisDateFormat,
+        xAxisChronological,
+        thresholds,
+    }), [graphType, xKey, yKeys, valueFields, aggregation, dimensionField, selectedRows, maxValue, capPercentAt100, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, rawGraphData, boxUseRawData, xAxisDateFormat, xAxisChronological, thresholds]);
+
+    // When a dataSourceId is supplied, fetch the preview data through the
+    // same backend pipeline used by view-metric so the chart matches exactly.
+    // Falls back to the locally-built `graphData` for legacy callers.
+    const preview = useMetricPreview(dataSourceId, dataSourceId ? previewConfig : null, { aggregationPeriod });
+    const chartData = dataSourceId ? preview.data : graphData;
+    const chartYKeys = dataSourceId && preview.yKeys.length > 0 ? preview.yKeys : yKeys;
 
     const handleSaveName = () => {
         if (metricName.trim()) {
@@ -82,70 +169,65 @@ export default function MetricDetails({
                 />
             )}
 
-            <VariableChipSelector
-                dependentVariables={dependentVariables}
+            <MetricViewer
+                config={previewConfig}
+                data={chartData}
+                yKeys={chartYKeys}
+                colours={coloursState}
+                availableYears={dataSourceId ? preview.availableYears : null}
+                selectedYear={dataSourceId ? preview.selectedYear : null}
+                onYearChange={dataSourceId ? preview.refetchForYear : undefined}
+                loading={dataSourceId ? preview.loading : false}
+                aliases={aliases}
                 wheelIndex={wheelIndex}
                 setWheelIndex={setWheelIndex}
-            />
-
-            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>
-                {/*<ColorPicker
-                    color={coloursState[wheelIndex]}
-                    onColorChange={(newColor) => {
-                        setColoursState((prev) => {
-                            const updated = [...prev];
-                            updated[wheelIndex] = newColor;
-                            return updated;
-                        });
-                    }}
-                    thumbSize={30}
-                    sliderSize={30}
-                    noSnap={true}
-                    gapSize={10}
-                    palette={[
-                        theme.colors.metricsPink,
-                        theme.colors.metricsOrange,
-                        theme.colors.metricsYellow,
-                        theme.colors.metricsLime,
-                        theme.colors.metricsGreen,
-                        theme.colors.metricsBlue,
-                        theme.colors.metricsLightBlue,
-                        theme.colors.metricsPurple,
-                    ]}
-                />*/}
-            </View>
-
-            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 16 }}>
-                <Card style={metricStepStyles.card}>
-                    <Card.Content>
+                onRenameVariable={canEditAliases ? openRenameDialog : undefined}
+                onRenameIndependent={canEditAliases && xKey ? openRenameDialog : undefined}
+                aggregationPeriod={aggregationPeriod}
+                onAggregationPeriodChange={setAggregationPeriod}
+                renderGraphContainer={(graphNode) => (
+                    <View style={{ marginBottom: 16 }}>
                         <ViewShot
                             ref={viewShotRef}
                             options={{ format: "png", quality: 1.0, result: "tmpfile" }}
                         >
-                            <View style={metricStepStyles.graphContainer}>
-                                <GraphPreview
-                                    graphType={graphType}
-                                    data={graphData}
-                                    xKey={xKey}
-                                    yKeys={yKeys}
-                                    colours={coloursState}
-                                    maxValue={maxValue}
-                                    capPercentAt100={capPercentAt100}
-                                    boxGrouping={boxGrouping}
-                                    boxTimePeriod={boxTimePeriod}
-                                    pieLabelPlacement={pieLabelPlacement}
-                                    rounding={rounding}
-                                    numberFormat={numberFormat}
-                                    percentRounding={percentRounding}
-                                    axisNumberFormat={axisNumberFormat}
-                                    rawGraphData={rawGraphData}
-                                    boxUseRawData={boxUseRawData}
-                                />
+                            <View
+                                collapsable={false}
+                                style={{ width: "100%", aspectRatio: 1 }}
+                                pointerEvents="box-none"
+                            >
+                                {graphNode}
                             </View>
                         </ViewShot>
-                    </Card.Content>
-                </Card>
-            </View>
+                    </View>
+                )}
+            />
+
+            <Portal>
+                <Dialog
+                    visible={!!renameTarget}
+                    onDismiss={closeRenameDialog}
+                    style={{ backgroundColor: theme.colors.surface }}
+                >
+                    <Dialog.Title>Rename field</Dialog.Title>
+                    <Dialog.Content>
+                        <Text style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}>
+                            {`Choose a label to show instead of "${renameTarget?.defaultLabel ?? ""}" when viewing this metric.`}
+                        </Text>
+                        <TextField
+                            label="Display name"
+                            placeholder={renameTarget?.defaultLabel ?? ""}
+                            value={renameValue}
+                            onChangeText={setRenameValue}
+                            autoFocus
+                        />
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <BasicButton label="Cancel" onPress={closeRenameDialog} />
+                        <BasicButton label="Save" onPress={handleSaveAlias} />
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
 
             <View style={{ marginTop: 16 }}>
                 <CustomiseOptions
@@ -169,15 +251,23 @@ export default function MetricDetails({
                     setPercentRounding={setPercentRounding}
                     axisNumberFormat={axisNumberFormat}
                     setAxisNumberFormat={setAxisNumberFormat}
-                    rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    xAxisDateFormat={xAxisDateFormat}
+                    setXAxisDateFormat={setXAxisDateFormat}
+                    xAxisChronological={xAxisChronological}
+                    setXAxisChronological={setXAxisChronological}
                     alerts={alerts}
                     setAlerts={setAlerts}
+                    thresholds={thresholds}
+                    setThresholds={setThresholds}
                     dependentVariables={dependentVariables}
                     userId={userId}
                     workspaceId={workspaceId}
                     workspaceUsers={workspaceUsers}
+                    graphData={chartData}
+                    yKeys={chartYKeys}
+                    rawGraphData={rawGraphData}
                 />
             </View>
         </View>

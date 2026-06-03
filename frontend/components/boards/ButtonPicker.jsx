@@ -4,6 +4,10 @@ import { List, Button, TextInput, Text, useTheme, IconButton as PaperIconButton 
 import DescriptiveButton from '../common/buttons/DescriptiveButton';
 import IconButton from '../common/buttons/IconButton';
 
+// Two-page editor for a board navigation button: a details page (label,
+// destination, icon preview) and an icon-picker page. Emits the button config
+// via onSelect. No live preview here — only the chosen icon is previewed.
+
 const NAVIGATION_DESTINATIONS = [
     {
         id: 'reports',
@@ -30,10 +34,10 @@ const NAVIGATION_DESTINATIONS = [
         route: '/(auth)/(drawer)/boards'
     },
     {
-        id: 'dashboard',
-        label: 'Dashboard',
+        id: 'home',
+        label: 'Home',
         icon: 'view-dashboard',
-        route: '/(auth)/(drawer)/dashboard'
+        route: '/(auth)/(drawer)/home'
     },
     {
         id: 'settings',

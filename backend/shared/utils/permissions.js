@@ -76,22 +76,31 @@ async function _resolveEffectivePermissions(userId, workspaceId){
         return {
             permissions: [],
             isOwner: true,
+            hideGatedComponents: false,
             version: user.permissionsVersion || 0
         };
     }
 
     const permissionSet = new Set();
+    // a user inherits the hide-gated-components flag if ANY of their roles
+    // has it enabled; this keeps the UI behaviour predictable when a user
+    // holds multiple roles.
+    let hideGatedComponents = false;
     for (const role of roles) {
         if (role?.permissions) {
             for (const perm of role.permissions) {
                 permissionSet.add(perm);
             }
         }
+        if (role?.hideGatedComponents === true) {
+            hideGatedComponents = true;
+        }
     }
 
     return {
         permissions: Array.from(permissionSet),
         isOwner: false,
+        hideGatedComponents,
         version: user.permissionsVersion || 0
     };
 

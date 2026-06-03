@@ -1,0 +1,107 @@
+[
+  {
+    "name": "accountManager",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "accountManagerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "overdue_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "overdue"
+  },
+  {
+    "name": "overdue_value",
+    "type": "double",
+    "category": "value",
+    "group": "overdue"
+  },
+  {
+    "name": "current_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "current"
+  },
+  {
+    "name": "current_value",
+    "type": "double",
+    "category": "value",
+    "group": "current"
+  },
+  {
+    "name": "next_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "next"
+  },
+  {
+    "name": "next_value",
+    "type": "double",
+    "category": "value",
+    "group": "next"
+  },
+  {
+    "name": "month2_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "month2"
+  },
+  {
+    "name": "month2_value",
+    "type": "double",
+    "category": "value",
+    "group": "month2"
+  },
+  {
+    "name": "month3_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "month3"
+  },
+  {
+    "name": "month3_value",
+    "type": "double",
+    "category": "value",
+    "group": "month3"
+  },
+  {
+    "name": "future_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "future"
+  },
+  {
+    "name": "future_value",
+    "type": "double",
+    "category": "value",
+    "group": "future"
+  },
+  {
+    "name": "total_count",
+    "type": "bigint",
+    "category": "value",
+    "group": "total"
+  },
+  {
+    "name": "total_value",
+    "type": "double",
+    "category": "value",
+    "group": "total"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

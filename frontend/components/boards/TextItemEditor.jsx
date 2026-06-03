@@ -3,6 +3,10 @@ import { View, StyleSheet } from 'react-native';
 import { TextInput, Button, Text, SegmentedButtons, useTheme } from 'react-native-paper';
 import { sanitizeColourValue } from '../../utils/boards/boardUtils';
 
+// Single-page editor for a board text block: content, alignment, sizing, and
+// colours, with a live preview at the bottom. Validates hex colours on save
+// and emits the resolved config via onSave.
+
 const alignmentButtons = [
     { value: 'left', label: 'Left', icon: 'format-align-left' },
     { value: 'center', label: 'Center', icon: 'format-align-center' },

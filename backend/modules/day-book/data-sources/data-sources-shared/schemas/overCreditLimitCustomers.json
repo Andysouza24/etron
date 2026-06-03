@@ -1,0 +1,58 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "tradingCurrency",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "creditLimit",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "accountBalance",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "amountOverCreditLimit",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "salesEmployeeName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

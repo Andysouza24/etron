@@ -20,7 +20,8 @@ const TextField = ({
     isDisabled = false,
     customRightButton = false,
     rightButtonIcon,
-    rightButtonPress
+    rightButtonPress,
+    noStyle = false,
 }) => {
     const theme = useTheme();
     const [hidePassword, setHidePassword] = useState(secureTextEntry);
@@ -44,7 +45,7 @@ const TextField = ({
                 <View
                     style={[
                         styles.labelContainer,
-                        { backgroundColor: theme.colors.background },
+                        { backgroundColor: noStyle ? theme.colors.surface : theme.colors.background },
                     ]}
                 >
                     <Text style={[styles.label, { color: theme.colors.text }]}>

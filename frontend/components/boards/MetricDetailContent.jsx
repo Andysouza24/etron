@@ -1,20 +1,42 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Text, Chip, useTheme } from 'react-native-paper';
 import GraphTypes from '../modules/day-book/metrics/graph-types';
-import { resolveAppearance, formatMetricValue, formatRangeValue } from '../../utils/boards/boardUtils';
+import MetricViewer from '../modules/day-book/metrics/MetricViewer';
+import { resolveAppearance, mergeAppearance, formatMetricValue, formatRangeValue } from '../../utils/boards/boardUtils';
 import { DEFAULT_CHART_COLOURS } from '../../utils/boards/boardConstants';
 import metricDataService from '../../services/MetricDataService';
 import { ScrollView } from 'react-native-gesture-handler';
+import DataSourceErrorNotice from './DataSourceErrorNotice';
+import { useMetricContext } from '../../contexts/MetricContext';
+import { useHasPermission } from '../../hooks/useHasPermission';
 
-const MetricDetailContent = ({ item, metricState, styles }) => {
+const MetricDetailContent = ({ item, metricState, onYearChange, styles, metricAppearance, dataSourceErrored = false }) => {
+    const theme = useTheme();
+    const { metrics } = useMetricContext();
+    const [aggregationPeriod, setAggregationPeriod] = useState('daily');
+    const { allowed: manageMetricsPermission } = useHasPermission('modules.daybook.metrics.manage_metrics');
+    const { allowed: viewDataPermission } = useHasPermission('modules.daybook.datasources.view_data');
+    // metadata + variable chips are gated behind either permission so users
+    // without data access don't see derived statistics about it.
+    const canViewDetails = manageMetricsPermission || viewDataPermission;
+
     if (!item) {
         return null;
     }
 
-    const theme = useTheme();
-
-    const config = item.config || {};
+    const snapshotConfig = item.config || {};
+    const liveMetric = Array.isArray(metrics)
+        ? metrics.find((m) => m?.metricId === snapshotConfig.metricId)
+        : null;
+    const liveThresholds = Array.isArray(liveMetric?.config?.thresholds)
+        ? liveMetric.config.thresholds
+        : null;
+    // Always use freshest fieldAliases (liveMetric preferred)
+    const liveFieldAliases = liveMetric?.config?.fieldAliases;
+    const config = liveThresholds
+        ? { ...snapshotConfig, thresholds: liveThresholds, fieldAliases: liveFieldAliases ?? snapshotConfig.fieldAliases }
+        : { ...snapshotConfig, fieldAliases: liveFieldAliases ?? snapshotConfig.fieldAliases };
     const configDependentVariables = Array.isArray(config.dependentVariables) ? config.dependentVariables : [];
     const dependentVariables = Array.isArray(metricState?.yKeys) && metricState.yKeys.length > 0
         ? metricState.yKeys
@@ -23,10 +45,17 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
     const graphDef = config.chartType ? GraphTypes[config.chartType] : null;
     const isLoading = metricState ? metricState.loading : true;
     const errorMessage = metricState?.error;
-    const data = Array.isArray(metricState?.data) ? metricState.data : [];
+    // When the backend shipped all four aggregation views in one bundle,
+    // swap the displayed rows to the currently selected period so toggling
+    // never triggers a refetch. Falls back to the default `data` slice for
+    // legacy or non-bucketable responses.
+    const periodSlice = metricState?.periods?.[aggregationPeriod];
+    const data = Array.isArray(periodSlice)
+        ? periodSlice
+        : (Array.isArray(metricState?.data) ? metricState.data : []);
     const hasData = data.length > 0 && dependentVariables.length > 0;
     const dataCount = data.length;
-    const appearance = resolveAppearance(config.appearance);
+    const appearance = resolveAppearance(mergeAppearance(metricAppearance, config.appearance));
     const axisColorMode = appearance.background && appearance.background !== 'transparent'
         ? (appearance.background.toLowerCase() === '#ffffff' || appearance.background.toLowerCase() === 'white' ? 'light' : 'dark')
         : (theme.dark ? 'light' : 'light');
@@ -64,66 +93,78 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
         : [];
     const summaryDisplay = dependentSummaries.slice(0, 2);
     const remainingSummaries = Math.max(dependentSummaries.length - summaryDisplay.length, 0);
-    const axisLabel = config.independentVariable || 'Not set';
+    const axisLabel = (config.independentVariable && config.fieldAliases?.[config.independentVariable])
+        ? config.fieldAliases[config.independentVariable]
+        : (config.independentVariable || 'Not set');
 
     return (
         <View style={styles.metricDetailContainer}>
-            <View style={[styles.metricDetailChart, { backgroundColor: chartBackground }]}> 
-                {isLoading && (
-                    <View style={styles.metricStatus}>
-                        <ActivityIndicator color={statusTextColor} />
-                        <Text style={[styles.metricStatusText, { color: statusMutedColor }]}>Syncing data...</Text>
-                    </View>
-                )}
-
-                {!isLoading && errorMessage && (
-                    <View style={styles.metricStatus}>
-                        <Text
-                            style={[styles.metricErrorText, { color: theme.colors?.error ?? '#ff8a80' }]}
-                            numberOfLines={3}
+            {dataSourceErrored ? (
+                <DataSourceErrorNotice />
+            ) : null}
+            {!isLoading && !errorMessage && graphDef && hasData && (
+                <MetricViewer
+                    config={config}
+                    data={data}
+                    yKeys={dependentVariables}
+                    colours={colours}
+                    axisColorMode={axisColorMode}
+                    availableYears={metricState?.availableYears}
+                    selectedYear={metricState?.selectedYear}
+                    onYearChange={onYearChange}
+                    loading={!!metricState?.loading}
+                    aliases={config.fieldAliases || {}}
+                    aggregationPeriod={aggregationPeriod}
+                    onAggregationPeriodChange={setAggregationPeriod}
+                    compactBottom={true}
+                    renderGraphContainer={(graphNode) => (
+                        <View
+                            collapsable={false}
+                            style={[styles.metricDetailChart, { backgroundColor: chartBackground }]}
+                            pointerEvents="box-none"
                         >
-                            {errorMessage}
-                        </Text>
-                    </View>
-                )}
+                            {graphNode}
+                        </View>
+                    )}
+                />
+            )}
+            {(isLoading || errorMessage || !graphDef || !hasData) && (
+                <View style={[styles.metricDetailChart, { backgroundColor: chartBackground }]}>
+                    {isLoading && (
+                        <View style={styles.metricStatus}>
+                            <ActivityIndicator color={statusTextColor} />
+                            <Text style={[styles.metricStatusText, { color: statusMutedColor }]}>Syncing data...</Text>
+                        </View>
+                    )}
 
-                {!isLoading && !errorMessage && !graphDef && (
-                    <View style={styles.metricStatus}>
-                        <Text style={[styles.metricErrorText, { color: theme.colors?.error ?? '#ff8a80' }]}>Unsupported chart type.</Text>
-                    </View>
-                )}
+                    {!isLoading && errorMessage && (
+                        <View style={styles.metricStatus}>
+                            <Text
+                                style={[styles.metricErrorText, { color: theme.colors?.error ?? '#ff8a80' }]}
+                                numberOfLines={3}
+                            >
+                                {errorMessage}
+                            </Text>
+                        </View>
+                    )}
 
-                {!isLoading && !errorMessage && graphDef && !hasData && (
-                    <View style={styles.metricStatus}>
-                        <Text style={[styles.metricEmptyText, { color: statusMutedColor }]}>No metric data available.</Text>
-                    </View>
-                )}
+                    {!isLoading && !errorMessage && !graphDef && (
+                        <View style={styles.metricStatus}>
+                            <Text style={[styles.metricErrorText, { color: theme.colors?.error ?? '#ff8a80' }]}>Unsupported chart type.</Text>
+                        </View>
+                    )}
 
-                {!isLoading && !errorMessage && graphDef && hasData && (
-                    <View style={styles.metricDetailChartInner}>
-                        {graphDef.render({
-                            data,
-                            xKey: config.independentVariable,
-                            yKeys: dependentVariables,
-                            colours,
-                            axisColorMode,
-                            maxValue: config.maxValue,
-                            capPercentAt100: config.capPercentAt100,
-                            boxGrouping: config.boxGrouping,
-                            boxTimePeriod: config.boxTimePeriod,
-                            pieLabelPlacement: config.pieLabelPlacement,
-                            rounding: config.rounding,
-                            numberFormat: config.numberFormat,
-                            percentRounding: config.percentRounding,
-                            axisNumberFormat: config.axisNumberFormat,
-                            rawGraphData: config.rawGraphData,
-                            boxUseRawData: config.boxUseRawData,
-                        })}
-                    </View>
-                )}
-            </View>
+                    {!isLoading && !errorMessage && graphDef && !hasData && (
+                        <View style={styles.metricStatus}>
+                            <Text style={[styles.metricEmptyText, { color: statusMutedColor }]}>No metric data available.</Text>
+                        </View>
+                    )}
+                </View>
+            )}
 
             <View style={styles.metricDetailInfo}>
+                {canViewDetails ? (
+                <>
                 <View style={styles.metricDetailMetaGrid}>
                     <View style={styles.metricDetailMetaItem}>
                         <Text style={styles.metricDetailMetaLabel}>Data</Text>
@@ -176,6 +217,8 @@ const MetricDetailContent = ({ item, metricState, styles }) => {
                         </View>
                     </View>
                 )}
+                </>
+                ) : null}
             </View>
         </View>
     );

@@ -8,12 +8,13 @@ import AggregationSelector from "../Selectors/AggregationSelector";
 import DataPreviewModal from "../modals/DataPreviewModal";
 import ExistingMetricsModal from "../modals/ExistingMetricsModal";
 import { simpleStyles } from "../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
+import ChipValueSelector from "../Selectors/ChipValueSelector";
 
 export default function SimpleConfig({
     ds,
     viewDataPermission,
-    valueSelection,
-    setValueSelection,
+    valueSelections,
+    setValueSelections,
     dateSelection,
     setDateSelection,
     aggregationSelection,
@@ -42,10 +43,10 @@ export default function SimpleConfig({
                 dataSourceId={ds.dataSourceId}
             >
                 <View style={simpleStyles.formSection}>
-                    <ValueSelector
+                    <ChipValueSelector
                         fields={ds.classifiedFields.valueFields}
-                        valueSelection={valueSelection}
-                        onValueSelectionChange={setValueSelection}
+                        valueSelections={valueSelections}
+                        onValueSelectionChange={setValueSelections}
                         selectionTitle="Select value to track"
                     />
                 </View>

@@ -5,7 +5,8 @@ import { fetchUserAttributes, signOut, updateUserAttributes } from 'aws-amplify/
 import { useVerification } from '../../contexts/VerificationContext';
 import { saveWorkspaceInfo } from '../../storage/workspaceStorage';
 import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
-import { apiGet } from '../../utils/api/apiClient';
+import { hydrateHideGatedSync } from '../../storage/permissionsStorage';
+import { apiGet, setUnauthorizedHandler } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
 import workspaceService from '../../services/WorkspaceService';
 import { MetricProvider } from '../../contexts/MetricContext';
@@ -144,7 +145,7 @@ export default function AuthLayout() {
             }
             
             await saveInfoIntoStorage();
-            router.replace("/(auth)/dashboard")
+            router.replace("/(auth)/home")
         } else if (authStatus === `configuring`) {
             console.log("Auth status configuring...")
         } else {
@@ -161,6 +162,30 @@ export default function AuthLayout() {
     useEffect(() => {
         checkAuthStatus();
     }, [authStatus, verifyingPassword]);
+
+    // Register a global unauthorized handler so the api client can force
+    // a sign-out + redirect to /landing whenever auth recovery fails
+    // (refresh token expired, retry still returns 401, etc.).
+    useEffect(() => {
+        setUnauthorizedHandler(async (reason) => {
+            console.warn('[AuthLayout] Forced sign-out due to:', reason);
+            try { await signOut(); } catch (e) { console.error('[AuthLayout] signOut failed:', e); }
+            try {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/landing');
+            } catch (e) {
+                console.error('[AuthLayout] redirect failed:', e);
+            }
+        });
+        return () => setUnauthorizedHandler(null);
+    }, []);
+
+    // Hydrate the synchronous mirror of hideGatedComponents from disk so
+    // PermissionGate has the correct value on its very first render
+    // (before the workspace-setup seed completes).
+    useEffect(() => {
+        hydrateHideGatedSync();
+    }, []);
 
 
     return (         

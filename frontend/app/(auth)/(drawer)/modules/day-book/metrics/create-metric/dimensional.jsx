@@ -4,6 +4,7 @@ import useMetricDataSource from "../../../../../../../hooks/modules/day_book/met
 import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
 import useCurrencySymbolSeed from "../../../../../../../hooks/modules/day_book/metrics/useCurrencySymbolSeed";
 import { useHasPermission } from "../../../../../../../hooks/useHasPermission";
+import { hasDuplicateValues } from "../../../../../../../utils/aggregation";
 import { parseNumericOrOriginal } from "../../../../../../../utils/numberParser";
 import { DEFAULT_NUMBER_FORMAT } from "../../../../../../../utils/constants/modules/day-book/metrics/numberFormat";
 import MetricWizard from "../../../../../../../components/modules/day-book/metrics/MetricWizard";
@@ -14,18 +15,29 @@ import { getCurrentUser } from "aws-amplify/auth";
 import { apiGet } from "../../../../../../../utils/api/apiClient";
 import endpoints from "../../../../../../../utils/api/endpoints";
 
-const Dimensional = () => {
+function convertToGraphData(rows) {
+    return rows.map((row) => {
+        const newRow = {};
+        for (const [key, value] of Object.entries(row)) {
+            newRow[key] = parseNumericOrOriginal(value);
+        }
+        return newRow;
+    });
+}
+
+const CreateDimensionalMetric = () => {
     const { allowed: viewDataPermission } = useHasPermission("modules.daybook.datasources.view_data");
     const ds = useMetricDataSource();
     const form = useMetricForm();
     const { submitMetric, viewShotRef } = useMetricSubmission();
 
-    const [selectedMetric, setSelectedMetric] = useState(null);
+    const [selectedMetric, setSelectedMetric] = useState("line");
     const [selectedRows, setSelectedRows] = useState([]);
+    const [valueSelection, setValueSelection] = useState(null);
     const [dateSelection, setDateSelection] = useState(null);
-    const [metricSelection, setMetricSelection] = useState(null);
     const [dimensionSelection, setDimensionSelection] = useState(null);
-    const [metricConfig, setMetricConfig] = useState(null);
+    const [aggregationSelection, setAggregationSelection] = useState("sum");
+    const [aggChecked, setAggChecked] = useState(false);
     const [maxValue, setMaxValue] = useState(null);
     const [capPercentAt100, setCapPercentAt100] = useState(false);
     const [boxGrouping, setBoxGrouping] = useState("all");
@@ -36,7 +48,12 @@ const Dimensional = () => {
     const [axisNumberFormat, setAxisNumberFormat] = useState(null);
     const [boxUseRawData, setBoxUseRawData] = useState(false);
     const [numberFormat, setNumberFormat] = useState({ ...DEFAULT_NUMBER_FORMAT });
+    const [xAxisDateFormat, setXAxisDateFormat] = useState("auto");
+    const [xAxisChronological, setXAxisChronological] = useState(true);
+
+    // alerts state
     const [alerts, setAlerts] = useState([]);
+    const [fieldAliases, setFieldAliases] = useState({});
     const [workspaceId, setWorkspaceId] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
     const [workspaceUsers, setWorkspaceUsers] = useState([]);
@@ -58,47 +75,45 @@ const Dimensional = () => {
         })();
     }, []);
 
-    const valueField = useMemo(() => {
-        if (!metricConfig?.dependentVariables?.length) return null;
-        return metricConfig.dependentVariables[0];
-    }, [metricConfig]);
+    useCurrencySymbolSeed(valueSelection, ds.classifiedFields?.valueFields, setNumberFormat);
 
-    useCurrencySymbolSeed(valueField, ds.classifiedFields?.valueFields, setNumberFormat);
+    const hasDuplicateDates = useMemo(
+        () => hasDuplicateValues(ds.dataSourceData, dateSelection),
+        [dateSelection, ds.dataSourceData]
+    );
 
+    useEffect(() => {
+        setAggChecked(hasDuplicateDates);
+    }, [hasDuplicateDates]);
+
+    // Distinct dimension values become the y-series in the pivoted chart.
     const dimensionValues = useMemo(() => {
         if (!dimensionSelection || !ds.dataSourceData.length) return [];
         const unique = [...new Set(ds.dataSourceData.map((row) => row[dimensionSelection]))];
         return unique.filter((v) => v != null).map(String);
     }, [dimensionSelection, ds.dataSourceData]);
 
-    const rawGraphData = useMemo(() => {
-        if (!dateSelection || !valueField || !dimensionSelection) return null;
+    const convertedRows = useMemo(() => {
         const rows =
             selectedRows.length > 0
                 ? ds.dataSourceData.filter((row) => selectedRows.includes(row[ds.dataSourceVariableNames[0]]))
                 : ds.dataSourceData;
-        return rows.map((row) => {
-            const newRow = {};
-            for (const [key, value] of Object.entries(row)) {
-                newRow[key] = parseNumericOrOriginal(value);
-            }
-            return newRow;
-        });
-    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows, dateSelection, valueField, dimensionSelection]);
+        return convertToGraphData(rows);
+    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows]);
 
+    const isAggregated =
+        (aggChecked || hasDuplicateDates) && dateSelection && valueSelection && aggregationSelection;
+
+    // Local pivot: { [date]: { date, [dimValue]: aggregated } }. Used as a
+    // fallback before backend preview data arrives.
     const graphData = useMemo(() => {
-        if (!dateSelection || !valueField || !dimensionSelection) return [];
-
-        const rows =
-            selectedRows.length > 0
-                ? ds.dataSourceData.filter((row) => selectedRows.includes(row[ds.dataSourceVariableNames[0]]))
-                : ds.dataSourceData;
+        if (!dateSelection || !valueSelection || !dimensionSelection) return [];
 
         const grouped = {};
-        for (const row of rows) {
+        for (const row of convertedRows) {
             const dateVal = row[dateSelection];
             const dimVal = row[dimensionSelection];
-            const numVal = parseNumericOrOriginal(row[valueField]);
+            const numVal = row[valueSelection];
 
             if (dateVal == null) continue;
             if (!grouped[dateVal]) {
@@ -111,7 +126,9 @@ const Dimensional = () => {
         }
 
         return Object.values(grouped);
-    }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows, dateSelection, valueField, dimensionSelection]);
+    }, [convertedRows, dateSelection, valueSelection, dimensionSelection]);
+
+    const rawGraphData = isAggregated ? convertedRows : null;
 
     const handleSubmit = useCallback(async () => {
         await submitMetric({
@@ -122,9 +139,9 @@ const Dimensional = () => {
                 type: selectedMetric,
                 metricType: form.metricType,
                 independentVariable: dateSelection,
-                dependentVariables: valueField ? [valueField] : [],
+                dependentVariables: valueSelection ? [valueSelection] : [],
                 dimensionField: dimensionSelection,
-                sourceMetricId: metricSelection,
+                aggregation: aggChecked ? aggregationSelection : null,
                 colours: form.coloursState,
                 selectedRows,
                 maxValue,
@@ -136,9 +153,13 @@ const Dimensional = () => {
                 percentRounding,
                 axisNumberFormat,
                 boxUseRawData,
+                xAxisDateFormat,
+                xAxisChronological,
+                alerts,
+                fieldAliases,
             },
         });
-    }, [form, ds.dataSourceId, dateSelection, valueField, dimensionSelection, metricSelection, selectedRows, selectedMetric, submitMetric]);
+    }, [form, ds.dataSourceId, dateSelection, valueSelection, dimensionSelection, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric, maxValue, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, boxUseRawData, xAxisDateFormat, xAxisChronological, alerts, fieldAliases]);
 
     const pages = useMemo(() => [
         {
@@ -146,19 +167,19 @@ const Dimensional = () => {
                 <DimensionalConfig
                     ds={ds}
                     viewDataPermission={viewDataPermission}
-                    selectedMetric={selectedMetric}
-                    setSelectedMetric={setSelectedMetric}
+                    valueSelection={valueSelection}
+                    setValueSelection={setValueSelection}
                     dateSelection={dateSelection}
                     setDateSelection={setDateSelection}
-                    metricSelection={metricSelection}
-                    setMetricSelection={setMetricSelection}
                     dimensionSelection={dimensionSelection}
                     setDimensionSelection={setDimensionSelection}
-                    metricConfig={metricConfig}
-                    setMetricConfig={setMetricConfig}
+                    aggregationSelection={aggregationSelection}
+                    setAggregationSelection={setAggregationSelection}
+                    aggChecked={aggChecked}
+                    setAggChecked={setAggChecked}
                 />
             ),
-            validate: () => !!metricSelection && !!dimensionSelection && !!dateSelection,
+            validate: () => !!valueSelection && !!dateSelection && !!dimensionSelection,
         },
         {
             component: (
@@ -175,6 +196,11 @@ const Dimensional = () => {
                     graphData={graphData}
                     xKey={dateSelection}
                     yKeys={dimensionValues}
+                    dataSourceId={ds.dataSourceId}
+                    aggregation={aggChecked ? aggregationSelection : null}
+                    dimensionField={dimensionSelection}
+                    valueFields={valueSelection ? [valueSelection] : []}
+                    selectedRows={selectedRows}
                     selectedMetric={selectedMetric}
                     setSelectedMetric={setSelectedMetric}
                     maxValue={maxValue}
@@ -198,16 +224,22 @@ const Dimensional = () => {
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    xAxisDateFormat={xAxisDateFormat}
+                    setXAxisDateFormat={setXAxisDateFormat}
+                    xAxisChronological={xAxisChronological}
+                    setXAxisChronological={setXAxisChronological}
                     alerts={alerts}
                     setAlerts={setAlerts}
                     userId={currentUserId}
                     workspaceId={workspaceId}
                     workspaceUsers={workspaceUsers}
+                    fieldAliases={fieldAliases}
+                    setFieldAliases={setFieldAliases}
                 />
             ),
             validate: () => !!form.metricName.trim(),
         },
-    ], [ds, viewDataPermission, selectedMetric, dateSelection, metricSelection, dimensionSelection, metricConfig, dimensionValues, form, viewShotRef, graphData, rawGraphData]);
+    ], [ds, viewDataPermission, selectedMetric, valueSelection, dateSelection, dimensionSelection, aggregationSelection, aggChecked, dimensionValues, form, viewShotRef, graphData, rawGraphData, fieldAliases]);
 
     return (
         <MetricWizard
@@ -218,4 +250,4 @@ const Dimensional = () => {
     );
 };
 
-export default Dimensional;
+export default CreateDimensionalMetric;

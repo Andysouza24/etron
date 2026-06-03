@@ -1,7 +1,8 @@
 import { View, StyleSheet } from "react-native";
-import { Text, useTheme } from "react-native-paper";
+import { Text } from "react-native-paper";
 import SelectableChip from "./SelectableChip";
 
+// Chip group for chart-export options: background colour and axis colour.
 const BACKGROUND_OPTIONS = ["white", "black", "transparent"];
 const AXIS_OPTIONS = [
     { value: "dark", label: "White axes" },
@@ -14,8 +15,6 @@ const ExportChipGroup = ({
     axisColorMode,
     onAxisColorChange,
 }) => {
-    const theme = useTheme();
-
     return (
         <View>
             <View style={styles.section}>

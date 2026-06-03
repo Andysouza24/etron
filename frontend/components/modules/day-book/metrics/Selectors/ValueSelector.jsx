@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
-import { Text, useTheme } from "react-native-paper";
-import DropDown from "../../../../common/input/DropDown";
+import GenericSelector from "./GenericSelector";
 import { toDropdownItems } from "../../../../../utils/fieldClassifier";
 
 export default function ValueSelector({
@@ -12,15 +11,12 @@ export default function ValueSelector({
     const dropdownItems = useMemo(() => toDropdownItems(fields), [fields]);
 
     return (
-        <>
-            <Text variant="labelLarge">{selectionTitle}</Text>
-            <DropDown
-                title="Value Fields"
-                items={dropdownItems}
-                showRouterButton={false}
-                onSelect={onValueSelectionChange}
-                value={valueSelection}
-            />
-        </>
+        <GenericSelector
+            label={selectionTitle}
+            title="Value Fields"
+            items={dropdownItems}
+            value={valueSelection}
+            onChange={onValueSelectionChange}
+        />
     );
 }

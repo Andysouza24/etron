@@ -1,6 +1,7 @@
 import React, { Children, cloneElement, useEffect, useMemo, useRef, useState } from "react";
 import { View, Pressable } from "react-native";
 import { Menu, Text, useTheme } from "react-native-paper";
+import { useHidePermissionGated } from "../../hooks/useHidePermissionGated";
 
 const PermissionGate = ({
 	allowed,
@@ -10,6 +11,7 @@ const PermissionGate = ({
 	duration = 3000,
 	dimOpacity = 0.6, 
 	dimWhenBlocked = true,
+	preserveLayoutWhenHidden = false,
 	menuProps,
 	contentStyle,
 	textStyle,
@@ -17,6 +19,7 @@ const PermissionGate = ({
 	const theme = useTheme();
 	const [visible, setVisible] = useState(false);
     const timeoutRef = useRef(null);
+    const hideWhenBlocked = useHidePermissionGated();
 
     useEffect(() => () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -47,6 +50,24 @@ const PermissionGate = ({
 
     	return cloneElement(child, { ...extraProps });
 	}, [child, allowed]);
+
+	// when the current role opts into hiding gated components, omit the
+	// child entirely rather than dimming + showing a tooltip. this acts as
+	// a runtime switch over the entire app so admins can choose between
+	// "show-but-disable" (default) and "fully hide" behaviour per role.
+	if (!allowed && hideWhenBlocked) {
+		// preserveLayoutWhenHidden keeps the child's footprint so parents
+		// that rely on symmetric layout (e.g. Appbar center-aligned title)
+		// don't shift when the gated icon is removed.
+		if (preserveLayoutWhenHidden) {
+			return (
+				<View style={{ opacity: 0 }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+					{renderedChild}
+				</View>
+			);
+		}
+		return null;
+	}
 
 	const anchor = (
 		<Pressable

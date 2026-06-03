@@ -8,9 +8,9 @@ import { Text } from "react-native-paper";
 import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import Header from "../../../../../../../components/layout/Header";
 import {
-    getConnectionScreen,
     getWizardConfig,
 } from "../../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
+import { getConnectionScreen } from "../../../../../../../adapters/day-book/data-sources/connectionScreens";
 import WizardProvider from "../../../../../../../components/modules/day-book/data-sources/wizard/WizardContext";
 import WizardScreen from "../../../../../../../components/modules/day-book/data-sources/wizard/WizardScreen";
 

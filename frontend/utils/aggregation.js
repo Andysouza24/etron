@@ -1,5 +1,10 @@
+// Client-side row aggregation helpers.
+// Groups rows by a date key and rolls up each value column by the chosen type.
+
 import { parseNumericOrNull } from "./numberParser";
 
+// Group rows by their date value and reduce each value column.
+// Non-numeric cells are dropped before aggregating.
 export function aggregateData(data, dateKey, valueKeys, aggregationType) {
     const groups = new Map();
     for (const row of data) {

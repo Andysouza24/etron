@@ -1,7 +1,10 @@
 import metricService from "../services/MetricService";
-import { useRef, useCallback, useMemo, createContext, useContext, useState } from "react";
+import { useRef, useCallback, useMemo, createContext, useContext, useState, useEffect } from "react";
 import useMetricSubscription from "../hooks/modules/day_book/metrics/useMetricSubscription";
 import useDataUpdateSubscription from "../hooks/modules/day_book/data-sources/useDataUpdateSubscription";
+import { getCurrentUser } from "aws-amplify/auth";
+import { apiGet } from "../utils/api/apiClient";
+import endpoints from "../utils/api/endpoints";
 
 const MetricContext = createContext(null);
 
@@ -17,6 +20,32 @@ export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [metricTypeFilter, setMetricTypeFilter] = useState(null);
+    // bumped per-dataSourceId when an onDataUpdate event arrives so that downstream graph caches
+    // can invalidate the cached chart data for metrics that use that data source
+    const [dataUpdateVals, setDataUpdateVals] = useState({});
+
+    // current user identity — used to filter metrics by access
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [userRoleId, setUserRoleId] = useState(null);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const { userId } = await getCurrentUser();
+                setCurrentUserId(userId);
+            } catch {}
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (!workspaceId) return;
+        (async () => {
+            try {
+                const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
+                setUserRoleId(result?.data?.roleId ?? null);
+            } catch {}
+        })();
+    }, [workspaceId]);
 
     const loadMetrics = useCallback(async (showLoading = true) => {
         try {
@@ -103,12 +132,30 @@ export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
         return serviceRef.current.getMetric(metricId);
     }, []);
 
-    // TODO: wire up useMetricSubscription to auto-update list on real-time events
     // the hook provides a single onUpdate callback for all metric changes
     useMetricSubscription((updatedMetric) => {
         const cleaned = Object.fromEntries(
             Object.entries(updatedMetric).filter(([_, v]) => v != null)
         );
+
+        // handle deletion (mirrors Boards pattern)
+        if (cleaned.action === "DELETE") {
+            setMetrics(prev => prev.filter(m => m.metricId !== cleaned.metricId));
+            console.log("[MetricContext] Real-time metric deleted:", cleaned.metricId);
+            return;
+        }
+
+        // AppSync AWSJSON fields arrive as JSON strings
+        // parse them so downstream consumers can read object properties
+        for (const field of ["config", "calculation"]) {
+            if (typeof cleaned[field] === "string") {
+                try {
+                    cleaned[field] = JSON.parse(cleaned[field]);
+                } catch (err) {
+                    console.warn(`[MetricContext] Failed to parse ${field} from subscription payload:`, err);
+                }
+            }
+        }
         setMetrics(prev => {
             const exists = prev.find(m => m.metricId === cleaned.metricId);
             if (exists) {
@@ -118,19 +165,48 @@ export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
             }
         });
         console.log("[MetricContext] Real-time metric update: ", cleaned);
-    }, workspaceId);
+    }, workspaceId, () => {
+        // on subscription reconnect (network blip, foreground), refetch
+        // the metric list so we catch anything that happened while we
+        // were disconnected.
+        loadMetrics(false);
+    });
 
     useDataUpdateSubscription((dataUpdate) => {
+        // bump Val so cached chart data for metrics on this data source is invalidated and refetched on next render
+        if (dataUpdate?.dataSourceId) {
+            setDataUpdateVals(prev => ({
+                ...prev,
+                [dataUpdate.dataSourceId]: (prev[dataUpdate.dataSourceId] ?? 0) + 1,
+            }));
+        }
         // trigger silent refresh to pick up new metric data
         loadMetrics(false);
         console.log("[MetricContext] Data update for data source:", dataUpdate.dataSourceId, "affecting metrics:", dataUpdate.metrics);
-    }, workspaceId);
+    }, workspaceId, () => {
+        loadMetrics(false);
+    });
 
     // filter metrics by type
     const filteredMetrics = useMemo(() => {
         if (!metricTypeFilter) return metrics;
         return metrics.filter(m => m.type === metricTypeFilter);
     }, [metrics, metricTypeFilter]);
+
+    // filter metrics by access — only show metrics the current user can see
+    const accessibleMetrics = useMemo(() => {
+        if (!currentUserId) return metrics;
+        return metrics.filter(m => {
+            const access = m.access;
+            if (!access || !access.accessType || access.accessType === 'workspace') return true;
+            if (String(m.createdBy) === String(currentUserId)) return true;
+            const collaborators = Array.isArray(access.collaborators) ? access.collaborators : [];
+            if (collaborators.some(c => String(c.userId) === String(currentUserId))) return true;
+            const roleAccess = Array.isArray(access.roleAccess) ? access.roleAccess : [];
+            if (userRoleId && roleAccess.some(r => String(r.roleId) === String(userRoleId))) return true;
+            return false;
+        });
+    }, [metrics, currentUserId, userRoleId]);
 
     // helper to get metrics by type
     const getMetricsByType = useCallback((type) => {
@@ -142,10 +218,12 @@ export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
         // states
         metrics,
         filteredMetrics,
+        accessibleMetrics,
         loading,
         error,
         ensureMetrics,
         metricTypeFilter,
+        dataUpdateVals,
 
         // actions
         createMetric,
@@ -156,7 +234,7 @@ export function MetricProvider({ children, workspaceId: workspaceIdProp }) {
         getMetricsByType,
         setMetricTypeFilter,
         refresh: () => loadMetrics(true),
-    }), [metrics, filteredMetrics, loading, error, ensureMetrics, metricTypeFilter, createMetric, deleteMetric, updateMetric, getMetricData, getMetric, getMetricsByType, loadMetrics]);
+    }), [metrics, filteredMetrics, accessibleMetrics, loading, error, ensureMetrics, metricTypeFilter, dataUpdateVals, createMetric, deleteMetric, updateMetric, getMetricData, getMetric, getMetricsByType, loadMetrics]);
 
     return (
         <MetricContext.Provider value={value}>

@@ -38,6 +38,27 @@ const FieldCategoryReviewStep = () => {
         );
     }
 
+    // empty source - no rows yet, so there are no fields to review
+    // the connection is created without a schema and will be flagged for review when data first arrives
+    if (schemaPreview.isEmpty || schemaPreview.schema.length === 0) {
+        return (
+            <View style={styles.empty}>
+                <Text variant="titleMedium">No data yet</Text>
+                <Text style={{ color: theme.colors.onSurfaceVariant }}>
+                    This source is empty, so there are no fields to review. You can still
+                    finish setting up the connection - we&apos;ll prompt you to review the
+                    fields once data starts arriving.
+                </Text>
+                <View style={styles.actions}>
+                    {!isFirst && (
+                        <BasicButton label="Back" onPress={goBack} mode="outlined" />
+                    )}
+                    <BasicButton label="Continue" onPress={goNext} />
+                </View>
+            </View>
+        );
+    }
+
     const confirmed = draft.confirmedSchema || schemaPreview.schema;
 
     return (

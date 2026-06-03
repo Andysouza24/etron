@@ -33,7 +33,7 @@ const CreateSimpleMetric = () => {
 
     const [selectedMetric, setSelectedMetric] = useState("line");
     const [selectedRows, setSelectedRows] = useState([]);
-    const [valueSelection, setValueSelection] = useState(null);
+    const [valueSelections, setValueSelections] = useState([]);
     const [dateSelection, setDateSelection] = useState(null);
     const [aggregationSelection, setAggregationSelection] = useState("sum");
     const [aggChecked, setAggChecked] = useState(false);
@@ -47,9 +47,13 @@ const CreateSimpleMetric = () => {
     const [axisNumberFormat, setAxisNumberFormat] = useState(null);
     const [boxUseRawData, setBoxUseRawData] = useState(false);
     const [numberFormat, setNumberFormat] = useState({ ...DEFAULT_NUMBER_FORMAT });
+    const [xAxisDateFormat, setXAxisDateFormat] = useState("auto");
+    const [xAxisChronological, setXAxisChronological] = useState(true);
 
     // alerts state
     const [alerts, setAlerts] = useState([]);
+    const [thresholds, setThresholds] = useState([]);
+    const [fieldAliases, setFieldAliases] = useState({});
     const [workspaceId, setWorkspaceId] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
     const [workspaceUsers, setWorkspaceUsers] = useState([]);
@@ -80,7 +84,11 @@ const CreateSimpleMetric = () => {
         setAggChecked(hasDuplicateDates);
     }, [hasDuplicateDates]);
 
-    useCurrencySymbolSeed(valueSelection, ds.classifiedFields?.valueFields, setNumberFormat);
+    useEffect(() => {
+        setValueSelections([]);
+    }, [ds.dataSourceId]);
+
+    useCurrencySymbolSeed(valueSelections[0], ds.classifiedFields?.valueFields, setNumberFormat);
 
     const convertedRows = useMemo(() => {
         const rows =
@@ -90,14 +98,14 @@ const CreateSimpleMetric = () => {
         return convertToGraphData(rows);
     }, [ds.dataSourceData, ds.dataSourceVariableNames, selectedRows]);
 
-    const isAggregated = (aggChecked || hasDuplicateDates) && dateSelection && valueSelection && aggregationSelection;
+    const isAggregated = (aggChecked || hasDuplicateDates) && dateSelection && valueSelections.length > 0 && aggregationSelection;
 
     const graphData = useMemo(() => {
         if (isAggregated) {
-            return aggregateData(convertedRows, dateSelection, [valueSelection], aggregationSelection);
+            return aggregateData(convertedRows, dateSelection, valueSelections, aggregationSelection);
         }
         return convertedRows;
-    }, [convertedRows, isAggregated, dateSelection, valueSelection, aggregationSelection]);
+    }, [convertedRows, isAggregated, dateSelection, valueSelections, aggregationSelection]);
 
     const rawGraphData = isAggregated ? convertedRows : null;
 
@@ -110,7 +118,7 @@ const CreateSimpleMetric = () => {
                 type: selectedMetric,
                 metricType: form.metricType,
                 independentVariable: dateSelection,
-                dependentVariables: valueSelection ? [valueSelection] : [],
+                dependentVariables: valueSelections,
                 aggregation: aggChecked ? aggregationSelection : null,
                 colours: form.coloursState,
                 selectedRows,
@@ -123,10 +131,14 @@ const CreateSimpleMetric = () => {
                 percentRounding,
                 axisNumberFormat,
                 boxUseRawData,
+                xAxisDateFormat,
+                xAxisChronological,
                 alerts,
+                thresholds,
+                fieldAliases,
             },
         });
-    }, [form, ds.dataSourceId, dateSelection, valueSelection, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric, maxValue, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat]);
+    }, [form, ds.dataSourceId, dateSelection, valueSelections, selectedRows, selectedMetric, aggChecked, aggregationSelection, submitMetric, maxValue, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, xAxisDateFormat, xAxisChronological, alerts, thresholds, fieldAliases]);
 
     const pages = useMemo(() => [
         {
@@ -134,8 +146,8 @@ const CreateSimpleMetric = () => {
                 <SimpleConfig
                     ds={ds}
                     viewDataPermission={viewDataPermission}
-                    valueSelection={valueSelection}
-                    setValueSelection={setValueSelection}
+                    valueSelections={valueSelections}
+                    setValueSelections={setValueSelections}
                     dateSelection={dateSelection}
                     setDateSelection={setDateSelection}
                     aggregationSelection={aggregationSelection}
@@ -144,7 +156,7 @@ const CreateSimpleMetric = () => {
                     setAggChecked={setAggChecked}
                 />
             ),
-            validate: () => !!valueSelection && !!dateSelection,
+            validate: () => valueSelections.length > 0 && !!dateSelection,
         },
         {
             component: (
@@ -155,12 +167,15 @@ const CreateSimpleMetric = () => {
                     setColoursState={form.setColoursState}
                     wheelIndex={form.wheelIndex}
                     setWheelIndex={form.setWheelIndex}
-                    dependentVariables={valueSelection ? [valueSelection] : []}
+                    dependentVariables={valueSelections}
                     viewShotRef={viewShotRef}
                     graphType={selectedMetric}
                     graphData={graphData}
                     xKey={dateSelection}
-                    yKeys={valueSelection ? [valueSelection] : []}
+                    yKeys={valueSelections}
+                    dataSourceId={ds.dataSourceId}
+                    aggregation={aggChecked ? aggregationSelection : null}
+                    selectedRows={selectedRows}
                     selectedMetric={selectedMetric}
                     setSelectedMetric={setSelectedMetric}
                     maxValue={maxValue}
@@ -184,16 +199,24 @@ const CreateSimpleMetric = () => {
                     rawGraphData={rawGraphData}
                     boxUseRawData={boxUseRawData}
                     setBoxUseRawData={setBoxUseRawData}
+                    xAxisDateFormat={xAxisDateFormat}
+                    setXAxisDateFormat={setXAxisDateFormat}
+                    xAxisChronological={xAxisChronological}
+                    setXAxisChronological={setXAxisChronological}
                     alerts={alerts}
                     setAlerts={setAlerts}
+                    thresholds={thresholds}
+                    setThresholds={setThresholds}
                     userId={currentUserId}
                     workspaceId={workspaceId}
                     workspaceUsers={workspaceUsers}
+                    fieldAliases={fieldAliases}
+                    setFieldAliases={setFieldAliases}
                 />
             ),
             validate: () => !!form.metricName.trim(),
         },
-    ], [ds, viewDataPermission, selectedMetric, valueSelection, dateSelection, aggregationSelection, aggChecked, form, viewShotRef, graphData, rawGraphData]);
+    ], [ds, viewDataPermission, selectedMetric, valueSelections, dateSelection, aggregationSelection, aggChecked, form, viewShotRef, graphData, rawGraphData, fieldAliases]);
 
     return (
         <MetricWizard

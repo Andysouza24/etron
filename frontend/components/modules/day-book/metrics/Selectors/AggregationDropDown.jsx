@@ -1,6 +1,5 @@
 import React from "react";
-import { Text } from "react-native-paper";
-import DropDown from "../../../../common/input/DropDown";
+import GenericSelector from "./GenericSelector";
 
 // TODO: add to utils/constants
 const AGGREGATION_ITEMS = [
@@ -17,15 +16,13 @@ export default function AggregationDropDown({
     selectedAggregation = AGGREGATION_ITEMS[0].value, // default to sum
 }) {
     return (
-        <>
-            <Text variant="labelMedium">Data Aggregation</Text>
-            <DropDown
-                title="Aggregation"
-                items={AGGREGATION_ITEMS}
-                showRouterButton={false}
-                onSelect={onAggregationSelect}
-                value={selectedAggregation}
-            />
-        </>
+        <GenericSelector
+            label="Data Aggregation"
+            labelVariant="labelMedium"
+            title="Aggregation"
+            items={AGGREGATION_ITEMS}
+            value={selectedAggregation}
+            onChange={onAggregationSelect}
+        />
     );
-} 
+}

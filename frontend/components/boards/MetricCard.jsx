@@ -2,8 +2,10 @@ import React from 'react';
 import { View, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Text, IconButton, useTheme } from 'react-native-paper';
 import GraphTypes from '../modules/day-book/metrics/graph-types';
+import MetricGraph from '../modules/day-book/metrics/MetricGraph';
 import { resolveAppearance } from '../../utils/boards/boardUtils';
 import { DEFAULT_CHART_COLOURS } from '../../utils/boards/boardConstants';
+import { useMetricContext } from '../../contexts/MetricContext';
 
 const MetricCard = ({ 
     item, 
@@ -12,16 +14,28 @@ const MetricCard = ({
     styles, 
     onEdit,
     onPress,
-    disableEditActions = false
+    disableEditActions = false,
+    dataSourceErrored = false,
+    compactBottom = false,
 }) => {
     const theme = useTheme();
+    const { metrics } = useMetricContext();
     const editIconColor = theme.colors?.primary ?? theme.colors?.icon ?? '#118AB2';
     const editContainerColor = theme.colors?.lowOpacityButton
         ?? theme.colors?.buttonBackground
         ?? theme.colors?.surfaceVariant
         ?? (theme.dark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.08)');
 
-    const config = item.config || {};
+    const snapshotConfig = item.config || {};
+    const liveMetric = Array.isArray(metrics)
+        ? metrics.find((m) => m?.metricId === snapshotConfig.metricId)
+        : null;
+    const liveThresholds = Array.isArray(liveMetric?.config?.thresholds)
+        ? liveMetric.config.thresholds
+        : null;
+    const config = liveThresholds
+        ? { ...snapshotConfig, thresholds: liveThresholds }
+        : snapshotConfig;
     const isLoading = metricState ? metricState.loading : true;
     const errorMessage = metricState?.error;
     const data = Array.isArray(metricState?.data) ? metricState.data : [];
@@ -85,24 +99,17 @@ const MetricCard = ({
 
         return (
             <View style={styles.metricPreviewChartInner}>
-                {graphDef.render({
-                    data,
-                    xKey: config.independentVariable,
-                    yKeys: dependentVariables,
-                    colours,
-                    axisColorMode,
-                    maxValue: config.maxValue,
-                    capPercentAt100: config.capPercentAt100,
-                    boxGrouping: config.boxGrouping,
-                    boxTimePeriod: config.boxTimePeriod,
-                    pieLabelPlacement: config.pieLabelPlacement,
-                    rounding: config.rounding,
-                    numberFormat: config.numberFormat,
-                    percentRounding: config.percentRounding,
-                    axisNumberFormat: config.axisNumberFormat,
-                    rawGraphData: config.rawGraphData,
-                    boxUseRawData: config.boxUseRawData,
-                })}
+                <MetricGraph
+                    config={config}
+                    data={data}
+                    yKeys={dependentVariables}
+                    colours={colours}
+                    axisColorMode={axisColorMode}
+                    availableYears={metricState?.availableYears ?? null}
+                    selectedYear={metricState?.selectedYear ?? null}
+                    hideYearFilter
+                    compactBottom={compactBottom}
+                />
             </View>
         );
     })();
@@ -124,6 +131,33 @@ const MetricCard = ({
                             iconColor={editIconColor}
                             containerColor={editContainerColor}
                             accessibilityLabel="Edit board item"
+                        />
+                    </View>
+                )}
+                {dataSourceErrored && (
+                    <View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            top: 6,
+                            right: 6,
+                            zIndex: 2,
+                            backgroundColor: theme.colors.errorContainer,
+                            borderRadius: 12,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                        }}
+                        accessibilityLabel="Data source has an error"
+                    >
+                        <IconButton
+                            icon="alert-circle"
+                            size={14}
+                            iconColor={theme.colors.onErrorContainer}
+                            style={{ margin: 0 }}
+                            disabled
                         />
                     </View>
                 )}

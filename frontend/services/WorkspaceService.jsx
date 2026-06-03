@@ -6,6 +6,10 @@ import AuthService from "./AuthService";
 import { saveWorkspaceInfo, extractWorkspaceId, getWorkspaceInfo, removeWorkspaceInfo } from "../storage/workspaceStorage";
 import { savePermissionsCache } from "../storage/permissionsStorage";
 import { saveUserInfo } from "../storage/userStorage";
+import { extractList } from "./_internal/normalizeResponse";
+
+// Wrapper keys this endpoint may use, on top of the shared defaults.
+const WORKSPACE_LIST_KEYS = ["data", "items", "results", "list", "value", "workspaces", "records", "rows", "Items"];
 
 class WorkspaceService {
 	constructor(client) {
@@ -14,18 +18,11 @@ class WorkspaceService {
 
 	// Try to coerce various backend response shapes into an array of workspaces
 	coerceWorkspaceList(raw) {
-		if (!raw) return [];
-		if (Array.isArray(raw)) return raw;
-		if (typeof raw !== "object") return [];
-		const list = raw.data || raw.items || raw.results || raw.list || raw.value || raw.workspaces || raw.records || raw.rows || raw.Items;
+		const list = extractList(raw, { keys: WORKSPACE_LIST_KEYS });
 		if (Array.isArray(list)) return list;
-		// fallback: first array found in object
-		const firstArray = Object.values(raw).find((v) => Array.isArray(v));
-		if (Array.isArray(firstArray)) return firstArray;
 		// If shape looks like a single workspace object, wrap it
 		try {
-			const id = extractWorkspaceId(raw);
-			if (id) return [raw];
+			if (extractWorkspaceId(raw)) return [raw];
 		} catch {}
 		return [];
 	}
@@ -86,18 +83,7 @@ class WorkspaceService {
 
 			return selected;
 		} catch (error) {
-			try {
-				const status = error?.response?.status;
-				const data = error?.response?.data;
-				const headers = error?.response?.headers;
-				/*console.error("[WorkspaceService] Failed to fetch/set workspace", {
-					message: error?.message,
-					status,
-					dataPreview: (() => { try { return JSON.stringify(data)?.slice(0, 500); } catch { return String(data)?.slice(0, 500); } })(),
-					headerKeys: headers ? Object.keys(headers) : undefined,
-				});*/
-			} catch {}
-			//console.error("[WorkspaceService] Error object:", error);
+			console.error("[WorkspaceService] fetchAndSetWorkspaceForCurrentUser:", error);
 			return null;
 		}
 	}
@@ -110,7 +96,8 @@ class WorkspaceService {
 			await savePermissionsCache({
 				permissions: permsResponse.data.permissions,
 				isOwner: permsResponse.data.isOwner,
-				version: permsResponse.data.version
+				version: permsResponse.data.version,
+				hideGatedComponents: permsResponse.data.hideGatedComponents === true
 			});
 			console.log("[WorkspaceService] Permissions cache seeded");
 		} catch (error) {

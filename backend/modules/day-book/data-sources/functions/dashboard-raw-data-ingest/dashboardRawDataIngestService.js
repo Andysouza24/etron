@@ -3,10 +3,31 @@ const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
 const { removeAllStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const parentAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardAdapter");
-const fileAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardFileAdapter");
+const micromaxParentAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardAdapter");
+const micromaxFileAdapter = require("@etron/data-sources-shared/adapters/micromaxDashboardFileAdapter");
+const testConnectionParentAdapter = require("@etron/data-sources-shared/adapters/testConnectionAdapter");
+const testConnectionFileAdapter = require("@etron/data-sources-shared/adapters/testConnectionFileAdapter");
+const featureFlags = require("@etron/data-sources-shared/utils/featureFlags");
 
 const sqsClient = new SQSClient({});
+
+// Registered parent/file adapter pairs. The ingest pipeline supports any
+// number of (parent, file) adapter pairs; each pair owns a unique S3 prefix.
+// Pairs can be gated behind feature flags so the pipeline ignores their S3
+// events without removing the underlying adapter code.
+const ADAPTER_PAIRS = [
+    { parent: micromaxParentAdapter, file: micromaxFileAdapter },
+    ...(featureFlags.testConnection
+        ? [{ parent: testConnectionParentAdapter, file: testConnectionFileAdapter }]
+        : []),
+];
+
+// Resolves the (parent, file) adapter pair responsible for a given S3 key
+// based on its prefix. Returns null if no registered pair matches.
+function findAdapterPairForKey(key) {
+    if (!key) return null;
+    return ADAPTER_PAIRS.find((pair) => key.startsWith(pair.parent.EXPORT_PREFIX)) || null;
+}
 
 // Returns a display name for a child data source given a fileName like
 // "sales-daily.json" -> "sales-daily".
@@ -14,13 +35,16 @@ function deriveDisplayName(fileName) {
     return fileName.replace(/\.json$/i, "");
 }
 
-// Loads every parent connection workspace-by-workspace.
+// Loads every parent connection (across all registered adapter pairs) workspace-by-workspace.
 async function listParents() {
-    return dataSourceRepo.findDataSourcesBySourceType(parentAdapter.SOURCE_TYPE);
+    const results = await Promise.all(
+        ADAPTER_PAIRS.map((pair) => dataSourceRepo.findDataSourcesBySourceType(pair.parent.SOURCE_TYPE))
+    );
+    return results.flat();
 }
 
 // Finds an existing child for a given (workspaceId, parentDataSourceId, fileName).
-async function findExistingChild(workspaceId, parentDataSourceId, fileName) {
+async function findExistingChild(workspaceId, parentDataSourceId, fileName, fileAdapter) {
     const children = await dataSourceRepo.findChildrenByParent(workspaceId, parentDataSourceId);
     return children.find(
         (c) => c.sourceType === fileAdapter.SOURCE_TYPE && c?.config?.fileName === fileName
@@ -28,8 +52,8 @@ async function findExistingChild(workspaceId, parentDataSourceId, fileName) {
 }
 
 // Ensures a child exists for the given parent + fileName. Returns the child.
-async function ensureChildDataSource(parent, fileName) {
-    const existing = await findExistingChild(parent.workspaceId, parent.dataSourceId, fileName);
+async function ensureChildDataSource(parent, fileName, fileAdapter) {
+    const existing = await findExistingChild(parent.workspaceId, parent.dataSourceId, fileName, fileAdapter);
     if (existing) return existing;
 
     const date = new Date().toISOString();
@@ -38,7 +62,7 @@ async function ensureChildDataSource(parent, fileName) {
         dataSourceId: uuidv4(),
         name: deriveDisplayName(fileName),
         sourceType: fileAdapter.SOURCE_TYPE,
-        method: "overwrite",
+        method: "append-new",
         expiry: null,
         status: "processing",
         createdBy: parent.createdBy || "system",
@@ -60,19 +84,24 @@ async function ensureChildDataSource(parent, fileName) {
     return child;
 }
 
-// Resolves an S3 key like `exports/foo.json` into every (parent, child) pair to
-// ingest. Creates missing children for each parent connection.
+// Resolves an S3 key like `exports/foo.json` (or `test-exports/foo.json`) into
+// every (parent, child) pair to ingest. Creates missing children for each
+// parent connection that matches the key's prefix.
 async function resolveCreateTargets(key) {
-    const parsed = parentAdapter.parseObjectKey(key);
+    const pair = findAdapterPairForKey(key);
+    if (!pair) return [];
+
+    const parsed = pair.parent.parseObjectKey(key);
     if (!parsed) return [];
 
-    const parents = await listParents();
+    const allParents = await listParents();
+    const parents = allParents.filter((p) => p.sourceType === pair.parent.SOURCE_TYPE);
     if (parents.length === 0) return [];
 
     const targets = [];
     for (const parent of parents) {
         try {
-            const child = await ensureChildDataSource(parent, parsed.fileName);
+            const child = await ensureChildDataSource(parent, parsed.fileName, pair.file);
             targets.push({ workspaceId: parent.workspaceId, dataSourceId: child.dataSourceId });
         } catch (err) {
             console.error(
@@ -88,11 +117,14 @@ async function resolveCreateTargets(key) {
 // Resolves an S3 key into every (workspaceId, dataSourceId) child that should
 // be removed. Does not delete here; callers do.
 async function resolveDeleteTargets(key) {
-    const parsed = parentAdapter.parseObjectKey(key);
+    const pair = findAdapterPairForKey(key);
+    if (!pair) return [];
+
+    const parsed = pair.parent.parseObjectKey(key);
     if (!parsed) return [];
 
     const matches = await dataSourceRepo.findDataSourcesBySourceTypeAndFileName(
-        fileAdapter.SOURCE_TYPE,
+        pair.file.SOURCE_TYPE,
         parsed.fileName,
     );
     return matches.map((m) => ({ workspaceId: m.workspaceId, dataSourceId: m.dataSourceId }));

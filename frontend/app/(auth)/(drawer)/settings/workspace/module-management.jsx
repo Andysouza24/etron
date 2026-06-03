@@ -201,6 +201,7 @@ const ModuleManagement = ({ availableFilters = ['All', 'Financial', 'Employees',
                         estimatedItemSize={100}
                         drawDistance={1}
                         ItemSeparatorComponent={() => <View style={{height: 20}} />}
+                        refreshing={loading}
                         onRefresh={async () => {
                             setLoading(true);
                             await fetchModules(workspaceId);

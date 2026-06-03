@@ -75,6 +75,12 @@ async function updateRole(workspaceId, roleId, data) {
     expressionAttributeNames["#hasAccess"] = "hasAccess";
   }
 
+  if (data.hideGatedComponents !== undefined) {
+    updateFields.push("#hideGatedComponents = :hideGatedComponents");
+    expressionAttributeValues[":hideGatedComponents"] = data.hideGatedComponents;
+    expressionAttributeNames["#hideGatedComponents"] = "hideGatedComponents";
+  }
+
   updateFields.push("#updatedAt = :updatedAt");
   expressionAttributeValues[":updatedAt"] = new Date().toISOString();
   expressionAttributeNames["#updatedAt"] = "updatedAt";

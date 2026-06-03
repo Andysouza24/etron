@@ -44,6 +44,24 @@ class MetricService {
         return apiGet(endpoints.modules.day_book.metrics.getMetricsByDataSource(dataSourceId), await this.#withWorkspace());
     }
 
+    // get collaboration settings for a metric
+    async getMetricCollaboration(metricId) {
+        const result = await this.getMetric(metricId);
+        const metric = result?.data ?? result;
+        return metric?.access ?? { accessType: 'workspace', collaborators: [], roleAccess: [] };
+    }
+
+    // update collaboration settings for a metric
+    async updateMetricCollaboration(metricId, { accessType, collaborators, roleAccess }) {
+        return this.updateMetric(metricId, {
+            access: {
+                accessType: accessType || 'workspace',
+                collaborators: (collaborators || []).map(c => ({ userId: String(c.userId) })),
+                roleAccess: (roleAccess || []).map(r => ({ roleId: String(r.roleId) })),
+            },
+        });
+    }
+
     // TODO: get upload/download URLs
     // TODO: fix
     /*async uploadGraphToS3(payload){

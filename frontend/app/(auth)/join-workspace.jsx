@@ -9,13 +9,14 @@ import InviteCard from "../../components/cards/inviteCard";
 import BasicButton from "../../components/common/buttons/BasicButton";
 import { apiGet, apiPost } from "../../utils/api/apiClient";
 import endpoints from "../../utils/api/endpoints";
-import { fetchUserAttributes, getCurrentUser, updateUserAttribute, signOut } from "aws-amplify/auth";
+import { fetchUserAttributes, getCurrentUser, signOut } from "aws-amplify/auth";
 import formatTTLDate from "../../utils/format/formatTTLDate";
 import { saveWorkspaceInfo } from "../../storage/workspaceStorage";
 import { router } from "expo-router";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
 import StackLayout from "../../components/layout/StackLayout";
 import workspaceService from "../../services/WorkspaceService";
+import { updateUserAttributeWithStep } from "../../utils/userAttributes";
 
 
 const JoinWorkspace = () => {
@@ -23,6 +24,7 @@ const JoinWorkspace = () => {
     const [invites, setInvites] = useState([]);
     const [selectedInvite, setSelectedInvite] = useState(null);
     const [joining, setJoining] = useState(false);
+    const [message, setMessage] = useState("");
 
 
     useEffect(() => {
@@ -65,39 +67,6 @@ const JoinWorkspace = () => {
         loadInvites();
     }, []);
 
-    // updates user attributes in cognito
-    async function handleUpdateUserAttribute(attributeKey, value) {
-        try {
-            const output = await updateUserAttribute({
-                userAttribute: {
-                    attributeKey,
-                    value
-                }
-            });
-
-            const { nextStep } = output;
-
-            switch (nextStep.updateAttributeStep) {
-                case 'CONFIRM_ATTRIBUTE_WITH_CODE':
-                    const codeDeliveryDetails = nextStep.codeDeliveryDetails;
-                    console.log(`Confirmation code was sent to ${codeDeliveryDetails?.deliveryMedium} at ${codeDeliveryDetails?.destination}`);
-                    return { needsConfirmation: true };
-                case 'DONE':
-                    const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    console.log(`${fieldName} updated successfully`);
-                    return { needsConfirmation: false };
-                default:
-                    console.log(`${attributeKey.replace('_', ' ')} update completed`);
-                    return { needsConfirmation: false };
-            }
-        } catch (error) {
-            console.error("Error updating user attribute:", error);
-            const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-            setMessage(`Error updating ${fieldName}: ${error.message}`);
-            return { needsConfirmation: false, error: true };
-        }
-    }
-
     const renderInvites = ({item}) => (
         <InviteCard 
             invite={item}
@@ -131,12 +100,12 @@ const JoinWorkspace = () => {
 
             await workspaceService.setupWorkspaceStorage(workspace, userAttributes.sub);
 
-            await handleUpdateUserAttribute('custom:has_workspace', "true");
+            await updateUserAttributeWithStep('custom:has_workspace', "true", { onError: setMessage });
 
             setJoining(false);
 
             // navigate to the profile
-            router.navigate("/dashboard");
+            router.navigate("/home");
         } catch (error) {
             setJoining(false);
             console.error("Error joining workspace: ", error);

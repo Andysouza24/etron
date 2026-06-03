@@ -30,7 +30,7 @@ class GraphErrorBoundary extends React.Component {
     }
 }
 
-export default function GraphPreview({ graphType, data, xKey, yKeys, colours, axisColorMode, maxValue, capPercentAt100, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, rawGraphData, boxUseRawData }) {
+export default function GraphPreview({ graphType, data, xKey, yKeys, colours, axisColorMode, maxValue, capPercentAt100, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, rawGraphData, boxUseRawData, xAxisDateFormat, xAxisChronological, preFormattedXLabels, secondaryDateTicks, thresholds, compactBottom }) {
     const graphDef = GraphTypes[graphType];
 
     if (!graphDef) {
@@ -38,7 +38,7 @@ export default function GraphPreview({ graphType, data, xKey, yKeys, colours, ax
     }
 
     try {
-        const rendered = graphDef.render({ data, xKey, yKeys, colours, axisColorMode, maxValue, capPercentAt100, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, rawGraphData, boxUseRawData });
+        const rendered = graphDef.render({ data, xKey, yKeys, colours, axisColorMode, maxValue, capPercentAt100, boxGrouping, boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding, axisNumberFormat, rawGraphData, boxUseRawData, xAxisDateFormat, xAxisChronological, preFormattedXLabels, secondaryDateTicks, thresholds, compactBottom });
         return <GraphErrorBoundary>{rendered}</GraphErrorBoundary>;
     } catch (err) {
         console.error('[GraphPreview] render function threw:', err);

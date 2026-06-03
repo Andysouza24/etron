@@ -24,7 +24,7 @@ async function createRoleInWorkspace(authUserId, workspaceId, payload) {
 
     await validateWorkspaceId(workspaceId);
 
-    const { name, permissions } = payload;
+    const { name, permissions, hideGatedComponents } = payload;
 
     if (!name || typeof name !== "string") {
         throw new Error("Please specify a name");
@@ -47,6 +47,10 @@ async function createRoleInWorkspace(authUserId, workspaceId, payload) {
         }
     }
 
+    if (hideGatedComponents !== undefined && typeof hideGatedComponents !== "boolean") {
+        throw new Error("'hideGatedComponents' must be a boolean");
+    }
+
     const roleId = uuidv4();
     const date = new Date().toISOString();
 
@@ -56,6 +60,7 @@ async function createRoleInWorkspace(authUserId, workspaceId, payload) {
         roleId: roleId,
         name: name,
         permissions: rolePermissions,
+        hideGatedComponents: hideGatedComponents === true,
         createdAt: date,
         updatedAt: date,
         hasAccess: {}
@@ -175,7 +180,7 @@ async function updateRoleInWorkspace(authUserId, workspaceId, roleId, payload) {
         throw new Error("Role not found:", roleId);
     }
 
-    const { name, permissions, hasAccess } = payload;
+    const { name, permissions, hasAccess, hideGatedComponents } = payload;
 
     const updatedFields = {};
 
@@ -219,6 +224,13 @@ async function updateRoleInWorkspace(authUserId, workspaceId, roleId, payload) {
         }
 
         updatedFields.hasAccess = mergedAccess;
+    }
+
+    if (hideGatedComponents !== undefined) {
+        if (typeof hideGatedComponents !== "boolean") {
+            throw new Error("'hideGatedComponents' must be a boolean");
+        }
+        updatedFields.hideGatedComponents = hideGatedComponents;
     }
 
     const updatedRole = await workspaceRepo.updateRole(workspaceId, roleId, updatedFields);

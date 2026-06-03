@@ -1,6 +1,10 @@
+// Classifies data-source schema fields into date / dimension / value buckets.
+// Drives which fields are offered as axes, groupings, and metric values.
+
 const DATE_TYPES = ["timestamp", "date", "datetime", "time"];
 const STRING_TYPES = ["string", "varchar", "char", "text"];
 
+// Map a raw column type string to one of "date", "dimension", or "value".
 export function classifyFieldType(type) {
     const t = (type ?? "").toLowerCase();
     if (DATE_TYPES.some((dt) => t.includes(dt))) return "date";
@@ -16,7 +20,7 @@ export function classifySchemaFields(schema) {
     if (!Array.isArray(schema)) return { dateFields, dimensionFields, valueFields };
 
     for (const field of schema) {
-        // Use pre-classified category from backend if available, otherwise infer from type
+        // Prefer the backend's category and fall back to inferring from the type.
         const category = field.category || classifyFieldType(field.type);
         const classified = {
             name: field.name,
@@ -36,6 +40,6 @@ export function classifySchemaFields(schema) {
 export function toDropdownItems(fields) {
     return fields.map((f) => ({
         value: f.name,
-        label: `${f.name} (${f.category})`,
+        label: f.name,
     }));
 }

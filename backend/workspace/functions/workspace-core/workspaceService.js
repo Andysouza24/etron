@@ -362,6 +362,7 @@ async function getUserEffectivePermissions(authUserId, workspaceId) {
     return {
         permissions: effective.permissions,
         isOwner: effective.isOwner,
+        hideGatedComponents: effective.hideGatedComponents === true,
         version: effective.version
     };
 }

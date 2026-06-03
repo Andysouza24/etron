@@ -135,7 +135,8 @@ async function updateDataSource(workspaceId, dataSourceId, dataSourceItem) {
 }
 
 // update datasource status
-async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
+// pass { silent: true } to skip the AppSync broadcast (e.g. during bulk dashboard setup so subscribers aren't spammed with per-child updates)
+async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem, { silent = false } = {}) {
     const updateFields = [];
     const removeFields = [];
     const expressionAttributeValues = {};
@@ -175,6 +176,29 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
         expressionAttributeNames["#progressPercent"] = "progressPercent";
     }
 
+    // requiresReview flag: surfaces "schema needs review" in the UI 
+    // callers pass `true` to set the flag, `false` to clear it, or omit the field to leave it untouched
+    if (statusItem.requiresReview === true) {
+        updateFields.push("#requiresReview = :requiresReview");
+        expressionAttributeValues[":requiresReview"] = true;
+        expressionAttributeNames["#requiresReview"] = "requiresReview";
+    } else if (statusItem.requiresReview === false) {
+        removeFields.push("#requiresReview");
+        expressionAttributeNames["#requiresReview"] = "requiresReview";
+    }
+
+    // errorType: classifies an error status so the UI can show "Schema drift",
+    // "Processing error", etc. instead of a generic error chip. Cleared whenever
+    // status is not 'error'. Callers can also explicitly clear by passing null.
+    if (statusItem.status === "error" && statusItem.errorType !== undefined && statusItem.errorType !== null) {
+        updateFields.push("#errorType = :errorType");
+        expressionAttributeValues[":errorType"] = statusItem.errorType;
+        expressionAttributeNames["#errorType"] = "errorType";
+    } else if (statusItem.status !== "error" || statusItem.errorType === null) {
+        removeFields.push("#errorType");
+        expressionAttributeNames["#errorType"] = "errorType";
+    }
+
     updateFields.push("#lastUpdate = :lastUpdate");
     expressionAttributeValues[":lastUpdate"] = new Date().toISOString();
     expressionAttributeNames["#lastUpdate"] = "lastUpdate";
@@ -199,14 +223,16 @@ async function updateDataSourceStatus(workspaceId, dataSourceId, statusItem) {
     );
 
     // broadcasts new state so subscription picks up status/progress transitions without polling
-    if (result.Attributes) {
+    if (result.Attributes && !silent) {
         await notifyDataSourceUpdate(result.Attributes);
     }
+    return result.Attributes;
 }
 
 // update progress fields without changing status
 // used to publish stage updates while job is in flight 
-async function updateDataSourceProgress(workspaceId, dataSourceId, { stage, percent }) {
+// pass { silent: true } to skip the AppSync broadcast
+async function updateDataSourceProgress(workspaceId, dataSourceId, { stage, percent }, { silent = false } = {}) {
     const expressionAttributeValues = { ":lastUpdate": new Date().toISOString() };
     const expressionAttributeNames = { "#lastUpdate": "lastUpdate" };
     const updateFields = ["#lastUpdate = :lastUpdate"];
@@ -235,12 +261,79 @@ async function updateDataSourceProgress(workspaceId, dataSourceId, { stage, perc
         );
 
         // broadcasts new progress
-        if (result.Attributes) {
+        if (result.Attributes && !silent) {
             await notifyDataSourceUpdate(result.Attributes);
         }
+        return result.Attributes;
     } catch (err) {
         // Progress updates are best-effort: never fail processing because of them.
         console.warn(`[dataSourceRepo] updateDataSourceProgress failed for ${workspaceId}/${dataSourceId}:`, err.message);
+        return null;
+    }
+}
+
+// initialise the dashboard setup counters on the parent data source
+// total = how many child files are queued for transform as part of this setup run
+// completed is reset to 0 so a re-discovery starts a fresh batch
+async function initDashboardSetupCounters(workspaceId, parentDataSourceId, total) {
+    const result = await dynamoDB.send(
+        new UpdateCommand({
+            TableName: tableName,
+            Key: { workspaceId, dataSourceId: parentDataSourceId },
+            UpdateExpression: "SET #setupTotal = :total, #setupCompleted = :zero, #progressStage = :stage, #progressPercent = :percent, #lastUpdate = :lastUpdate",
+            ExpressionAttributeNames: {
+                "#setupTotal": "setupTotal",
+                "#setupCompleted": "setupCompleted",
+                "#progressStage": "progressStage",
+                "#progressPercent": "progressPercent",
+                "#lastUpdate": "lastUpdate",
+            },
+            ExpressionAttributeValues: {
+                ":total": total,
+                ":zero": 0,
+                ":stage": total > 0 ? `Importing 0 of ${total} files` : "Setup complete",
+                ":percent": 0,
+                ":lastUpdate": new Date().toISOString(),
+            },
+            ReturnValues: "ALL_NEW",
+        })
+    );
+    if (result.Attributes) {
+        await notifyDataSourceUpdate(result.Attributes);
+    }
+    return result.Attributes;
+}
+
+// atomically increments the parent's setupCompleted counter and broadcasts an aggregated progress update
+// used by the dashboard transform pipeline so subscribers only see one notification per file completion on the parent
+async function bumpDashboardSetupProgress(workspaceId, parentDataSourceId) {
+    try {
+        const result = await dynamoDB.send(
+            new UpdateCommand({
+                TableName: tableName,
+                Key: { workspaceId, dataSourceId: parentDataSourceId },
+                UpdateExpression: "ADD #setupCompleted :one SET #lastUpdate = :lastUpdate",
+                ExpressionAttributeNames: {
+                    "#setupCompleted": "setupCompleted",
+                    "#lastUpdate": "lastUpdate",
+                },
+                ExpressionAttributeValues: {
+                    ":one": 1,
+                    ":lastUpdate": new Date().toISOString(),
+                },
+                ReturnValues: "ALL_NEW",
+            })
+        );
+        const attrs = result.Attributes || {};
+        const completed = Number(attrs.setupCompleted) || 0;
+        const total = Number(attrs.setupTotal) || 0;
+        const stage = total > 0 ? `Imported ${completed} of ${total} files` : `Imported ${completed} files`;
+        const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : null;
+        await notifyDataSourceUpdate({ ...attrs, progressStage: stage, progressPercent: percent });
+        return attrs;
+    } catch (err) {
+        console.warn(`[dataSourceRepo] bumpDashboardSetupProgress failed for ${workspaceId}/${parentDataSourceId}:`, err.message);
+        return null;
     }
 }
 
@@ -385,9 +478,37 @@ async function findChildrenByParent(workspaceId, parentDataSourceId) {
     return result.Items || [];
 }
 
+// flip the `enabled` flag on a data source
+// `enabled === false` is the user-disabled state: background ingest continues but every
+// user-initiated action is rejected. omitting the attribute is equivalent to enabled.
+async function updateDataSourceEnabled(workspaceId, dataSourceId, enabled) {
+    const result = await dynamoDB.send(
+        new UpdateCommand({
+            TableName: tableName,
+            Key: { workspaceId, dataSourceId },
+            UpdateExpression: "SET #enabled = :enabled, #lastUpdate = :lastUpdate",
+            ExpressionAttributeNames: {
+                "#enabled": "enabled",
+                "#lastUpdate": "lastUpdate",
+            },
+            ExpressionAttributeValues: {
+                ":enabled": !!enabled,
+                ":lastUpdate": new Date().toISOString(),
+            },
+            ReturnValues: "ALL_NEW",
+        })
+    );
+
+    if (result.Attributes) {
+        await notifyDataSourceUpdate(result.Attributes);
+    }
+    return result.Attributes;
+}
+
 module.exports = {
     addDataSource,
     updateDataSource,
+    updateDataSourceEnabled,
     removeDataSource,
     getDataSourceById,
     getDataSourcesByWorkspaceId,
@@ -396,6 +517,8 @@ module.exports = {
     findChildrenByParent,
     updateDataSourceStatus,
     updateDataSourceProgress,
+    initDashboardSetupCounters,
+    bumpDashboardSetupProgress,
     addMetricToDataSource,
     removeMetricFromDataSource,
     removeAllDataSources

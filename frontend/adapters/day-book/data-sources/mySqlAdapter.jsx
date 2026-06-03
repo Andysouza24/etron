@@ -1,12 +1,3 @@
-import React from "react";
-import ConnectionPage from "../../../components/modules/day-book/data-sources/ConnectionPage";
-import { MySqlFormSection } from "../../../components/layout/FormSelection";
-import {
-  validateMySqlForm,
-  generateMySqlNameFromHostname,
-  buildMySqlConnectionData,
-} from "../../../utils/connectionValidators";
-
 import {
   delay,
   validateSourceId,
@@ -121,20 +112,8 @@ export const createMySqlAdapter = (authService, apiClient, options = {}) => {
   };
 };
 
-export const MySqlConnectionScreen = () => (
-  <ConnectionPage
-    connectionType="mysql"
-    title="MySQL Database"
-    FormComponent={MySqlFormSection}
-    formValidator={validateMySqlForm}
-    connectionDataBuilder={buildMySqlConnectionData}
-    nameGenerator={generateMySqlNameFromHostname}
-  />
-);
-
 export const adapterDescriptor = {
   type: TYPE,
   category: "database",
   factory: createMySqlAdapter,
-  ConnectionScreen: MySqlConnectionScreen,
 };

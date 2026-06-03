@@ -1,9 +1,9 @@
 ﻿// Author(s): Matthew Page, Noah Bradley
 
 import { View, StyleSheet, Alert } from "react-native";
-import { ActivityIndicator, Card, Chip, Snackbar, Text, Portal, Dialog, Button } from "react-native-paper";
+import { ActivityIndicator, Card, Checkbox, Chip, Snackbar, Text, Portal, Dialog, Button } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import Header from "../../../../../components/layout/Header";
 import ResponsiveScreen from "../../../../../components/layout/ResponsiveScreen";
@@ -31,24 +31,25 @@ export default function EditRole() {
 	const [role, setRole] = useState(null);
 	const [name, setName] = useState("");
 	const [selectedPerms, setSelectedPerms] = useState([]);
+	const [hideGatedComponents, setHideGatedComponents] = useState(false);
 
 	const [permissionGroups, setPermissionGroups] = useState([]);
 
 	const [currentUserRoleId, setCurrentUserRoleId] = useState(null);
 	const [confirmSelfLock, setConfirmSelfLock] = useState(false);
 
-	const initialRef = useRef({ name: "", perms: [] });
+	const [initialValues, setInitialValues] = useState({ name: "", perms: [], hideGated: false });
 
 	const initialValuesChanged = useMemo(() => {
-		const initial = initialRef.current;
-		if ((name || "").trim() !== (initial.name || "").trim()) return true;
+		if ((name || "").trim() !== (initialValues.name || "").trim()) return true;
+		if ((hideGatedComponents === true) !== (initialValues.hideGated === true)) return true;
 
 		const selPerms = new Set(selectedPerms);
-		const initPerms = new Set(initial.perms || []);
+		const initPerms = new Set(initialValues.perms || []);
 		if (selPerms.size !== initPerms.size) return true;
 		for (const permission of selPerms) if (!initPerms.has(permission)) return true;
 		return false;
-	}, [name, selectedPerms]);
+	}, [name, selectedPerms, hideGatedComponents, initialValues]);
 
 	const canSave = useMemo(() => {
 		return !saving && initialValuesChanged && !!name.trim();
@@ -83,14 +84,17 @@ export default function EditRole() {
 
 			const initialName = role.name || "";
 			const initialPerms = normalizePermissionKeys(role.permissions);
+			const initialHideGated = role.hideGatedComponents === true;
 
 			setName(initialName);
 			setSelectedPerms(initialPerms);
+			setHideGatedComponents(initialHideGated);
 
-			initialRef.current = {
+			setInitialValues({
 				name: initialName,
 				perms: initialPerms,
-			};
+				hideGated: initialHideGated,
+			});
 
 			setNotFound(false);
 		} catch (error) {
@@ -109,18 +113,24 @@ export default function EditRole() {
 	const willSelfLoseManageRoles = useMemo(() => {
 		if (!currentUserRoleId) return false;
 		if (currentUserRoleId !== roleId) return false;
-		const hadManage = (initialRef.current.perms).includes(MANAGE_ROLES);
+		const hadManage = (initialValues.perms || []).includes(MANAGE_ROLES);
 		const willHaveManage = selectedPerms.includes(MANAGE_ROLES);
 		return hadManage && !willHaveManage;
-	}, [currentUserRoleId, roleId, selectedPerms]);
+	}, [currentUserRoleId, roleId, selectedPerms, initialValues]);
 
 	const persistRole = async () => {
 		const uniquePermissions = normalizePermissionKeys(selectedPerms);
 		await apiPatch(endpoints.workspace.roles.update(workspaceId, roleId), {
 			name: name.trim(),
 			permissions: uniquePermissions,
+			hideGatedComponents: hideGatedComponents === true,
 		});
-		initialRef.current = { name: name.trim(), perms: uniquePermissions };
+		setSelectedPerms(uniquePermissions);
+		setInitialValues({
+			name: name.trim(),
+			perms: uniquePermissions,
+			hideGated: hideGatedComponents === true,
+		});
 		setSnack({ visible: true, text: "Role updated" });
 	};
 
@@ -213,11 +223,25 @@ export default function EditRole() {
 
 					{/* TODO: Board access per role should be handled via the permission gating system in the future. */}
 					{!role.owner && (
-						<PermissionPicker
-							groups={permissionGroups}
-							selectedPerms={selectedPerms}
-							onChange={setSelectedPerms}
-						/>
+						<>
+							<Card style={styles.card}>
+								<Checkbox.Item
+									label="Hide components users can't access"
+									status={hideGatedComponents ? "checked" : "unchecked"}
+									onPress={() => setHideGatedComponents((prev) => !prev)}
+									position="leading"
+									style={styles.toggleRow}
+								/>
+								<Text style={styles.toggleHelp}>
+									When on, buttons, menu items, and other actions this role can&apos;t use are removed from view instead of shown as disabled.
+								</Text>
+							</Card>
+							<PermissionPicker
+								groups={permissionGroups}
+								selectedPerms={selectedPerms}
+								onChange={setSelectedPerms}
+							/>
+						</>
 					)}
 				</StackLayout>
 			)}
@@ -256,4 +280,6 @@ export default function EditRole() {
 
 const styles = StyleSheet.create({
 	card: { marginTop: 16 },
+	toggleRow: { paddingHorizontal: 8, paddingVertical: 4 },
+	toggleHelp: { paddingHorizontal: 16, paddingBottom: 12, opacity: 0.7, fontSize: 12 },
 });

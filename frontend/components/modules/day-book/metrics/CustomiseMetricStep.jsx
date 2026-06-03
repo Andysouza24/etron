@@ -5,10 +5,11 @@ import {metricStepStyles} from "../../../../assets/styles/stylesheets/day-book/m
 import ColorPicker from "react-native-wheel-color-picker";
 import ViewShot from "react-native-view-shot";
 import VariableChipSelector from "./VariableChipSelector";
+import IndependentVariableChip from "./IndependentVariableChip";
 
 
 
-export default function CustomiseMetricStep({ form, dependentVariables = [], graphPreview, viewShotRef }) {
+export default function CustomiseMetricStep({ form, dependentVariables = [], independentVariable, graphPreview, viewShotRef }) {
     const theme = useTheme();
     const { metricName, setMetricName, coloursState, setColoursState, wheelIndex, setWheelIndex } = form;
 
@@ -24,6 +25,7 @@ export default function CustomiseMetricStep({ form, dependentVariables = [], gra
             {/* variable colour selector chips */}
             <VariableChipSelector
                 dependentVariables={dependentVariables}
+                colours={coloursState}
                 wheelIndex={wheelIndex}
                 setWheelIndex={setWheelIndex}
             />
@@ -69,6 +71,8 @@ export default function CustomiseMetricStep({ form, dependentVariables = [], gra
                     </ViewShot>
                 </Card.Content>
             </Card>
+
+            <IndependentVariableChip independentVariable={independentVariable} />
         </ScrollView>
     )
 }

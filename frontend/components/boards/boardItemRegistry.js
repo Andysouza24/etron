@@ -1,14 +1,20 @@
 import React from "react";
 import { View, TouchableOpacity } from "react-native";
 import MetricCard from "./MetricCard";
+import SimpleMetricCard from "../modules/day-book/metrics/cards/SimpleMetricCard";
 import ButtonCard from "./ButtonCard";
 import TextCard from "./TextCard";
+import DeletedItemCard from "./DeletedItemCard";
 import {
   calculateButtonGridWidth,
   calculateMetricGridWidth,
   calculateTextGridHeight,
   calculateTextGridWidth,
 } from "../../utils/boards/itemHandlers";
+
+// Toggle to swap the board's metric element between the full MetricCard
+// (chart visualisation) and the compact SimpleMetricCard (trend chip).
+const USE_SIMPLE_METRIC_CARD = true;
 
 const createBaseDefinitions = ({
   gridCols,
@@ -25,29 +31,86 @@ const createBaseDefinitions = ({
       icon: "chart-line",
       computeMinWidth: ({ configMinWidth }) =>
         Math.max(configMinWidth, metricMinWidth),
-      computeMaxHeightFallback: ({ configMinHeight, item }) =>
-        Math.max(
+      computeMaxHeightFallback: ({ configMinHeight, item }) => {
+        if (USE_SIMPLE_METRIC_CARD) return 1;
+        return Math.max(
           configMinHeight,
           item.config?.maxHeightUnits ?? defaultMetricMaxHeight
-        ),
+        );
+      },
       renderContent: ({
         item,
         editingActive,
         styles,
         handlers,
         metricStates,
+        metricAppearancesById,
+        metricsById,
+        dataSourceById,
         isResizeActive,
-      }) => (
-        <MetricCard
-          item={item}
-          metricState={metricStates[item.id]}
-          isEditing={editingActive}
-          styles={styles}
-          onEdit={handlers.openItemOptions}
-          onPress={handlers.openMetricDetails}
-          disableEditActions={isResizeActive}
-        />
-      ),
+      }) => {
+        const metricId = item?.config?.metricId;
+        const metric = metricId ? metricsById?.[metricId] : null;
+        // A workspace metric list is required to make this judgement. If the
+        // list hasn't loaded yet (metricsById is null/undefined) we let the
+        // regular MetricCard render its own loading state instead of
+        // falsely flagging the metric as deleted.
+        if (metricsById && metricId && !metric) {
+          return (
+            <DeletedItemCard
+              reason="metric"
+              isEditing={editingActive}
+              styles={styles}
+              item={item}
+              onEdit={handlers.openItemOptions}
+              disableEditActions={isResizeActive}
+            />
+          );
+        }
+        if (metric && metric.activeDataSource === false) {
+          return (
+            <DeletedItemCard
+              reason="dataSource"
+              isEditing={editingActive}
+              styles={styles}
+              item={item}
+              onEdit={handlers.openItemOptions}
+              disableEditActions={isResizeActive}
+            />
+          );
+        }
+        if (USE_SIMPLE_METRIC_CARD) {
+          return (
+            <SimpleMetricCard
+              item={{ ...item, name: metric?.name ?? item?.name }}
+              metricState={metricStates[item.id]}
+              dataSourceErrored={
+                dataSourceById?.[item?.config?.dataSourceId]?.status === 'error'
+              }
+              showActions={false}
+              isEditing={editingActive}
+              disableEditActions={isResizeActive}
+              onEdit={handlers.openItemOptions}
+              onPress={editingActive ? undefined : handlers.openMetricDetails}
+            />
+          );
+        }
+        return (
+          <MetricCard
+            item={item}
+            metricState={metricStates[item.id]}
+            metricAppearance={metricAppearancesById?.[item.config?.metricId]}
+            isEditing={editingActive}
+            styles={styles}
+            onEdit={handlers.openItemOptions}
+            onPress={handlers.openMetricDetails}
+            disableEditActions={isResizeActive}
+            dataSourceErrored={
+              dataSourceById?.[item?.config?.dataSourceId]?.status === 'error'
+            }
+          />
+        );
+      },
       isPressable: ({ editingActive }) => !editingActive,
       onPress: ({ handlers, item }) => handlers.openMetricDetails?.(item.id),
       buildOption: (creationHandlers) =>
@@ -66,6 +129,7 @@ const createBaseDefinitions = ({
       label: "Button",
       description: "Add a navigation button",
       icon: "gesture-tap-button",
+      heightStep: 0.5,
       computeMinWidth: ({ item, configMinWidth }) =>
         Math.max(
           configMinWidth,
@@ -100,6 +164,7 @@ const createBaseDefinitions = ({
       label: "Text",
       description: "Add a formatted text block",
       icon: "format-text",
+      heightStep: 0.5,
       computeMinWidth: ({ item, configMinWidth }) =>
         Math.max(
           configMinWidth,
@@ -141,7 +206,12 @@ const computeLayoutDimensions = ({ item, gridCols, definition, context }) => {
   const config = item.config || {};
 
   const configMinWidth = Math.max(1, config.minWidthUnits ?? 1);
-  const configMinHeight = Math.max(1, config.minHeightUnits ?? 1);
+  const heightStep = definition.heightStep ?? 1;
+  const minHeightFloor = Math.min(1, heightStep);
+  const configMinHeight = Math.max(
+    minHeightFloor,
+    config.minHeightUnits ?? minHeightFloor
+  );
 
   const minWidthFromDefinition = definition.computeMinWidth
     ? definition.computeMinWidth({ item, configMinWidth, context })
@@ -190,9 +260,10 @@ const computeLayoutDimensions = ({ item, gridCols, definition, context }) => {
     heightUnits,
     resizeConstraints: {
       minWidth: Math.max(1, minWidthUnits),
-      minHeight: Math.max(1, configMinHeight),
+      minHeight: Math.max(minHeightFloor, configMinHeight),
       maxWidth: maxWidthUnits,
       maxHeight: configuredMaxHeight,
+      heightStep,
     },
   };
 };
@@ -243,6 +314,9 @@ export const createGridItemBuilder = ({
     items,
     editingActive,
     metricStates,
+    metricAppearancesById,
+    metricsById,
+    dataSourceById,
     isResizeActive,
     styles,
     handlers,
@@ -285,6 +359,9 @@ export const createGridItemBuilder = ({
         styles,
         handlers,
         metricStates,
+        metricAppearancesById,
+        metricsById,
+        dataSourceById,
         isResizeActive,
       });
 

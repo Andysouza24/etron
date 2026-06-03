@@ -29,6 +29,12 @@ const STATUS_CONFIG = {
 		colorKey: "secondaryContainer",
 		textColorKey: "onSecondaryContainer",
 	},
+	pending_review: {
+		label: "Pending review",
+		icon: "clipboard-alert-outline",
+		colorKey: "secondaryContainer",
+		textColorKey: "onSecondaryContainer",
+	},
 	no_data: {
 		label: "No data",
 		icon: "database-off-outline",

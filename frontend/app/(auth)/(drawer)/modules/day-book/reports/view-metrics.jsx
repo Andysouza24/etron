@@ -177,7 +177,7 @@ const ViewMetrics = () => {
 export default ViewMetrics;
 
 // --- MetricCard Component ---
-const MetricCard = forwardRef(({ metricSettings, filteredData, backgroundMode, axisColorModeState }, ref) => {
+const MetricCard = forwardRef(function MetricCard({ metricSettings, filteredData, backgroundMode, axisColorModeState }, ref) {
     const theme = useTheme();
     const viewShotRef = useRef();
     const coloursState = ["red", "blue", "green", "purple"];

@@ -5,7 +5,8 @@ const METRIC_WIDTH_RATIO = 2 / 3;
 const METRIC_HEIGHT_UNITS = 2;
 const TEXT_CHARACTERS_PER_UNIT = 12;
 const TEXT_MIN_WIDTH_UNITS = 3;
-const TEXT_MIN_HEIGHT_UNITS = 1;
+const TEXT_MIN_HEIGHT_UNITS = 0.5;
+const TEXT_HEIGHT_STEP = 0.5;
 const TEXT_MAX_HEIGHT_UNITS = 6;
 
 const clampUnits = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -98,16 +99,16 @@ export const calculateTextGridWidth = (text = "", cols = 12) => {
 };
 
 export const calculateTextGridHeight = (text = "") => {
-  const lineCount = Math.max(
-    TEXT_MIN_HEIGHT_UNITS,
-    typeof text === "string" ? text.split(/\r?\n/).length : 1
-  );
+  const lineCount = typeof text === "string" ? text.split(/\r?\n/).length : 1;
 
+  if (lineCount <= 1) return TEXT_MIN_HEIGHT_UNITS;
   if (lineCount <= 2) return 1;
   if (lineCount <= 4) return 2;
   if (lineCount <= 6) return 3;
   return Math.min(TEXT_MAX_HEIGHT_UNITS, Math.ceil(lineCount / 2));
 };
+
+export const TEXT_HEIGHT_STEP_UNITS = TEXT_HEIGHT_STEP;
 
 export const createMetricItem = (metric, existingLayout, cols = 12) => {
   const metricWidth = calculateMetricGridWidth(cols);
@@ -141,7 +142,6 @@ export const createMetricItem = (metric, existingLayout, cols = 12) => {
     : Array.isArray(metric?.colors)
     ? metric.colors
     : [];
-  const appearance = rawConfig.appearance || metric?.appearance || {};
   const label = rawConfig.label || metric?.label || metric?.name || "Metric";
 
   return {
@@ -163,7 +163,10 @@ export const createMetricItem = (metric, existingLayout, cols = 12) => {
       selectedRows,
       colours: resolvedColours,
       colors: resolvedColours,
-      appearance,
+      // Appearance is intentionally inherited from the source metric at
+      // render time. Board-level overrides are stored sparsely under
+      // `appearance` only when the user explicitly configures them.
+      appearance: {},
     },
   };
 };

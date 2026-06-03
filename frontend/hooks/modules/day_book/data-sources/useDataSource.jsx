@@ -31,6 +31,18 @@ export default function useDataSource() {
     () => dataSourceService.fetchDataFromSource.bind(dataSourceService),
     []
   );
+  const getErrorContext = useMemo(
+    () => dataSourceService.getErrorContext.bind(dataSourceService),
+    []
+  );
+  const resolveError = useMemo(
+    () => dataSourceService.resolveError.bind(dataSourceService),
+    []
+  );
+  const refreshFromDefaultSchema = useMemo(
+    () => dataSourceService.refreshFromDefaultSchema.bind(dataSourceService),
+    []
+  );
 
   // Alias expected by some screens
   const fetchDataSource = fetchDataFromSource;
@@ -43,6 +55,9 @@ export default function useDataSource() {
     getDataSource,
     fetchDataFromSource,
     fetchDataSource,
+    getErrorContext,
+    resolveError,
+    refreshFromDefaultSchema,
     dataSourceService,
   };
 }

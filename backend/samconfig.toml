@@ -6,7 +6,7 @@ s3_prefix = "etron-backend"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
 image_repositories = []
-parameter_overrides = "WorkspaceBucketName=\"amplify-dw9x9f8kcq4l4-mai-workspacesbucket784af028-tyhgap5jppje\" AppConfigurationBucketName=\"amplify-dw9x9f8kcq4l4-mai-appconfigurationbucket22-knsnj7tf8mls\" AthenaDatabaseName=\"etron_day_book_db\" AuditQueueArn=\"arn:aws:sqs:ap-southeast-2:890890989607:AuditQueue\" AuditQueueUrl=\"https://sqs.ap-southeast-2.amazonaws.com/890890989607/AuditQueue\" AppSyncUrl=\"https://hvcdfdjxljfkvkfs5j54zqntxa.appsync-api.ap-southeast-2.amazonaws.com/graphql\" AppSyncApiKey=\"da2-hvpajzcswvevzby36nacu5rrx4\" UserPoolArn=\"arn:aws:cognito-idp:ap-southeast-2:890890989607:userpool/ap-southeast-2_d2Jecy0b9\""
+parameter_overrides = "WorkspaceBucketName=\"amplify-dw9x9f8kcq4l4-mai-workspacesbucket784af028-tyhgap5jppje\" AppConfigurationBucketName=\"amplify-dw9x9f8kcq4l4-mai-appconfigurationbucket22-knsnj7tf8mls\" AthenaDatabaseName=\"etron_day_book_db\" AuditQueueArn=\"arn:aws:sqs:ap-southeast-2:890890989607:AuditQueue\" AuditQueueUrl=\"https://sqs.ap-southeast-2.amazonaws.com/890890989607/AuditQueue\" AppSyncUrl=\"https://hvcdfdjxljfkvkfs5j54zqntxa.appsync-api.ap-southeast-2.amazonaws.com/graphql\" AppSyncApiKey=\"da2-vqjtjsbaqbh55bdxpabzufnqhy\" UserPoolArn=\"arn:aws:cognito-idp:ap-southeast-2:890890989607:userpool/ap-southeast-2_d2Jecy0b9\""
 
 
 [default.global.parameters]

@@ -4,6 +4,8 @@ import { View } from "react-native";
 import { ActivityIndicator, useTheme } from "react-native-paper";
 import Svg, { Circle } from "react-native-svg";
 
+// Circular progress indicator. Falls back to a spinner when `progress`
+// is not a number (indeterminate); otherwise draws a clamped 0–1 arc.
 const CircularProgress = ({
     progress,
     size = 40,

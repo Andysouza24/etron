@@ -1,13 +1,13 @@
-import React from "react";
-import ConnectionPage from "../../../components/modules/day-book/data-sources/ConnectionPage";
-import { ApiFormSection } from "../../../components/layout/FormSelection";
-import {
-  validateApiForm,
-  generateApiNameFromUrl,
-  buildApiConnectionData,
-} from "../../../utils/connectionValidators";
-import { getSavedWorkspaceId } from "../../../storage/workspaceStorage";
+import { router } from "expo-router";
+
+import { getSavedWorkspaceId, getWorkspaceId } from "../../../storage/workspaceStorage";
 import endpoints from "../../../utils/api/endpoints";
+import { apiPost } from "../../../utils/api/apiClient";
+
+import ApiConnectStep from "./api/wizard-steps/ApiConnectStep";
+import FieldCategoryReviewStep from "../../../components/modules/day-book/data-sources/wizard/steps/FieldCategoryReviewStep";
+import GeneralSettingsStep from "../../../components/modules/day-book/data-sources/wizard/steps/GeneralSettingsStep";
+import ApiSettingsExtra from "./api/wizard-steps/ApiSettingsExtra";
 
 import { formatDate, createBaseAdapter } from "./baseAdapter";
 
@@ -212,21 +212,54 @@ export const createCustomApiAdapter = (authService, apiClient) => {
   };
 };
 
-export const ApiConnectionScreen = () => (
-  <ConnectionPage
-    connectionType="custom-api"
-    title="Custom API"
-    FormComponent={ApiFormSection}
-    formValidator={validateApiForm}
-    connectionDataBuilder={buildApiConnectionData}
-    nameGenerator={generateApiNameFromUrl}
-  />
-);
+// wizard finalise: activates previously-created pending data source by persisting user-confirmed schema and flipping status to active
+const finaliseCustomApi = async (draft) => {
+  const { dataSourceId, name, confirmedSchema, schemaPreview } = draft;
+  if (!dataSourceId) throw new Error("Setup has not started yet");
+  if (!name?.trim()) throw new Error("Connection name is required");
+  // empty schema is allowed when the source had no rows at preview time
+  // backend activates without saving a schema and flags requiresReview when data first arrives
+  const isEmptyPreview = schemaPreview?.isEmpty || (schemaPreview && (schemaPreview.schema?.length ?? 0) === 0);
+  if (!isEmptyPreview && !confirmedSchema?.length) {
+    throw new Error("Schema has not been reviewed");
+  }
+
+  const workspaceId = await getWorkspaceId();
+  await apiPost(
+    endpoints.modules.day_book.data_sources.activate(dataSourceId),
+    { workspaceId, confirmedSchema: confirmedSchema || [], name: name.trim() }
+  );
+
+  router.navigate("/modules/day-book/data-management");
+  return { dataSourceId };
+};
 
 export const adapterDescriptor = {
   type: TYPE,
   aliases: ["custom-api"],
   category: "api",
   factory: createCustomApiAdapter,
-  ConnectionScreen: ApiConnectionScreen,
+  wizard: {
+    title: "Custom API",
+    initialDraft: { form: {} },
+    steps: [
+      { key: "connect", title: "Connect", Component: ApiConnectStep },
+      {
+        key: "field-review",
+        title: "Review fields",
+        Component: FieldCategoryReviewStep,
+        applies: (draft) => Boolean(draft.schemaPreview),
+      },
+      {
+        key: "general-settings",
+        title: "Settings",
+        Component: GeneralSettingsStep,
+        props: {
+          ExtraSettings: ApiSettingsExtra,
+          finaliseLabel: "Create Connection",
+        },
+      },
+    ],
+    finalise: finaliseCustomApi,
+  },
 };

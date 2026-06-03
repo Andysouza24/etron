@@ -1,4 +1,5 @@
-// this is a temporary verification file.
+// Re-verifies the current user's password before sensitive actions.
+// Works by re-running signIn; an "already authenticated" error also means success.
 
 import { getCurrentUser, signIn } from "aws-amplify/auth";
 

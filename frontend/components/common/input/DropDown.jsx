@@ -17,6 +17,7 @@ const DropDown = ({
     allowed = true,
     clearOnSelect = false,
     maxVisibleItems = 3.5,
+    noStyle = false,
 }) => {
     const theme = useTheme();
     const triggerRef = useRef(null);
@@ -94,9 +95,11 @@ const DropDown = ({
                     {
                         borderColor: expanded ? theme.colors.primary : theme.colors.outline,
                         borderWidth: expanded ? 2 : 1,
-                        backgroundColor: pressed
-                            ? theme.colors.surfaceVariant
-                            : theme.colors.surface,
+                        backgroundColor: noStyle
+                            ? "transparent"
+                            : pressed
+                                ? theme.colors.surfaceVariant
+                                : theme.colors.surface,
                     },
                 ]}
                 accessibilityRole="button"

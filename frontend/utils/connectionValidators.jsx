@@ -1,5 +1,7 @@
-// TODO: look at putting data source specific validation requirements in the adapter
-// validation and utility functions for connection forms
+// Validation, name-generation, and payload builders for connection forms.
+// Each data-source type (API, FTP, MySQL, dashboard) gets a validate + build pair.
+// TODO: move data-source-specific validation rules into the adapters.
+
 const validateUrl = (url) => {
   if (!url?.trim()) return "API URL is required";
   
