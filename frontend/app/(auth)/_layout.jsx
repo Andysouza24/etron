@@ -1,17 +1,25 @@
 import { Slot, router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react-native';
 import { fetchUserAttributes, signOut, updateUserAttributes } from 'aws-amplify/auth';
 import { useVerification } from '../../contexts/VerificationContext';
 import { saveWorkspaceInfo } from '../../storage/workspaceStorage';
 import { saveUserInfo, removeWorkspaceInfo } from '../../storage/userStorage';
-import { saveRole } from '../../storage/permissionsStorage';
-import { apiGet } from '../../utils/api/apiClient';
+import { hydrateHideGatedSync } from '../../storage/permissionsStorage';
+import { apiGet, setUnauthorizedHandler } from '../../utils/api/apiClient';
 import endpoints from '../../utils/api/endpoints';
+import workspaceService from '../../services/WorkspaceService';
+import { MetricProvider } from '../../contexts/MetricContext';
+import { DataSourceProvider } from '../../contexts/DataSourceContext';
+import { BoardProvider } from '../../contexts/BoardContext';
+import { NotificationProvider } from '../../contexts/NotificationContext';
+import { useAppContext } from '../../contexts/AppContext';
 
 export default function AuthLayout() {
     const { authStatus } = useAuthenticator();
     const { verifyingPassword } = useVerification();
+    const { setWorkspaceId } = useAppContext();
+    const [workspaceId, setLocalWorkspaceId] = useState(null);
 
     const setHasWorkspaceAttribute = async (value) => {
         try {
@@ -53,16 +61,19 @@ export default function AuthLayout() {
                 const result = await apiGet(endpoints.workspace.core.getByUserId(userId));
                 workspace = result.data;
             } catch (error) {
-                await setHasWorkspaceAttribute(false);
                 if (error.message.includes("Workspace not found")) {
+                    await setHasWorkspaceAttribute(false);
                     console.log("No workspace yet.");
                     await removeWorkspaceInfo();
                     return false;
                 } else if (error.message.includes("No user found")) {
+                    await setHasWorkspaceAttribute(false);
                     console.log("No user found, rerouting to landing page...")
                     router.replace("/landing.jsx");
                     return false;
                 }
+                // errors don't clear workspace attribute
+                //TODO: fix attribute in cognito/dynamo, stop clearing from frontend
                 console.error("Error fetching workspace:", error);
                 return false;
             }
@@ -100,37 +111,18 @@ export default function AuthLayout() {
     }
 
     const saveInfoIntoStorage = async() => {
-        const userAttributes = await fetchUserAttributes();
-
-        let workspaceId;
         try {
+            const userAttributes = await fetchUserAttributes();
             const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            workspaceId = result.data.workspaceId;
+            await workspaceService.setupWorkspaceStorage(result.data, userAttributes.sub);
+            const wsId = result.data?.workspaceId || result.data?.id;
+            if (wsId) {
+                setWorkspaceId(wsId);
+                setLocalWorkspaceId(wsId);
+            }
+            console.log("[_layout.jsx] Workspace storage setup completed");
         } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
-        }
-
-        try {
-            const result = await apiGet(endpoints.workspace.users.getUser(workspaceId, userAttributes.sub));
-            await saveUserInfo(result.data);  // Saves into local storage
-        } catch (error) {
-            console.error("Error saving user info into storage:", error);
-        }
-
-        try {
-            const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspaceId));
-            await saveRole(result.data);
-        } catch (error) {
-            console.error("Error saving user's role details into local storage:", error);
-        }
-        
-        try {
-            const result = await apiGet(endpoints.workspace.core.getByUserId(userAttributes.sub));
-            await saveWorkspaceInfo(result.data);
-            console.log("saved workspace info:", result.data);
-        } catch (error) {
-            console.error("Error saving workspace info into storage:", error);
+            console.error("[_layout.jsx] Error saving workspace info into storage:", error);
         }
     }
 
@@ -147,13 +139,13 @@ export default function AuthLayout() {
 
             const workspaceExists = await checkWorkspaceExists().catch(() => false);
             if (!workspaceExists) {
-                console.log("No workplace")
+                console.log("No workspace")
                 router.replace("/(auth)/workspace-choice")
                 return;
             }
             
-            saveInfoIntoStorage();
-            router.replace("/(auth)/dashboard")
+            await saveInfoIntoStorage();
+            router.replace("/(auth)/home")
         } else if (authStatus === `configuring`) {
             console.log("Auth status configuring...")
         } else {
@@ -171,10 +163,40 @@ export default function AuthLayout() {
         checkAuthStatus();
     }, [authStatus, verifyingPassword]);
 
+    // Register a global unauthorized handler so the api client can force
+    // a sign-out + redirect to /landing whenever auth recovery fails
+    // (refresh token expired, retry still returns 401, etc.).
+    useEffect(() => {
+        setUnauthorizedHandler(async (reason) => {
+            console.warn('[AuthLayout] Forced sign-out due to:', reason);
+            try { await signOut(); } catch (e) { console.error('[AuthLayout] signOut failed:', e); }
+            try {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/landing');
+            } catch (e) {
+                console.error('[AuthLayout] redirect failed:', e);
+            }
+        });
+        return () => setUnauthorizedHandler(null);
+    }, []);
+
+    // Hydrate the synchronous mirror of hideGatedComponents from disk so
+    // PermissionGate has the correct value on its very first render
+    // (before the workspace-setup seed completes).
+    useEffect(() => {
+        hydrateHideGatedSync();
+    }, []);
+
 
     return (         
-        <>
-            <Slot />
-        </> 
+        <NotificationProvider>
+            <DataSourceProvider>
+                <MetricProvider workspaceId={workspaceId}>
+                    <BoardProvider workspaceId={workspaceId}>
+                        <Slot />
+                    </BoardProvider>
+                </MetricProvider>
+            </DataSourceProvider>
+        </NotificationProvider>
     );
 }

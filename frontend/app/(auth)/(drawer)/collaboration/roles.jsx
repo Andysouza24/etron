@@ -1,6 +1,6 @@
 // Author(s): Matthew Page, Noah Bradley
 
-import { View, FlatList, RefreshControl } from "react-native";
+import { View, FlatList } from "react-native";
 import Header from "../../../../components/layout/Header";
 import { Text, TextInput, TouchableRipple, useTheme, ActivityIndicator } from "react-native-paper";
 import { router, useFocusEffect } from "expo-router";
@@ -9,6 +9,7 @@ import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 import { apiGet } from "../../../../utils/api/apiClient";
 import endpoints from "../../../../utils/api/endpoints";
 import ResponsiveScreen from "../../../../components/layout/ResponsiveScreen";
+import ThemedRefreshControl from "../../../../components/common/ThemedRefreshControl";
 import { hasPermission } from "../../../../utils/permissions";
 
 
@@ -25,9 +26,10 @@ const Roles = () => {
         try {
             const workspaceId = await getWorkspaceId();
             const result = await apiGet(endpoints.workspace.roles.getRoles(workspaceId));
-            setRoles(result.data);
+            setRoles(Array.isArray(result?.data) ? result.data : []);
         } catch (error) {
             console.error("Error fetching roles:", error);
+            setRoles([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -60,6 +62,7 @@ const Roles = () => {
 
     const renderItem = ({ item, index }) => {
         const isLast = index === filtered.length - 1;
+        const permissionCount = Array.isArray(item?.permissions) ? item.permissions.length : 0;
 
         return (<>
             <TouchableRipple
@@ -83,7 +86,7 @@ const Roles = () => {
                     </Text>
                     {!item.owner && (
                         <Text variant="labelMedium" style={{ opacity: 0.6 }}>
-                            {item.permissions.length ?? 0} perms
+                            {permissionCount} perms
                         </Text>
                     )}
                 </View>
@@ -125,7 +128,7 @@ const Roles = () => {
                     data={filtered}
                     keyExtractor={(item) => item.roleId}
                     renderItem={renderItem}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadRoles(); }} />}
+                    refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadRoles(); }} />}
                     ListEmptyComponent={
                         <View style={{ alignItems: "center", marginTop: 48 }}>
                             <Text variant="titleMedium" style={{ marginBottom: 6 }}>

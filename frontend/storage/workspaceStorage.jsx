@@ -1,36 +1,11 @@
 // Author(s): Rhys Cleary
 
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import AuthService from "../services/AuthService";
+import { getUserStorageKey, loadMap, saveMap } from "./storageHelpers";
 
 // store workspace information: workspaceId, name, location, description, createdAt, UpdatedAt
 const workspaceKey = "workspaceInfo"; // legacy single-entry key (pre multi-account)
 const workspaceMapKey = "workspaceInfoByUser"; // new multi-account map key
-
-async function getUserStorageKey() {
-    try {
-        const info = await AuthService.getCurrentUserInfo();
-        const userKey = info?.userId || info?.username || info?.email || null;
-        return userKey ? String(userKey) : null;
-    } catch {
-        return null;
-    }
-}
-
-async function loadWorkspaceMap() {
-    try {
-        const raw = await AsyncStorage.getItem(workspaceMapKey);
-        return raw ? JSON.parse(raw) : {};
-    } catch {
-        return {};
-    }
-}
-
-async function saveWorkspaceMap(map) {
-    try {
-        await AsyncStorage.setItem(workspaceMapKey, JSON.stringify(map || {}));
-    } catch {}
-}
 
 // Try a variety of common keys and shapes to extract an ID from server responses
 export function extractWorkspaceId(obj) {
@@ -75,9 +50,9 @@ export async function saveWorkspaceInfo(workspace) {
         const userKey = await getUserStorageKey();
         //console.log('[workspaceStorage] saveWorkspaceInfo.beforeSave', { userKey, receivedId: extractWorkspaceId(workspace), normalizedId: extractWorkspaceId(normalized) });
         if (userKey) {
-            const map = await loadWorkspaceMap();
+            const map = await loadMap(workspaceMapKey);
             map[userKey] = normalized;
-            await saveWorkspaceMap(map);
+            await saveMap(workspaceMapKey, map);
             //console.log('[workspaceStorage] saveWorkspaceInfo (per-user)', { hasWorkspace: !!workspace, workspaceId: extractWorkspaceId(normalized) });
         } else {
             // Fallback to legacy single-entry behavior
@@ -94,7 +69,7 @@ export async function getWorkspaceInfo() {
     try {
         const userKey = await getUserStorageKey();
         if (userKey) {
-            const map = await loadWorkspaceMap();
+            const map = await loadMap(workspaceMapKey);
             let parsed = map[userKey] || null;
             // Migrate legacy single-entry to per-user if exists and user has none
             if (!parsed) {
@@ -104,7 +79,7 @@ export async function getWorkspaceInfo() {
                     const healed = normalizeWorkspaceShape(legacyParsed);
                     if (healed) {
                         map[userKey] = healed;
-                        await saveWorkspaceMap(map);
+                        await saveMap(workspaceMapKey, map);
                         // Optionally clear legacy key to avoid confusion
                         try { await AsyncStorage.removeItem(workspaceKey); } catch {}
                         parsed = healed;
@@ -118,7 +93,7 @@ export async function getWorkspaceInfo() {
                 try {
                     const healed = normalizeWorkspaceShape(parsed);
                     if (healed) {
-                        const map2 = await loadWorkspaceMap();
+                        const map2 = await loadMap(workspaceMapKey);
                         map2[userKey] = healed;
                         await saveWorkspaceMap(map2);
                     }
@@ -130,7 +105,7 @@ export async function getWorkspaceInfo() {
         const value = await AsyncStorage.getItem(workspaceKey);
         const parsed = value ? JSON.parse(value) : null;
         //const id = extractWorkspaceId(parsed);
-        const id = parsed.workspaceId;
+        const id = parsed?.workspaceId;
         //console.log('[workspaceStorage] getWorkspaceInfo (legacy)', { exists: !!parsed, workspaceId: id });
         return parsed;
     } catch (error) {
@@ -143,9 +118,9 @@ export async function removeWorkspaceInfo() {
     try {
         const userKey = await getUserStorageKey();
         if (userKey) {
-            const map = await loadWorkspaceMap();
+            const map = await loadMap(workspaceMapKey);
             if (map[userKey]) delete map[userKey];
-            await saveWorkspaceMap(map);
+            await saveMap(workspaceMapKey, map);
             //console.log('[workspaceStorage] removeWorkspaceInfo (per-user)', { userKey });
         } else {
             await AsyncStorage.removeItem(workspaceKey);
@@ -159,13 +134,7 @@ export async function removeWorkspaceInfo() {
 // get values from the information stored
 export async function getWorkspaceId() {
     const workspace = await getWorkspaceInfo();
-    const id = workspace.workspaceId;
-    //const id = extractWorkspaceId(workspace);
-    // Auto-heal stored value to include id/workspaceId for future fast access
-    /*if (workspace && id && (!workspace.id || !workspace.workspaceId)) {
-        try { await saveWorkspaceInfo(workspace); } catch {}
-    }*/
-    //console.log('[workspaceStorage] getWorkspaceId ->', id);
+    const id = workspace?.workspaceId;
     return id;
 }
 

@@ -6,8 +6,8 @@ const { hasPermission } = require("@etron/shared/utils/permissions");
 
 // Permissions for this service
 const PERMISSIONS = {
-    VIEW_USER_AUDIT_LOG: "apps.audit.view_user_audit_log",
-    VIEW_WORKSPACE_AUDIT_LOG: "apps.audit.view_workspace_audit_log",
+    VIEW_USER_AUDIT_LOG: "app.audit.view_user_audit_log",
+    VIEW_WORKSPACE_AUDIT_LOG: "app.audit.view_workspace_audit_log",
 };
 
 async function getWorkspaceLog(authUserId, workspaceId, limit, lastKey) {

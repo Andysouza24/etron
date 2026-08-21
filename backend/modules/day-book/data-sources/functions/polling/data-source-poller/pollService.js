@@ -1,78 +1,58 @@
-// Author(s): Rhys Cleary
+// Author(s): Rhys Cleary, Holly Wyatt
 
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
 const dataSourceSecretsRepo = require("@etron/data-sources-shared/repositories/dataSourceSecretsRepository");
-const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
 const adapterFactory = require("@etron/data-sources-shared/adapters/adapterFactory");
-const { saveStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
-const { translateData } = require("@etron/data-sources-shared/utils/translateData");
-const { toParquet } = require("@etron/data-sources-shared/utils/typeConversion");
-const { generateSchema } = require("@etron/data-sources-shared/utils/schema");
-const { saveSchemaAndUpdateTable } = require("@etron/data-sources-shared/utils/schema");
-const { appendToStoredData, replaceStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataToSchema");
+const { safeProcessIngest } = require("@etron/data-sources-shared/utils/ingestPipeline");
 
 async function pollDataSource(workspace, dataSource) {
     const allowedTypes = adapterFactory.getAllowedPollingTypes();
 
-    // check if the data source is active and an allowed type
+    // only poll allowed adapter types
     if (!allowedTypes.includes(dataSource.sourceType)) {
         return;
     }
+    // active sources keep polling. Errored sources also poll so they can
+    // recover automatically when the upstream is fixed, and any drift /
+    // processing failure gets tracked in the temp store via safeProcessIngest.
     if (dataSource.status !== "active" && dataSource.status !== "error") {
         return;
     }
 
-    // get sources secrets
-    const secrets = await dataSourceSecretsRepo.getSecrets(workspace.workspaceId, dataSource.dataSourceId);
+    const workspaceId = workspace.workspaceId;
+    const dataSourceId = dataSource.dataSourceId;
 
-    // create adapter
-    const adapter = adapterFactory.getAdapter(dataSource.sourceType);
-
-    // try polling
-    const newData = await retryPoll(adapter, dataSource.config, secrets);
-    const translatedData = translateData(newData);
-
-    if (translatedData.length === 0) {
-        await dataSourceRepo.updateDataSourceStatus(
-            workspace.workspaceId, 
-            dataSource.dataSourceId, 
-            { status: "no_data", errorMessage: "No data existent" }
-        );
-        return;
-    }
-
-    const {valid, error } = validateFormat(translatedData);
-    if (!valid) throw new Error(`Invalid data format: ${error}`);
-
-    // create the schema
-    const schema = generateSchema(translatedData.slice(0, 100));
-
-    // cast rows to the schema
-    const castedData = castDataToSchema(translatedData, schema);
-
-    // convert the data to parquet file
-    const parquetBuffer = await toParquet(castedData, schema);
-
-    if (dataSource.method === "extend") {
-        // extend the data source
-        await appendToStoredData(workspace.workspaceId, dataSource.dataSourceId, castedData, schema);
-    } else {
-        // replace data
-        await replaceStoredData(workspace.workspaceId, dataSource.dataSourceId, parquetBuffer);
-    }
-
-    // save the schema to S3
-    await saveSchemaAndUpdateTable(workspace.workspaceId, dataSource.dataSourceId, schema);
-
-    // update status
-    if (dataSource.status !== "active" || dataSource.error !== null) {
-        await dataSourceRepo.updateDataSourceStatus(workspace.workspaceId, dataSource.dataSourceId, {
-            status: "active",
-            errorMessage: null
+    // adapter failures are routed straight to error - the data never arrived,
+    // so the temp store flow does not apply. Once we have rows, safeProcessIngest
+    // handles translate/validate/drift/parquet/store with full error tracking.
+    let newData;
+    try {
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "processing",
+            errorMessage: null,
+            errorType: null,
+            progressStage: "Polling source",
+            progressPercent: 5,
         });
+
+        const secrets = await dataSourceSecretsRepo.getSecrets(workspaceId, dataSourceId);
+        const adapter = adapterFactory.getAdapter(dataSource.sourceType);
+
+        await dataSourceRepo.updateDataSourceProgress(workspaceId, dataSourceId, { stage: "Fetching data", percent: 15 });
+        newData = await retryPoll(adapter, dataSource.config, secrets);
+    } catch (err) {
+        console.error(`[Poll] adapter poll failed for ${workspaceId}/${dataSourceId}:`, err.message);
+        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
+            status: "error",
+            errorMessage: err.message,
+            errorType: "poll",
+        });
+        throw err;
     }
+
+    return safeProcessIngest(workspaceId, dataSource, newData, {
+        logPrefix: "[Poll]",
+    });
 }
 
 async function retryPoll(adapter, config, secrets) {

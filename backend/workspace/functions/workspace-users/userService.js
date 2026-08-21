@@ -7,6 +7,7 @@ const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 const { getUserByEmail } = require("@etron/shared/utils/auth");
 const { hasPermission } = require("@etron/shared/utils/permissions");
 const { logAuditEvent } = require("@etron/shared/utils/auditLogger");
+const { permissionCache } = require("@etron/shared/utils/permissionCache");
 
 // Permissions for this service
 const PERMISSIONS = {
@@ -120,7 +121,12 @@ async function updateUserInWorkspace(authUserId, workspaceId, userId, payload) {
         itemName: `${user.given_name} ${user.family_name}`
     });
 
-    return workspaceUsersRepo.updateUser(workspaceId, userId, updatedUserItem);
+    const result = await workspaceUsersRepo.updateUser(workspaceId, userId, updatedUserItem);
+
+    permissionCache.invalidate(workspaceId, userId); // invalidate cache for the user
+    await workspaceUsersRepo.bumpPermissionsVersion(workspaceId, userId); // bump permissions version for the user
+
+    return result;
 }
 
 async function getUserInWorkspace(authUserId, workspaceId, userId) {
@@ -153,6 +159,8 @@ async function removeUserFromWorkspace(authUserId, workspaceId, userId) {
     }
 
     await validateWorkspaceId(workspaceId);
+
+    permissionCache.invalidate(workspaceId, userId); // invalidate cache for the user
 
     await workspaceUsersRepo.removeUser(workspaceId, userId);
 

@@ -4,7 +4,7 @@ import { useRouter, Link, useLocalSearchParams } from "expo-router";
 import { Text, Snackbar, Portal, ActivityIndicator } from 'react-native-paper';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
-import { View, Linking, Modal, TextInput, Keyboard, StyleSheet, Pressable } from 'react-native';
+import { View, Modal, TextInput, Keyboard, StyleSheet, Pressable } from 'react-native';
 import TextField from '../components/common/input/TextField';
 import BasicButton from '../components/common/buttons/BasicButton';
 import { useTheme } from 'react-native-paper';
@@ -21,17 +21,14 @@ import {
     signUp, 
     confirmSignUp, 
     signInWithRedirect, 
-    getCurrentUser, 
-    signOut,
-    updateUserAttributes,
-    fetchUserAttributes,
-    resendSignUpCode
+    getCurrentUser,
+    signOut
 } from 'aws-amplify/auth';
 import Header from "../components/layout/Header";
+import useOAuthCallbacks from "../hooks/system/useOAuthCallbacks";
+import useWorkspaceProvisioning from "../hooks/system/useWorkspaceProvisioning";
+import useSignUpFlow from "../hooks/system/useSignUpFlow";
 
-import { apiGet } from "../utils/api/apiClient";
-import endpoints from "../utils/api/endpoints";
-import { saveWorkspaceInfo } from "../storage/workspaceStorage";
 import VerificationDialog from "../components/overlays/VerificationDialog";
 
 //Amplify.configure(awsmobile);
@@ -47,12 +44,9 @@ function LoginSignup() {
     const [message, setMessage] = useState('');
     const [snack, setSnack] = useState({ visible: false, text: '' , tone: 'error'});  //tone: 'error' | 'info'
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [showVerificationModal, setShowVerificationModal] = useState(false);
-    const [verificationCode, setVerificationCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [socialLoading, setSocialLoading] = useState({ google: false, microsoft: false });
     const [signedOutForLinking, setSignedOutForLinking] = useState(!isLinking);
-    const [resendCooldown, setResendCooldown] = useState(0);
     const [loadingNextPage, setLoadingNextPage] = useState(false);
 
     const router = useRouter();
@@ -80,12 +74,6 @@ function LoginSignup() {
         });
     }, [router, actions.login]);
 
-    useEffect(() => {
-        if (!showVerificationModal || resendCooldown <= 0) return;
-        const t = setTimeout(() => setResendCooldown((c) => Math.max(c - 1, 0)), 1000);
-        return () => clearTimeout(t);
-    }, [showVerificationModal, resendCooldown]);
-
     // Handle sign out for linking
     useEffect(() => {
         if (isLinking && !signedOutForLinking) {
@@ -102,136 +90,24 @@ function LoginSignup() {
         }
     }, [isLinking, signedOutForLinking]);
 
-    // Setup deep link handling
-    useEffect(() => {
-        const handleDeepLink = async (objectUrl) => {
-            console.log('Deep link received:', objectUrl);
-
-            let url = objectUrl.url || objectUrl;
-            if (!url) return;
-            
-            // check if the URL is a valid social sign-in callback
-            if (url && (url.includes('myapp://callback'))) {
-                try {
-                    // wait to ensure the sign-in process completes
-                    setTimeout(async () => {
-                        try {
-                            const user = await getCurrentUser();
-                            console.log('Social sign-in successful:', user);
-                            // navigate to profile page (or consider back to accounts page again)
-
-                            const userAttributes = await fetchUserAttributes();
-                            const hasGivenName = userAttributes["given_name"];
-                            const hasFamilyName = userAttributes["family_name"];
-                            let hasWorkspaceAttribute = userAttributes["custom:has_workspace"];
-
-                            // if the attribute doesn't exist set it to false
-                            if (hasWorkspaceAttribute == null) {
-                                await setHasWorkspaceAttribute(false);
-                                hasWorkspaceAttribute = "false";
-                            }
-
-                            const hasWorkspace = hasWorkspaceAttribute === "true";
-
-                            if (!hasWorkspace) {
-                                if (!hasGivenName || !hasFamilyName) {
-                                    router.dismissAll();
-                                    router.replace("(auth)/personalise-account");
-                                    return;
-                                } else {
-                                    router.dismissAll();
-                                    router.replace("(auth)/workspace-choice");
-                                    return;
-                                }
-                            } else {
-                                // fetch the workspace
-                                try {
-                                    const workspace = await apiGet(
-                                        endpoints.workspace.core.getByUserId(user.userId)
-                                    );
-
-                                    if (!workspace.data || !workspace.data.workspaceId) {
-                                        // clear attribute and redirect to choose workspace
-                                        await setHasWorkspaceAttribute(false);
-                                        router.dismissAll();
-                                        router.replace("(auth)/workspace-choice");
-                                        return;
-                                    }
-
-                                    // save locally and go to profile screen
-                                    await saveWorkspaceInfo(workspace.data);
-                                    router.dismissAll();
-                                    router.replace("(auth)/authenticated-loading");
-                                } catch (error) {
-                                    console.error("Error fetching workspace:", error);
-                                    setMessage("Unable to locate workspace. Please try again."); 
-                                }
-                            }
-
-                            router.dismissAll();
-                            router.replace("(auth)/authenticated-loading");
-
-                        } catch (error) {
-                            console.error('No authenticated user found after social sign-in');
-                            setMessage("Social sign-in was cancelled or failed");
-                        }
-                    }, 1000);
-                } catch (error) {
-                    console.error('Error handling social sign-in callback:', error);
-                    setMessage("Error completing social sign-in");
-                    await signOut();
-                }
-            }
-
-            // check if the URL is a valid social sign-out
-            if (url && (url.includes('myapp://signout/'))) {
-                router.dismissAll();
-                try {
-                    // navigate to landing with signout()
-                    await signOut();
-                    setMessage("Signed out successfully!");
-
-                } catch (error) {
-                    console.error('Error handling social sign-out:', error);
-                    setMessage("Social sign-out was cancelled or failed");
-                }
-            }
-        };
-
-        // listen for deep links
-        const subscription = Linking.addEventListener('url', handleDeepLink);
-
-        // check if the app was opened with a deep link
-        Linking.getInitialURL().then(handleDeepLink);
-
-        return () => subscription?.remove();
-    }, []);
+    const { provisionAfterAuth } = useWorkspaceProvisioning({ router, setMessage });
+    const { handleGoogleSignIn, handleMicrosoftSignIn } = useOAuthCallbacks({ router, setMessage, isLinking, provisionAfterAuth });
 
     const showSnack = (text, tone = 'error') => {
         setSnack({ visible: true, text, tone});
     }
 
-    const setHasWorkspaceAttribute = async (value) => {
-        try {
-            await updateUserAttributes({
-                userAttributes: {
-                    'custom:has_workspace': value ? 'true' : 'false'
-                }
-            });
-        } catch (error) {
-            console.error("Unable to update user attribute has_workspace:", error);
-        }
-    }
-
-    const handleResend = async () => {
-        if (resendCooldown > 0) return;
-        try {
-            await resendSignUpCode({username: email});
-            setResendCooldown(60);
-        } catch (error) {
-            console.error("Error resending the code", error);
-        }
-    }
+    const {
+        showVerificationModal,
+        setShowVerificationModal,
+        verificationCode,
+        setVerificationCode,
+        resendCooldown,
+        setResendCooldown,
+        handleResend,
+        handleSignUp,
+        handleConfirmCode,
+    } = useSignUpFlow({ email, password, confirmPassword, isLinking, router, showSnack, setLoading, setMessage });
 
     const handleSignIn = async () => {
         setLoading(true);
@@ -275,54 +151,6 @@ function LoginSignup() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleSignUp = async () => {
-        setLoading(true);
-        setMessage('');
-        
-        const result = await accountService.signUpWithEmail(email, password, confirmPassword);
-
-        if (result.success) {
-            setShowVerificationModal(true);
-        } else {
-            showSnack(result.error, "error");
-        }
-        setLoading(false);
-    };
-
-    const handleGoogleSignIn = async () => {
-        const result = await accountService.signInWithGoogle(isLinking);
-        
-        if (result.success && isLinking) {
-            setMessage("Google sign-in initiated. You'll be redirected after authentication.");
-        }
-    };
-
-    const handleMicrosoftSignIn = async () => {
-        const result = await accountService.signInWithMicrosoft(isLinking);
-        
-        if (result.success && isLinking) {
-            setMessage("Microsoft sign-in initiated. You'll be redirected after authentication.");
-        }
-    };
-
-    const handleConfirmCode = async () => {
-        setLoading(true);
-        setMessage('');
-        const result = await accountService.completeSignUp(email, password, verificationCode);
-        
-        if (result.success) {
-            setShowVerificationModal(false);
-            
-            if (isLinking) {
-                // If we're linking, navigate back to accounts after successful signup
-                setTimeout(() => {
-                    router.push('/(auth)/(drawer)/settings/account/accounts');
-                }, 1000);
-            }
-        }
-        setLoading(false);
     };
 
     const handleToggleSignUp = () => {
@@ -497,7 +325,7 @@ function LoginSignup() {
 
                             <TextInput
                                 placeholder="Code"
-                                placeholderTextColor={"#DDDDDD"}
+                                placeholderTextColor={theme.colors.darkNeutral}
                                 value={verificationCode}
                                 onChangeText={setVerificationCode}
                                 keyboardType="numeric"
@@ -508,7 +336,7 @@ function LoginSignup() {
                                     borderColor: theme.colors.outline,
                                     borderRadius: 5,
                                     minWidth: 200,
-                                    color: "#FFFFFF"
+                                    color: theme.colors.darkNeutral
                                 }}
                             />
 

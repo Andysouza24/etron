@@ -1,0 +1,89 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "soNumber",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerOrderNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesEmployee",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "outstandingQty",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "dueDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "outstandingValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "outstandingValue_LC_",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "outstandingValue_FC_",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "stockQty",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

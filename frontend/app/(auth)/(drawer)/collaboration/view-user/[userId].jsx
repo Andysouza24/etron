@@ -22,7 +22,7 @@ import AvatarDisplay from "../../../../../components/icons/AvatarDisplay";
 import ItemNotFound from "../../../../../components/common/errors/MissingItem";
 import { hasPermission } from "../../../../../utils/permissions";
 import PermissionGate from "../../../../../components/common/PermissionGate";
-
+import { useHasPermission } from "../../../../../hooks/useHasPermission";
 
 const ViewUser = () => {
 	const { userId } = useLocalSearchParams();
@@ -38,24 +38,14 @@ const ViewUser = () => {
 	const [profilePicture, setProfilePicture] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userExists, setUserExists] = useState(true);
-    const [manageUserPermission, setManageUserPermission] = useState(false);
-    const [viewUserAuditLogPermission, setViewUserAuditLogPermission] = useState(false);
+    const { allowed: manageUserPermission } = useHasPermission("app.collaboration.manage_users");
+    const { allowed: viewUserLogPermission } = useHasPermission("app.audit.view_user_audit_log");
 
     useFocusEffect(
         useCallback(() => {
-            (async () => {
-                await loadPermission();
-                await loadUser();
-            })();
+            loadUser();
         }, [loadUser])
     );
-
-    async function loadPermission() {
-        const manageUserPermission = await hasPermission("app.collaboration.manage_users");
-        setManageUserPermission(manageUserPermission);
-        const viewUserAuditLogPermission = await hasPermission("app.audit.view_user_audit_log");
-        setViewUserAuditLogPermission(viewUserAuditLogPermission);
-    }
 
     const loadUser = useCallback(async () => {
         setLoading(true);
@@ -135,7 +125,7 @@ const ViewUser = () => {
                         </List.Section>
 
                         <PermissionGate
-                            allowed={false}
+                            allowed={viewUserLogPermission}
                             onAllowed={() => router.navigate(`/collaboration/user-log/${userId}`)}
                         >
                             <DescriptiveButton label="User Activity Log" />

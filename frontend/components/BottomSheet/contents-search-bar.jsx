@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
-import { StyleSheet, View, TextInput } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { useTheme, Icon, IconButton } from 'react-native-paper';
 
 export const CONTENTS_SEARCH_BAR_BOTTOM_MARGIN = 8;
@@ -22,7 +23,7 @@ const ContentsSearchBar = ({ value, onChangeText, placeholder = 'Search', onFocu
   return (
     <View style={containerStyle}>
       <Icon source="magnify" size={20} color={iconColor} style={styles.leftIcon} />
-      <TextInput
+      <BottomSheetTextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

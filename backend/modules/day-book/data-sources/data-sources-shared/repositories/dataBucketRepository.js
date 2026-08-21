@@ -118,6 +118,75 @@ async function doesObjectExist(bucket, key) {
     }
 }
 
+// stable hash of a row's content, ignoring per-ingest fields so the same source row matches across ingests
+function buildRowContentHash(row) {
+    if (!row || typeof row !== "object") return JSON.stringify(row);
+    const keys = Object.keys(row).filter((k) => k !== "timestamp" && k !== "rowId").sort();
+    return keys.map((k) => `${k}=${JSON.stringify(row[k] === undefined ? null : row[k])}`).join("|");
+}
+
+// list every parquet partition currently stored for a data source
+async function listStoredDataKeys(workspaceId, dataSourceId) {
+    const prefix = `workspaces/${workspaceId}/day-book/dataSources/${dataSourceId}/data/`;
+    const keys = [];
+    let ContinuationToken;
+    do {
+        const result = await s3Client.send(new ListObjectsV2Command({
+            Bucket: bucketName,
+            Prefix: prefix,
+            ContinuationToken,
+        }));
+        for (const obj of result.Contents || []) {
+            if (obj.Key && obj.Key.endsWith(".parquet")) keys.push(obj.Key);
+        }
+        ContinuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+    } while (ContinuationToken);
+    return keys;
+}
+
+// append-new. Append only rows whose content is not already present in any existing partition; existing rows are untouched
+async function appendNewToStoredData(workspaceId, dataSourceId, newData, schema) {
+    if (!Array.isArray(newData) || newData.length === 0) return { appended: 0 };
+
+    try {
+        const existingHashes = new Set();
+        const keys = await listStoredDataKeys(workspaceId, dataSourceId);
+        for (const key of keys) {
+            try {
+                const existingFile = await s3Client.send(new GetObjectCommand({
+                    Bucket: bucketName,
+                    Key: key,
+                }));
+                const existingBuffer = await streamToBuffer(existingFile.Body);
+                const existingRows = await fromParquet(existingBuffer, schema);
+                for (const row of existingRows) {
+                    existingHashes.add(buildRowContentHash(row));
+                }
+            } catch (err) {
+                if (err.name === "NoSuchKey") continue;
+                throw err;
+            }
+        }
+
+        const filtered = [];
+        const seenInBatch = new Set();
+        for (const row of newData) {
+            const hash = buildRowContentHash(row);
+            if (existingHashes.has(hash)) continue;
+            if (seenInBatch.has(hash)) continue;
+            seenInBatch.add(hash);
+            filtered.push(row);
+        }
+
+        if (filtered.length === 0) return { appended: 0 };
+
+        await appendToStoredData(workspaceId, dataSourceId, filtered, schema);
+        return { appended: filtered.length };
+    } catch (error) {
+        handleS3Error(error, `Error appending new rows to ${bucketName}`);
+    }
+}
+
 // extend data. Append to existing S3 data
 async function appendToStoredData(workspaceId, dataSourceId, newData, schema) {
     const date = new Date().toISOString().split('T')[0];
@@ -303,6 +372,209 @@ async function saveSchema(workspaceId, dataSourceId, schema) {
     }
 }
 
+// --- temp schema + temp data ---
+// While a data source is in an error state (schema drift, processing error, etc.)
+// the main schema + data stay frozen so existing metrics keep working with their
+// last known-good shape. Fresh ingests are cast against an auto-generated
+// all-string "temp" schema and appended to a parallel /temp-data/ prefix so the
+// data source still appears to update (timestamps stay fresh) until the user
+// confirms a revised schema.
+
+function tempSchemaKey(workspaceId, dataSourceId) {
+    return `workspaces/${workspaceId}/day-book/dataSources/${dataSourceId}/temp-schema.json`;
+}
+
+function tempDataPrefix(workspaceId, dataSourceId) {
+    return `workspaces/${workspaceId}/day-book/dataSources/${dataSourceId}/temp-data/`;
+}
+
+function mainDataPrefix(workspaceId, dataSourceId) {
+    return `workspaces/${workspaceId}/day-book/dataSources/${dataSourceId}/data/`;
+}
+
+async function getTempSchema(workspaceId, dataSourceId) {
+    try {
+        const object = await s3Client.send(
+            new GetObjectCommand({ Bucket: bucketName, Key: tempSchemaKey(workspaceId, dataSourceId) }),
+        );
+        const schema = await streamToString(object.Body);
+        return JSON.parse(schema);
+    } catch (error) {
+        if (error.name === "NoSuchKey") return null;
+        handleS3Error(error, `Error retrieving temp schema from ${bucketName}`);
+    }
+}
+
+async function saveTempSchema(workspaceId, dataSourceId, schema) {
+    try {
+        await s3Client.send(
+            new PutObjectCommand({
+                Bucket: bucketName,
+                Key: tempSchemaKey(workspaceId, dataSourceId),
+                Body: JSON.stringify(schema, null, 2),
+                ContentType: "application/json",
+            }),
+        );
+    } catch (error) {
+        handleS3Error(error, `Error saving temp schema to ${bucketName}`);
+    }
+}
+
+async function deletePrefix(prefix) {
+    let ContinuationToken;
+    do {
+        const objectList = await s3Client.send(new ListObjectsV2Command({
+            Bucket: bucketName,
+            Prefix: prefix,
+            ContinuationToken,
+        }));
+        if (objectList.Contents && objectList.Contents.length > 0) {
+            await s3Client.send(new DeleteObjectsCommand({
+                Bucket: bucketName,
+                Delete: { Objects: objectList.Contents.map((o) => ({ Key: o.Key })) },
+            }));
+        }
+        ContinuationToken = objectList.IsTruncated ? objectList.NextContinuationToken : null;
+    } while (ContinuationToken);
+}
+
+async function clearTempSchema(workspaceId, dataSourceId) {
+    try {
+        await s3Client.send(new DeleteObjectsCommand({
+            Bucket: bucketName,
+            Delete: { Objects: [{ Key: tempSchemaKey(workspaceId, dataSourceId) }] },
+        }));
+    } catch (error) {
+        // best effort - the file may not exist yet
+        if (error.name !== "NoSuchKey") {
+            console.warn(`[dataBucket] clearTempSchema failed for ${workspaceId}/${dataSourceId}:`, error.message);
+        }
+    }
+}
+
+async function clearTempStoredData(workspaceId, dataSourceId) {
+    try {
+        await deletePrefix(tempDataPrefix(workspaceId, dataSourceId));
+    } catch (error) {
+        handleS3Error(error, `Error clearing temp data in ${bucketName}`);
+    }
+}
+
+// list every parquet file under a given prefix
+async function listKeysUnderPrefix(prefix) {
+    const keys = [];
+    let ContinuationToken;
+    do {
+        const result = await s3Client.send(new ListObjectsV2Command({
+            Bucket: bucketName,
+            Prefix: prefix,
+            ContinuationToken,
+        }));
+        for (const obj of result.Contents || []) {
+            if (obj.Key && obj.Key.endsWith(".parquet")) keys.push(obj.Key);
+        }
+        ContinuationToken = result.IsTruncated ? result.NextContinuationToken : null;
+    } while (ContinuationToken);
+    return keys;
+}
+
+// Append rows to today's partition under /temp-data/. Mirrors appendToStoredData
+// but writes to the temp prefix so the live data stays untouched while in error.
+async function appendToTempStoredData(workspaceId, dataSourceId, newData, schema) {
+    if (!Array.isArray(newData) || newData.length === 0) return;
+    const date = new Date().toISOString().split('T')[0];
+    const key = `${tempDataPrefix(workspaceId, dataSourceId)}${date}.parquet`;
+
+    try {
+        let finalBuffer = null;
+        const exists = await doesObjectExist(bucketName, key);
+
+        if (exists) {
+            const existingFile = await s3Client.send(
+                new GetObjectCommand({ Bucket: bucketName, Key: key }),
+            );
+            const existingBuffer = await streamToBuffer(existingFile.Body);
+            const existingData = await fromParquet(existingBuffer, schema);
+            const mergedData = [...existingData, ...newData];
+            finalBuffer = await toParquet(mergedData, schema);
+        } else {
+            finalBuffer = await toParquet(newData, schema);
+        }
+
+        await s3Client.send(
+            new PutObjectCommand({
+                Bucket: bucketName,
+                Key: key,
+                Body: finalBuffer,
+                ContentType: "application/octet-stream",
+            }),
+        );
+    } catch (error) {
+        handleS3Error(error, `Error appending temp data to ${bucketName}`);
+    }
+}
+
+// Replace the entire /temp-data/ prefix with a single partition built from
+// `data`. Used for "overwrite" methods on errored sources.
+async function replaceTempStoredData(workspaceId, dataSourceId, data, schema) {
+    await clearTempStoredData(workspaceId, dataSourceId);
+    if (!Array.isArray(data) || data.length === 0) return;
+    const date = new Date().toISOString().split('T')[0];
+    const key = `${tempDataPrefix(workspaceId, dataSourceId)}${date}.parquet`;
+    const buffer = await toParquet(data, schema);
+    try {
+        await s3Client.send(
+            new PutObjectCommand({
+                Bucket: bucketName,
+                Key: key,
+                Body: buffer,
+                ContentType: "application/octet-stream",
+            }),
+        );
+    } catch (error) {
+        handleS3Error(error, `Error replacing temp data in ${bucketName}`);
+    }
+}
+
+// Read every row currently stored under /data/ or /temp-data/ for a data source.
+// Returns an array of objects in insertion order across partitions. Used by the
+// "resolve error" reprocess flow.
+async function readAllStoredRows(workspaceId, dataSourceId, schema) {
+    if (!Array.isArray(schema) || schema.length === 0) return [];
+    const keys = await listKeysUnderPrefix(mainDataPrefix(workspaceId, dataSourceId));
+    const rows = [];
+    for (const key of keys.sort()) {
+        try {
+            const obj = await s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }));
+            const buffer = await streamToBuffer(obj.Body);
+            const partition = await fromParquet(buffer, schema);
+            if (Array.isArray(partition)) rows.push(...partition);
+        } catch (err) {
+            if (err.name === "NoSuchKey") continue;
+            throw err;
+        }
+    }
+    return rows;
+}
+
+async function readAllTempStoredRows(workspaceId, dataSourceId, schema) {
+    if (!Array.isArray(schema) || schema.length === 0) return [];
+    const keys = await listKeysUnderPrefix(tempDataPrefix(workspaceId, dataSourceId));
+    const rows = [];
+    for (const key of keys.sort()) {
+        try {
+            const obj = await s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }));
+            const buffer = await streamToBuffer(obj.Body);
+            const partition = await fromParquet(buffer, schema);
+            if (Array.isArray(partition)) rows.push(...partition);
+        } catch (err) {
+            if (err.name === "NoSuchKey") continue;
+            throw err;
+        }
+    }
+    return rows;
+}
+
 function streamToString(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -331,7 +603,17 @@ module.exports = {
     getDataSchema,
     saveSchema,
     appendToStoredData,
+    appendNewToStoredData,
     savePartitionedData,
     loadPartitionedData,
-    removeAllMetricData
+    removeAllMetricData,
+    // temp schema + temp data (used while a data source is in error)
+    getTempSchema,
+    saveTempSchema,
+    clearTempSchema,
+    appendToTempStoredData,
+    replaceTempStoredData,
+    clearTempStoredData,
+    readAllStoredRows,
+    readAllTempStoredRows,
 };

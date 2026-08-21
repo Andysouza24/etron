@@ -1,19 +1,20 @@
 // Author(s): Matthew Parkinson, Noah Bradley
 
 import { View, ScrollView, ActivityIndicator, StyleSheet, Alert } from "react-native";
-import { Text, useTheme, Card, Chip } from "react-native-paper";
+import { Text, useTheme, Card } from "react-native-paper";
 import Header from "../../../../../../components/layout/Header.jsx";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen.jsx";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import endpoints from "../../../../../../utils/api/endpoints.js";
-import GraphTypes from "../metrics/graph-types.jsx";
+import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage.jsx";
 import ViewShot from "react-native-view-shot";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system";
 import BasicButton from "../../../../../../components/common/buttons/BasicButton.jsx";
+import ExportChipGroup from "../../../../../../components/common/ExportChipGroup";
 
 const ViewMetrics = () => {
     const { ids } = useLocalSearchParams();
@@ -145,55 +146,12 @@ const ViewMetrics = () => {
                 style={{ flex: 1 }}
                 contentContainerStyle={{ gap: 25, paddingVertical: 20 }}
             >
-                {/* Background Colour Selector */}
-                <View style={styles.selectorContainer}>
-                    <Text style={styles.sectionHeader}>Choose Background</Text>
-                    <View style={styles.chipRow}>
-                        {["white", "black", "transparent"].map((color) => (
-                            <Chip
-                                key={color}
-                                selected={backgroundMode === color}
-                                onPress={() => setBackgroundMode(color)}
-                                style={{
-                                    marginHorizontal: 4,
-                                    backgroundColor:
-                                        backgroundMode === color
-                                            ? theme.colors.primary
-                                            : "transparent",
-                                }}
-                                textStyle={{ color: "white" }}
-                                selectedColor="white"
-                            >
-                                {color.charAt(0).toUpperCase() + color.slice(1)}
-                            </Chip>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Axis Colour Selector */}
-                <View style={styles.selectorContainer}>
-                    <Text style={styles.sectionHeader}>Axis Colours</Text>
-                    <View style={styles.chipRow}>
-                        {["dark", "light"].map((mode) => (
-                            <Chip
-                                key={mode}
-                                selected={axisColorModeState === mode}
-                                onPress={() => setAxisColorModeState(mode)}
-                                style={{
-                                    marginHorizontal: 4,
-                                    backgroundColor:
-                                        axisColorModeState === mode
-                                            ? theme.colors.primary
-                                            : "transparent",
-                                }}
-                                textStyle={{ color: "white" }}
-                                selectedColor="white"
-                            >
-                                {mode === "dark" ? "White" : "Black"}
-                            </Chip>
-                        ))}
-                    </View>
-                </View>
+                <ExportChipGroup
+                    backgroundMode={backgroundMode}
+                    onBackgroundChange={setBackgroundMode}
+                    axisColorMode={axisColorModeState}
+                    onAxisColorChange={setAxisColorModeState}
+                />
                 
                 {metricsData.map((metric, index) => (
                     <MetricCard
@@ -219,7 +177,7 @@ const ViewMetrics = () => {
 export default ViewMetrics;
 
 // --- MetricCard Component ---
-const MetricCard = forwardRef(({ metricSettings, filteredData, backgroundMode, axisColorModeState }, ref) => {
+const MetricCard = forwardRef(function MetricCard({ metricSettings, filteredData, backgroundMode, axisColorModeState }, ref) {
     const theme = useTheme();
     const viewShotRef = useRef();
     const coloursState = ["red", "blue", "green", "purple"];
@@ -319,20 +277,6 @@ function convertToGraphData(rows, metricSettings) {
 }
 
 const styles = StyleSheet.create({
-    selectorContainer: {
-        width: "100%",
-        marginBottom: 16,
-    },
-    sectionHeader: {
-        fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 8,
-    },
-    chipRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignItems: "center",
-    },
     metricCard: {
         borderRadius: 8,
         padding: 10,

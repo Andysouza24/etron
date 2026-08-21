@@ -1,5 +1,7 @@
-// TODO: look at putting data source specific validation requirements in the adapter
-// validation and utility functions for connection forms
+// Validation, name-generation, and payload builders for connection forms.
+// Each data-source type (API, FTP, MySQL, dashboard) gets a validate + build pair.
+// TODO: move data-source-specific validation rules into the adapters.
+
 const validateUrl = (url) => {
   if (!url?.trim()) return "API URL is required";
   
@@ -193,4 +195,52 @@ export const buildMySqlConnectionData = (formData) => ({
   username: formData.username?.trim(),
   password: formData.password?.trim(),
   database: formData.database?.trim()
+});
+
+// dashboard raw data validation
+const FILE_NAME_PATTERN = /^[A-Za-z0-9._-]+\.json$/;
+
+export const validateDashboardRawDataForm = (formData, returnErrors = false) => {
+  const errors = {};
+
+  const nameError = validateRequired(formData.name, "Connection name");
+  if (nameError) errors.name = nameError;
+
+  const fileName = formData.fileName?.trim();
+  if (!fileName) {
+    errors.fileName = "File name is required";
+  } else if (!FILE_NAME_PATTERN.test(fileName)) {
+    errors.fileName = "File name must be a .json file with letters, numbers, '.', '_' or '-' only";
+  }
+
+  if (returnErrors) {
+    return Object.keys(errors).length === 0 ? true : errors;
+  }
+  return Object.keys(errors).length === 0;
+};
+
+export const buildDashboardRawDataConnectionData = (formData) => ({
+  name: formData.name?.trim(),
+  fileName: formData.fileName?.trim(),
+  description: formData.description?.trim() || undefined,
+});
+
+
+// parent connection - optional name, no config, children auto discovered
+export const validateMicromaxDashboardForm = (formData, returnErrors = false) => {
+  const errors = {};
+
+  const trimmedName = formData?.name?.trim();
+  if (trimmedName && trimmedName.length > 100) {
+    errors.name = "Connection name must be 100 characters or fewer";
+  }
+
+  if (returnErrors) {
+    return Object.keys(errors).length === 0 ? true : errors;
+  }
+  return Object.keys(errors).length === 0;
+};
+
+export const buildMicromaxDashboardConnectionData = (formData) => ({
+  name: formData?.name?.trim() || "Micromax Dashboard",
 });

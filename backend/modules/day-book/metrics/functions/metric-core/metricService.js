@@ -2,6 +2,7 @@
 
 const metricRepo = require("@etron/day-book-shared/repositories/metricRepository");
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
+const { notifyMetricUpdate } = require("@etron/day-book-shared/utils/notifyMetricUpdate");
 const { getUploadUrl, getDownloadUrl } = require("@etron/metrics-shared/repositories/metricsBucketRepository");
 const { hasPermission } = require("@etron/shared/utils/permissions");
 const { validateWorkspaceId } = require("@etron/shared/utils/validation");
@@ -86,6 +87,9 @@ async function createMetricInWorkspace(authUserId, payload) {
     // add metricId to the associated data source
     await dataSourceRepo.addMetricToDataSource(workspaceId, dataSourceId, metricId);
 
+    // broadcast to subscribers so other devices/users see the new metric
+    await notifyMetricUpdate(metricItem, "CREATE");
+
     // log audit
     await logAuditEvent({
         workspaceId,
@@ -134,12 +138,31 @@ async function updateMetricInWorkspace(authUserId, metricId, payload) {
         ContentType: "image/jpeg"
     });
 
-    const updatedMetric = metricRepo.updateMetric(workspaceId, metricId, metricItem);
+    const updatedMetric = await metricRepo.updateMetric(workspaceId, metricId, metricItem);
 
     // update data source to active
     await metricRepo.updateMetricDataSourceStatus(workspaceId, metricId, true);
 
     const thumbnailUrl = await getDownloadUrl(metric.thumbnailKey);
+
+    // broadcast to subscribers so other devices/users see the updated metric
+    await notifyMetricUpdate({
+        workspaceId,
+        metricId,
+        name: updatedMetric?.name ?? name,
+        dataSourceId: updatedMetric?.dataSourceId ?? dataSourceId,
+        activeDataSource: true,
+        config: updatedMetric?.config ?? config,
+        thumbnailKey: metric.thumbnailKey,
+        createdAt: updatedMetric?.createdAt ?? metric.createdAt,
+        updatedAt: updatedMetric?.updatedAt ?? new Date().toISOString(),
+        createdBy: updatedMetric?.createdBy ?? metric.createdBy,
+        metricType: updatedMetric?.metricType ?? metric.metricType,
+        sourceMetrics: updatedMetric?.sourceMetrics ?? metric.sourceMetrics,
+        calculation: updatedMetric?.calculation ?? metric.calculation,
+        aggregationMethod: updatedMetric?.aggregationMethod ?? metric.aggregationMethod,
+        trendDirection: updatedMetric?.trendDirection ?? metric.trendDirection,
+    }, "UPDATE");
 
     // log audit
     await logAuditEvent({
@@ -210,9 +233,11 @@ async function deleteMetricInWorkspace(authUserId, workspaceId, metricId) {
     // remove the metric from the associated data source
     await dataSourceRepo.removeMetricFromDataSource(workspaceId, metric.dataSourceId, metric.metricId);
 
-
     // remove metric from repo
     await metricRepo.removeMetric(workspaceId, metricId);
+
+    // broadcast deletion to subscribers so other devices/users remove this metric from their list
+    await notifyMetricUpdate(metric, "DELETE"); //TODO: fix, metric deletion not working
 
     // log audit
     await logAuditEvent({
@@ -229,10 +254,25 @@ async function deleteMetricInWorkspace(authUserId, workspaceId, metricId) {
     return {message: "Metric successfully deleted"};
 }
 
+async function getMetricsByDataSourceInWorkspace(authUserId, workspaceId, dataSourceId) {
+    await validateWorkspaceId(workspaceId);
+    const isAuthorised = await hasPermission(authUserId, workspaceId, PERMISSIONS.VIEW_METRICS);
+
+    if (!isAuthorised) {
+        throw new Error("User does not have permission to perform action");
+    }
+
+    const allMetrics = await metricRepo.getMetricsByWorkspaceId(workspaceId);
+    const filtered = allMetrics.filter(m => m.dataSourceId === dataSourceId);
+
+    return filtered;
+}
+
 module.exports = {
     createMetricInWorkspace,
     updateMetricInWorkspace,
     getMetricInWorkspace,
     getMetricsInWorkspace,
+    getMetricsByDataSourceInWorkspace,
     deleteMetricInWorkspace
 };

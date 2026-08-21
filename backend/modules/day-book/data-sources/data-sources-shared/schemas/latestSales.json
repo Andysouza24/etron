@@ -1,0 +1,114 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesEmployee",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "currency",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "unitPrice",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "qty",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "discount",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "foreignSalesAmount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "audSalesAmount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "invoiceCRNote",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "invoiceDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "customerOrderNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "COGS",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "salesType",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "courier",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "consignmentNoteNo",
+    "type": "string",
+    "category": "dimension"
+  }
+]

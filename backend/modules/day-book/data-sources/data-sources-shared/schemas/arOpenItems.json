@@ -1,0 +1,93 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "transactionType",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "docNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "docDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "postingDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "dueDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "customerRefNumber",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "amount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "balanceDue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "createdAt",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "updatedAt",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "currency",
+    "type": "string",
+    "category": "dimension"
+  }
+]

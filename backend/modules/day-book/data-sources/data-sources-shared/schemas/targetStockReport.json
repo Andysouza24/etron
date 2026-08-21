@@ -1,0 +1,58 @@
+[
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "stockOnHand",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "procurementMethod",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "3monthsAvg",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "targetVal",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "overstockVal",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "dormantVal",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "longDescription",
+    "type": "string",
+    "category": "dimension"
+  }
+]

@@ -1,4 +1,5 @@
-// this is a temporary file to provide a context for verifying password
+// Thin placeholder context for password-verification state.
+// Mounted in the root layout; consumed by account-settings and the auth layout.
 
 import React, { createContext, useContext } from 'react';
 

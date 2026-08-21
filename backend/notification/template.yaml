@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  eTRON notification-domain functions template
+
+Parameters:
+  AuditQueueUrl:
+    Type: String
+  UserPoolArn:
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 5
+    Runtime: nodejs22.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        AUDIT_QUEUE_URL: !Ref AuditQueueUrl
+        USERPOOL_ARN: !Ref UserPoolArn
+
+Resources:
+
+  eTRONApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !Ref UserPoolArn
+            Identity:
+              Header: Authorization
+
+  # DynamoDB Tables
+  DevicePushTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: DevicePushTokens
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: pushToken
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: pushToken
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
+  NotificationPreferencesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: NotificationPreferences
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  UserNotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserNotifications
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: notificationId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: notificationId
+          KeyType: RANGE
+      LocalSecondaryIndexes:
+        - IndexName: createdAt-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      BillingMode: PAY_PER_REQUEST
+
+  # Notification Core Lambda
+  NotificationCoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./functions/notification-core
+      Handler: notificationHandler.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: DevicePushTokens
+        - DynamoDBCrudPolicy:
+            TableName: NotificationPreferences
+        - DynamoDBCrudPolicy:
+            TableName: UserNotifications
+        - Statement:
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+            Resource: "*"
+      Events:
+        GetNotifications:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: get
+            RestApiId: !Ref eTRONApi
+        CreateNotification:
+          Type: Api
+          Properties:
+            Path: /notifications
+            Method: post
+            RestApiId: !Ref eTRONApi
+        RegisterPushToken:
+          Type: Api
+          Properties:
+            Path: /notifications/push-token
+            Method: post
+            RestApiId: !Ref eTRONApi
+        RemovePushToken:
+          Type: Api
+          Properties:
+            Path: /notifications/push-token
+            Method: delete
+            RestApiId: !Ref eTRONApi
+        GetPreferences:
+          Type: Api
+          Properties:
+            Path: /notifications/preferences
+            Method: get
+            RestApiId: !Ref eTRONApi
+        UpdatePreferences:
+          Type: Api
+          Properties:
+            Path: /notifications/preferences
+            Method: put
+            RestApiId: !Ref eTRONApi
+
+  # Notification Evaluator Lambda
+  NotificationEvaluatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./functions/notification-evaluator
+      Handler: evaluatorHandler.handler
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: DevicePushTokens
+        - DynamoDBCrudPolicy:
+            TableName: NotificationPreferences
+        - Statement:
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+            Resource: !GetAtt NotificationQueue.Arn
+      Events:
+        # Scheduled evaluation — can be enabled later when thresholds are implemented
+        # ScheduledEvaluation:
+        #   Type: Schedule
+        #   Properties:
+        #     Schedule: rate(5 minutes)
+        #     Enabled: false
+        EvaluateNotification:
+          Type: Api
+          Properties:
+            Path: /notifications/evaluate
+            Method: post
+            RestApiId: !Ref eTRONApi
+        NotificationQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationQueue.Arn
+            BatchSize: 10
+
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: NotificationQueue
+      VisibilityTimeout: 60

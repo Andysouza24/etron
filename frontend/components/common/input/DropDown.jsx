@@ -1,287 +1,203 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Keyboard } from 'react-native';
-import { Text, useTheme, IconButton, List, TextInput } from 'react-native-paper';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, FlatList, Pressable } from 'react-native';
+import { Text, useTheme, Portal, Surface, Divider, Menu, Icon } from 'react-native-paper';
 import { router } from "expo-router";
 import PermissionGate from '../PermissionGate';
 
 const ITEM_HEIGHT = 48;
-const SEARCH_HEIGHT = 56;
-const FOOTER_HEIGHT = 50; 
+const MENU_CORNER_RADIUS = 4;
+const MENU_VERTICAL_GAP = 4;
 
 const DropDown = ({
     title,
     items = [],
-    showRouterButton=true,
+    showRouterButton = true,
     onSelect,
     value,
-    allowed=true,
+    allowed = true,
+    clearOnSelect = false,
     maxVisibleItems = 3.5,
+    noStyle = false,
 }) => {
     const theme = useTheme();
+    const triggerRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    
+    const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 0 });
+
     useEffect(() => {
-        if (value) {
-            const found = items.find((i) => i.value === value);
-            setSelectedItem(found || null);
-        }
+        if (value === undefined) return;
+        if (value === null) { setSelectedItem(null); return; }
+        const found = items.find((i) => i.value === value);
+        setSelectedItem(found || null);
     }, [value, items]);
-    
+
+    const openMenu = () => {
+        if (!triggerRef.current) {
+            setExpanded(true);
+            return;
+        }
+        triggerRef.current.measureInWindow((x, y, width, height) => {
+            setAnchor({ x, y: y + height + MENU_VERTICAL_GAP, width });
+            setExpanded(true);
+        });
+    };
+
+    const closeMenu = () => setExpanded(false);
+
     const handleItemSelect = (item) => {
-        setSelectedItem(item);
-        setExpanded(false);
-        if (onSelect) onSelect(item.value);
-    }
+        closeMenu();
+        if (onSelect) onSelect(item.value, item);
+        if (clearOnSelect) {
+            setSelectedItem(null);
+        } else {
+            setSelectedItem(item);
+        }
+    };
 
-    const filteredItems = items.filter((item) =>
-        (item.label ?? "").toLowerCase().includes(searchQuery.toLowerCase())
-    )
-
-    const listMaxHeight = Math.min(
+    const listHeight = Math.min(
         ITEM_HEIGHT * maxVisibleItems,
-        ITEM_HEIGHT * filteredItems.length
+        ITEM_HEIGHT * items.length
     );
 
-    return (
-        <List.Section>
-            <List.Accordion
-                title={selectedItem ? selectedItem.label : title}
-                expanded={expanded}
-                onPress={() => {
-                    if (!expanded) Keyboard.dismiss();
-                    setExpanded(prev => !prev)
+    const triggerLabel = selectedItem ? selectedItem.label : title;
+    const isTitlePlaceholder = !selectedItem;
+
+    const menuContainerColor =
+        theme.colors.surfaceContainer ??
+        theme.colors.elevation?.level2 ??
+        theme.colors.surface;
+
+    const renderItem = ({ item }) => {
+        const isSelected = selectedItem?.value === item.value;
+        return (
+            <Menu.Item
+                title={item.label}
+                onPress={() => handleItemSelect(item)}
+                style={[
+                    styles.menuItem,
+                    isSelected && { backgroundColor: theme.colors.secondaryContainer },
+                ]}
+                titleStyle={{
+                    color: isSelected ? theme.colors.onSecondaryContainer : theme.colors.onSurface,
                 }}
-                style={[expanded ? styles.containerExpanded : styles.containerCollapsed, { borderColor: theme.colors.outline }]}
+            />
+        );
+    };
+
+    return (
+        <>
+            <Pressable
+                ref={triggerRef}
+                onPress={() => (expanded ? closeMenu() : openMenu())}
+                style={({ pressed }) => [
+                    styles.trigger,
+                    {
+                        borderColor: expanded ? theme.colors.primary : theme.colors.outline,
+                        borderWidth: expanded ? 2 : 1,
+                        backgroundColor: noStyle
+                            ? "transparent"
+                            : pressed
+                                ? theme.colors.surfaceVariant
+                                : theme.colors.surface,
+                    },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+                accessibilityLabel={triggerLabel}
             >
-                <View style={styles.searchContainer}>
-                    <TextInput
-                        mode="outlined"
-                        placeholder="Search..."
-                        placeholderTextColor={theme.colors.placeholderText}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        style={[styles.searchInput, { height: SEARCH_HEIGHT }]}
-                        outlineColor={theme.colors.outline}
-                        activeOutlineColor={theme.colors.primary}
-                        theme={{ roundness: 0 }}
-                    />
-                </View>
-
-                <View
-                    style={[ styles.panelContainer, {borderColor: theme.colors.outline,} ]}
+                <Text
+                    style={[
+                        styles.triggerText,
+                        { color: isTitlePlaceholder ? theme.colors.onSurfaceVariant : theme.colors.onSurface },
+                    ]}
+                    numberOfLines={1}
                 >
-                    <ScrollView
-                        nestedScrollEnabled
-                        style={{ maxHeight: listMaxHeight }}
-                        keyboardShouldPersistTaps="always"
-                        bounces
-                        onStartShouldSetResponderCapture={() => false}
-                        onMoveShouldSetResponderCapture={(e) => {
-                            const touches = e.nativeEvent?.touches;
-                            return touches && touches.length > 0;
-                        }}
-                    >
-                        {filteredItems.map((item, index) => (
-                            <List.Item
-                                key={index}
-                                title={item.label}
-                                style={[styles.items, { borderColor: theme.colors.outline, height: ITEM_HEIGHT }]}
-                                titleStyle={{ lineHeight: 20 }}
-                                onPress={() => {
-                                    Keyboard.dismiss();
-                                    handleItemSelect(item);
-                                }}
-                            />
-                        ))}
-                    </ScrollView>
+                    {triggerLabel}
+                </Text>
+                <Icon
+                    source={expanded ? "menu-up" : "menu-down"}
+                    size={24}
+                    color={theme.colors.onSurfaceVariant}
+                />
+            </Pressable>
 
-                    {showRouterButton && (
-                        <PermissionGate allowed={allowed}>
-                            <TouchableOpacity
-                                style={[styles.routerButton, { borderColor: theme.colors.outline, height: FOOTER_HEIGHT }]}
-                                onPress={() => router.navigate('/modules/day-book/data-management/create-data-connection')}
-                            >
-                                <View style={styles.routerButtonContent}>
-                                    <IconButton icon="plus" size={20} style={styles.routerIcon} iconColor={theme.colors.icon} />
-                                    <Text style={[styles.routerText, { color: theme.colors.placeholderText }]}>
-                                        New Data Source
-                                    </Text>
+            {expanded && (
+                <Portal>
+                    <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
+                    <Surface
+                        elevation={2}
+                        style={[
+                            styles.menuSurface,
+                            {
+                                top: anchor.y,
+                                left: anchor.x,
+                                width: anchor.width,
+                                backgroundColor: menuContainerColor,
+                            },
+                        ]}
+                    >
+                        <View style={{ height: listHeight }}>
+                            <FlatList
+                                data={items}
+                                keyExtractor={(item, idx) => `${item.value ?? idx}`}
+                                renderItem={renderItem}
+                                keyboardShouldPersistTaps="always"
+                                showsVerticalScrollIndicator
+                                getItemLayout={(_, index) => ({
+                                    length: ITEM_HEIGHT,
+                                    offset: ITEM_HEIGHT * index,
+                                    index,
+                                })}
+                            />
+                        </View>
+
+                        {showRouterButton && (
+                            <PermissionGate allowed={allowed}>
+                                <View>
+                                    <Divider />
+                                    <Menu.Item
+                                        leadingIcon="plus"
+                                        title="New Data Source"
+                                        onPress={() => {
+                                            closeMenu();
+                                            router.navigate('/modules/day-book/data-management/create-data-connection');
+                                        }}
+                                        titleStyle={{ color: theme.colors.onSurfaceVariant }}
+                                    />
                                 </View>
-                            </TouchableOpacity>
-                        </PermissionGate>
-                    )}
-                </View>
-            </List.Accordion>
-        </List.Section>
+                            </PermissionGate>
+                        )}
+                    </Surface>
+                </Portal>
+            )}
+        </>
     );
 };
 
 export default DropDown;
 
 const styles = StyleSheet.create({
-    containerCollapsed: {
-        borderWidth: 1,
-        borderRadius: 10
-    },
-    containerExpanded: {
-        borderWidth: 1,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
-    },
-    searchContainer: {
-        borderCurve: 0,
-    },
-    searchInput: {
-        height: 50,
-        fontSize: 16,
-    },
-
-    panelContainer: {
-        borderLeftWidth: 1,
-        borderRightWidth: 1,
-        borderBottomWidth: 1,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-        overflow: 'hidden',
-    },
-
-    items: {
-        borderWidth: 1,
-    },
-    lastItem: {
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-    },
-    routerButton: {
-        height: 50,
-        borderWidth: 1,
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
-        justifyContent: 'center',
-        paddingHorizontal: 5,
-    },
-    routerButtonContent: {
+    trigger: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: MENU_CORNER_RADIUS,
+        height: ITEM_HEIGHT,
+        paddingHorizontal: 12,
     },
-    routerIcon: {
-        margin: 0,
-        marginRight: 4,
-    },
-    routerText: {
+    triggerText: {
+        flex: 1,
         fontSize: 16,
+        marginRight: 8,
+    },
+    menuSurface: {
+        position: 'absolute',
+        borderRadius: MENU_CORNER_RADIUS,
+        overflow: 'hidden',
+    },
+    menuItem: {
+        height: ITEM_HEIGHT,
+        justifyContent: 'center',
     },
 });
-
-/*
-const DropDown = ({
-    label = 'Select',
-    options = [], //Will pull individual sources from backend
-    selectedValue,
-    onValueChange,
-    placeholder = 'Search',
-}) => {
-    const [menuVisible, setMenuVisible] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const filteredOptions = options.filter(option =>
-        option.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const theme = useTheme();
-
-    return (
-        <View style={styles.container}>
-            <Menu
-                visible={menuVisible}
-                onDismiss={() => setMenuVisible(false)}
-                anchor={
-                    <TouchableOpacity onPress={() => setMenuVisible(true)}>
-                        <TextInput
-                            label={label}
-                            value={selectedValue}
-                            editable={false}
-                            right={<TextInput.Icon icon="menu-down" onPress={() => setMenuVisible(true)} />}
-                            style={styles.input}
-                        />
-                    </TouchableOpacity>
-                }
-                contentStyle={styles.menuContent}
-            >
-                <TextInput
-                    placeholder={placeholder}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    style={styles.searchInput}
-                    left={<TextInput.Icon icon="magnify"/>}
-                    right={<TextInput.Icon icon="menu-up" onPress={() => setMenuVisible(false)} />}
-                />
-
-                <ScrollView style={styles.list}>
-                    {filteredOptions.map((item, index) => (
-                        <List.Item
-                            key={`${item}-${index}`}
-                            title={item}
-                            onPress={() => {
-                                onValueChange(item);
-                                setMenuVisible(false);
-                                setSearchQuery('');
-                            }}
-                            titleStyle={{ color: theme.colors.text }}
-                            style={{
-                                paddingVertical: 4,
-                                paddingHorizontal: 10,
-                            }}
-                        />
-                    ))}
-                </ScrollView>
-
-                <TouchableOpacity
-                    style={styles.routerButton}
-                    onPress={() => {
-                        setMenuVisible(false);
-                        setSearchQuery('');
-                        router.navigate('/create-data-connection')
-                    }}
-                >
-                    <Text style={{ color: theme.colors.placeholderText, textAlignVertical: 'center' }}>
-                        New Data Source
-                    </Text>
-                </TouchableOpacity>
-            </Menu>
-        </View>
-    );
-};
-
-export default DropDown;
-
-const styles = StyleSheet.create({
-    container: {
-        margin: 0,
-        zIndex: 999,
-        width: 230,
-    },
-    input: {
-        backgroundColor: 'white',
-    },
-    searchInput: {
-        margin: 0,
-        backgroundColor: '#f2f2f2',
-    },
-    menuContent: {
-        paddingVertical: 0,
-        width: 230,
-    },
-    list: {
-        maxheight: 200,
-    },
-    routerButton: {
-        borderWidth: 1,
-        paddingHorizontal: 15,
-        paddingVertical: 0,
-        height: 50,
-    },
-})
-*/

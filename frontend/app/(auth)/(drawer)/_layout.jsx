@@ -1,16 +1,26 @@
-// Author(s): Noah Bradley
+// Author(s): Noah Bradley, Holly Wyatt
 
 import { useState, useEffect } from "react";
 import { DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import { useTheme, Appbar, Icon, Text } from "react-native-paper";
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { useTheme, Appbar, Icon, Divider } from "react-native-paper";
+import { View, StyleSheet } from "react-native";
 import { Drawer } from "expo-router/drawer"
-import DescriptiveButton from "../../../components/common/buttons/DescriptiveButton";
-import { commonStyles } from "../../../assets/styles/stylesheets/common";
 import PermissionGate from "../../../components/common/PermissionGate";
-import { hasPermission } from "../../../utils/permissions";
+import RouteGuard from "../../../components/common/RouteGuard";
+import { usePermissionSync } from "../../../hooks/usePermissionSync";
+import { getWorkspaceId } from "../../../storage/workspaceStorage";
+import { useHasPermission } from "../../../hooks/useHasPermission";
+import { getPermissionForRoute } from "../../../utils/routePermissions";
 
+// drawer entries no longer hold a `permKey` — the required permission is
+// looked up via `getPermissionForRoute(name)` against the central route map
+// in utils/routePermissions.js so there's a single source of truth.
 const generalOptions = [
+    {
+        name: "notifications",
+        label: "Notifications",
+        icon: "bell",
+    },
     {
         name: "account-settings",
         label: "My Account",
@@ -20,13 +30,12 @@ const generalOptions = [
         name: "collaboration",
         label: "Collaboration",
         icon: "account-group",
-        permKey: "app.workspace.view_collaboration_settings",
     },
     {
         name: "settings",
         label: "Settings",
         icon: "cog",
-    }
+    },
 ]
 
 const dayBookOptions = [
@@ -34,19 +43,16 @@ const dayBookOptions = [
         name: "modules/day-book/reports",
         label: "Reports",
         icon: "file-chart",
-        permKey: "modules.daybook.reports.view_reports"
     },
     {
         name: "modules/day-book/data-management",
         label: "Data Management",
         icon: "database",
-        permKey: "modules.daybook.datasources.view_dataSources"
     },
     {
         name: "modules/day-book/metrics",
         label: "Metrics",
         icon: "chart-line",
-        permKey: "modules.daybook.metrics.view_metrics"
     },
     /*{
         name: "modules/day-book/notifications",
@@ -57,96 +63,64 @@ const dayBookOptions = [
 
 const boardOptions = [
     {
-        name: "dashboard",
-        label: "Dashboard",
+        name: "home",
+        label: "Home",
         icon: "view-compact",
+    },
+    {
+        name: "boards",
+        label: "Boards",
+        icon: "view-grid-plus",
     },
 ]
 
-const DrawerRow = ({ label, icon, onPress, active = false, style }) => {
+const DrawerButton = ({ route, options, navigation, permKey, isActive }) => {
+    const { allowed } = useHasPermission(permKey);
     const theme = useTheme();
-    const lightBackground = theme.colors.altGM;
-    const activeBackground = theme.colors.focusedBackground;
-    const onTile = "#000000"
-
-    return (
-        <TouchableOpacity
-            onPress={onPress}
-            style={[
-                styles.row,
-                { backgroundColor: active ? activeBackground : lightBackground },
-                style,
-            ]}
-            activeOpacity={0.7}
-        >
-            <Icon source={icon} size={22} color={onTile} />
-            <Text style={[styles.rowLabel, { color: onTile }]} numberOfLines={1}>
-                {label}
-            </Text>
-        </TouchableOpacity>
-    )
-}
-
-const DrawerButton = ({route, options, navigation, allowed, isActive }) => {
     return (
         <PermissionGate
             allowed={allowed}
-            onAllowed={() => navigation.navigate(route.name)}
+            onAllowed={() => navigation.jumpTo(route.name)}
         >
             <DrawerItem
-                key={route.key}
                 label={options.drawerLabel ?? route.name}
-                icon={({ size }) => <Icon source={options.drawerIcon ? options.drawerIcon({}).source ?? options.drawerIcon : options.drawerIcon} size={size} color={"#000"} />}
-                
-                style={[styles.itemContainer, isActive && styles.itemContainerActive]}
-                labelStyle={[styles.itemLabel]}
+                icon={options.drawerIcon}
                 focused={isActive}
+                activeTintColor={theme.colors.onSecondaryContainer}
+                activeBackgroundColor={theme.colors.secondaryContainer}
+                inactiveTintColor={theme.colors.onSurfaceVariant}
+                style={styles.itemContainer}
+                labelStyle={styles.itemLabel}
+                onPress={() => {}}
             />
         </PermissionGate>
     );
-}
+};
 
 const CustomDrawer = (props) => {
     const { navigation, drawerState, setDrawerState, state, descriptors } = props;
     const theme = useTheme();
-    const [allowedMap, setAllowedMap] = useState({});
-
-    const allOptions = [...generalOptions, ...dayBookOptions, ...boardOptions];
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            const entries = await Promise.all(
-                allOptions.map(async (option) => {
-                    if (option.permKey) {
-                        try {
-                            const allowed = await hasPermission(option.permKey);
-                            return [option.name, !!allowed];
-                        } catch {
-                            return [option.name, false];
-                        }
-                    }
-                return [option.name, true];
-                })
-            );
-            if (mounted) setAllowedMap(Object.fromEntries(entries));
-        })();
-        return () => { mounted = false; };
-    }, []);
 
     const activeRouteName = state?.routes?.[state.index]?.name;
+
+    // boards drawer entry is hardcoded in the default view (not driven by
+    // boardOptions) so we need to gate it explicitly using the central map
+    const { allowed: canViewBoards } = useHasPermission(getPermissionForRoute("boards"));
 
     let generalRoutes = [];
     let dayBookRoutes = [];
     let boardRoutes = [];
     state.routes.forEach((route) => {
         const name = route.name;
-        const allowed = allowedMap[name] ?? true;
+        // central map returns undefined for unknown routes; in that case the
+        // route guard handles redirect, and we treat the entry as gated.
+        const permKey = getPermissionForRoute(name) ?? null;
         if (generalOptions.some((page) => page.name === name)) {
-            generalRoutes.push({ route, allowed });
+            generalRoutes.push({ route, permKey });
         } else if (dayBookOptions.some((page) => page.name === name)) {
-            dayBookRoutes.push({ route, allowed });
+            dayBookRoutes.push({ route, permKey });
         } else if (boardOptions.some((page) => page.name === name)) {
-            boardRoutes.push({ route, allowed });
+            boardRoutes.push({ route, permKey });
         }
     });
 
@@ -155,61 +129,88 @@ const CustomDrawer = (props) => {
         case "day-book":
             displayedRoutes = dayBookRoutes;
             break;
-        case "boards":
-            displayedRoutes = boardRoutes;
-            break;
         default:
             displayedRoutes = []
     }
 
     return (
         <View style={{ flex: 1 }}>
-            <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1 }}>
-                {drawerState == "default" ? (
-                    <Appbar.Action icon={"menu-open"} onPress={() => {navigation.closeDrawer()}} />
+            <DrawerContentScrollView {...props} contentContainerStyle={{ flexGrow: 1, paddingTop: 0 }}>
+                {drawerState === "default" ? (
+                    <Appbar.Action icon="menu-open" onPress={() => navigation.closeDrawer()} />
                 ) : (
-                    <Appbar.Action icon={"arrow-left-thin"} onPress={() => {setDrawerState("default")}} />
+                    <Appbar.Action icon="arrow-left-thin" onPress={() => setDrawerState("default")} />
                 )}
-                {drawerState == "default" ? (
+                {drawerState === "default" ? (
                     <View>
-                        <DrawerRow
-                            label="Boards"
-                            icon="view-dashboard"
-                            onPress={() => setDrawerState("boards")}
-                            style={{ marginTop: 6 }}
+                        <DrawerItem
+                            label="Home"
+                            icon={({ color, size }) => <Icon source="home" size={size} color={color} />}
+                            focused={activeRouteName === "home"}
+                            activeTintColor={theme.colors.onSecondaryContainer}
+                            activeBackgroundColor={theme.colors.secondaryContainer}
+                            inactiveTintColor={theme.colors.onSurfaceVariant}
+                            onPress={() => {
+                                setDrawerState("default");
+                                navigation.jumpTo("home");
+                                navigation.closeDrawer();
+                            }}
+                            style={[styles.itemContainer, { marginTop: 6 }]}
+                            labelStyle={styles.itemLabel}
                         />
-                        <View style={styles.divider} />
-                        <DrawerRow
+                        <PermissionGate
+                            allowed={canViewBoards}
+                            onAllowed={() => {
+                                setDrawerState("default");
+                                navigation.jumpTo("boards");
+                                navigation.closeDrawer();
+                            }}
+                        >
+                            <DrawerItem
+                                label="Boards"
+                                icon={({ color, size }) => <Icon source="view-grid-plus" size={size} color={color} />}
+                                focused={activeRouteName === "boards"}
+                                activeTintColor={theme.colors.onSecondaryContainer}
+                                activeBackgroundColor={theme.colors.secondaryContainer}
+                                inactiveTintColor={theme.colors.onSurfaceVariant}
+                                onPress={() => {}}
+                                style={styles.itemContainer}
+                                labelStyle={styles.itemLabel}
+                            />
+                        </PermissionGate>
+                        <Divider />
+                        <DrawerItem
                             label="Day Book"
-                            icon="file-document-multiple"
+                            icon={({ color, size }) => <Icon source="file-document-multiple" size={size} color={color} />}
+                            inactiveTintColor={theme.colors.onSurfaceVariant}
                             onPress={() => setDrawerState("day-book")}
-                            style={{ marginTop: 6}}
+                            style={[styles.itemContainer, { marginTop: 6 }]}
+                            labelStyle={styles.itemLabel}
                         />
                     </View>
                 ) : (
-                    displayedRoutes.map(({ route, allowed }) => (
+                    displayedRoutes.map(({ route, permKey }) => (
                         <DrawerButton
                             key={route.key}
                             route={route}
                             options={descriptors[route.key].options}
                             navigation={navigation}
-                            isActive={activeRouteName == route.name}
-                            allowed={allowed}
-                            style={{backgroundColor:"#000000"}}
+                            isActive={activeRouteName === route.name}
+                            permKey={permKey}
                         />
                     ))
                 )}
             </DrawerContentScrollView>
             <View style={styles.bottomSection}>
-                <View style={styles.divider} />
-                {generalRoutes.map(({ route, allowed }) => (
+                <Divider style={styles.divider} />
+                {generalRoutes.map(({ route, permKey }) => (
                     <DrawerButton
                         key={route.key}
                         route={route}
-                        allowed={allowed}
+                        permKey={permKey}
                         options={descriptors[route.key].options}
                         navigation={navigation}
-                        isActive={activeRouteName == route.name}    
+                        isActive={activeRouteName === route.name}
                     />
                 ))}
             </View>
@@ -220,8 +221,20 @@ const CustomDrawer = (props) => {
 export default function DrawerLayout() {
     const theme = useTheme();
     const [drawerState, setDrawerState] = useState("default");
+    const [workspaceId, setWorkspaceId] = useState(null);
+    
+    useEffect(() => {
+        (async () => {
+            const id = await getWorkspaceId();
+            setWorkspaceId(id);
+        })();
+    }, []);
+
+    const { forceRefresh } = usePermissionSync(workspaceId);
 
     return (
+        <>
+        <RouteGuard />
         <Drawer
             drawerContent={(props) => (
                 <CustomDrawer
@@ -236,24 +249,29 @@ export default function DrawerLayout() {
                 drawerStyle: {
                     backgroundColor: theme.colors.navigationRailBackground,
                 },
+                drawerActiveTintColor: theme.colors.onSecondaryContainer,
+                drawerActiveBackgroundColor: theme.colors.secondaryContainer,
+                drawerInactiveTintColor: theme.colors.onSurfaceVariant,
+                drawerItemStyle: styles.itemContainer,
+                drawerLabelStyle: styles.itemLabel,
                 overlayColor: 'transparent',
-                sceneContainerStyle: {
+                sceneStyle: {
                     backgroundColor: theme.colors.background,
-                }
+                },
             }}
         >
-            {boardOptions.map(({ name, label, icon }) =>
+            {boardOptions.map(({ name, label, icon }) => (
                 <Drawer.Screen
                     key={name}
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
                         ),
                     }}
                 />
-            )}
+            ))}
 
             {dayBookOptions.map(({ name, label, icon }) => (
                 <Drawer.Screen
@@ -261,8 +279,8 @@ export default function DrawerLayout() {
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
                         ),
                     }}
                 />
@@ -274,13 +292,14 @@ export default function DrawerLayout() {
                     name={name}
                     options={{
                         drawerLabel: label,
-                        drawerIcon: ({ size }) => (
-                            <Icon source={icon} color="#000" size={size} />
-                        )
+                        drawerIcon: ({ size, color }) => (
+                            <Icon source={icon} color={color} size={size} />
+                        ),
                     }}
                 />
             ))}
         </Drawer>
+        </>
     );
 }
 
@@ -289,40 +308,15 @@ const styles = StyleSheet.create({
         marginHorizontal: 10,
         marginVertical: 6,
         borderRadius: 10,
-        backgroundColor: "#FFFFFF"
-    },
-    itemContainerActive: {
-        backgroundColor: "#E0E0E0"
     },
     itemLabel: {
-        color: "#000",
         fontSize: 16,
     },
-
-    // Rows meant to look like drawer buttons
-    row: {
-        marginHorizontal: 10,
-        marginVertical: 6,
-        borderRadius: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-    },
-    rowLabel: {
-        fontSize: 16,
-    },
-
     bottomSection: {
         paddingBottom: 30,
-        marginHorizontal: 12
+        marginHorizontal: 12,
     },
     divider: {
-        alignSelf: "center",
-        width: "90%",
-        borderTopWidth: 1,
-        borderTopColor: "#FFFFFF",
         marginTop: 8,
         marginBottom: 4,
         opacity: 0.6,

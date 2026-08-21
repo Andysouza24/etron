@@ -13,6 +13,9 @@ const REPORTS_BASE_URL =
 const AUDIT_BASE_URL =
   "https://5dzdrirs49.execute-api.ap-southeast-2.amazonaws.com/dev/audits";
 
+const NOTIFICATION_BASE_URL =
+  "https://a4a8fkp9y8.execute-api.ap-southeast-2.amazonaws.com/dev/notifications";
+
 const endpoints = {
 	workspace: {
 		core: {
@@ -23,6 +26,8 @@ const endpoints = {
 			transfer: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/transfer`,
 			delete: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}`,
 			getDefaultPermissions: `${WORKSPACE_BASE_URL}/permissions`,
+			getPermissionsVersion: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/permissions/version`,
+			getEffectivePermissions: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/permissions/effective`,
 		},
 
 		invites: {
@@ -56,6 +61,7 @@ const endpoints = {
 			delete: (workspaceId, boardId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards/${boardId}`,
 			getBoard: (workspaceId, boardId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards/${boardId}`,
 			getBoards: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/boards`,
+			getDashboard: (workspaceId) => `${WORKSPACE_BASE_URL}/${workspaceId}/dashboard`,
 		},
 
 		modules: {
@@ -85,6 +91,16 @@ const endpoints = {
 		}
 	},
 
+	notifications: {
+	    getNotifications: `${NOTIFICATION_BASE_URL}`,
+	    createNotification: `${NOTIFICATION_BASE_URL}`,
+	    registerPushToken: `${NOTIFICATION_BASE_URL}/push-token`,
+	    removePushToken: `${NOTIFICATION_BASE_URL}/push-token`,
+	    getPreferences: `${NOTIFICATION_BASE_URL}/preferences`,
+	    updatePreferences: `${NOTIFICATION_BASE_URL}/preferences`,
+	    evaluate: `${NOTIFICATION_BASE_URL}/evaluate`,
+	},
+
 	modules: {
 		day_book: {
 			data_sources: {
@@ -96,11 +112,25 @@ const endpoints = {
 				removeDataSource: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}`,
 				testConnection: `${DATASOURCES_BASE_URL}/test-connection`,
 				remotePreview: `${DATASOURCES_BASE_URL}/preview/remote`,
+				previewSchema: `${DATASOURCES_BASE_URL}/preview-schema`,
+				previewSchemaForSource: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/preview-schema`,
+				confirmSchema: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/confirm-schema`,
+				errorContext: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/error-context`,
+				resolveError: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/resolve-error`,
+				refreshDefaultSchema: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/refresh-default-schema`,
+				activate: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/activate`,
+				toggleEnabled: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/toggle-enabled`,
 				viewData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data`,
 				viewDataForMetric: (dataSourceId, metricId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/view-data-for-metric/${metricId}`,
+				previewMetricData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/preview-metric-data`,
 				getUploadUrl: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/upload`,
 				getAvailableSheets: `${DATASOURCES_BASE_URL}/available-sheets`,
 				updateData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/update-data`,
+				refreshDashboardRawData: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/dashboard-raw-data/refresh`,
+				rescanMicromaxDashboard: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/micromax-dashboard/rescan`,
+				discoverMicromaxDashboard: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/micromax-dashboard/discover`,
+				rescanTestConnection: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/test-connection/rescan`,
+				discoverTestConnection: (dataSourceId) => `${DATASOURCES_BASE_URL}/${dataSourceId}/test-connection/discover`,
 				
 				// google sheets specific endpoints
 				integrations: {
@@ -119,6 +149,7 @@ const endpoints = {
 				getMetric: (metricId) => `${METRICS_BASE_URL}/${metricId}`,
 				getMetrics: `${METRICS_BASE_URL}`,
 				removeMetric: (metricId) => `${METRICS_BASE_URL}/${metricId}`,
+				getMetricsByDataSource: (dataSourceId) => `${METRICS_BASE_URL}/by-data-source/${dataSourceId}`,
 			},
 
 			reports: {

@@ -5,14 +5,115 @@
   },
   "build": {
     "development": {
+      "channel": "development",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      }
+    },
+    "development-large": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "resourceClass": "large",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      }
+    },
+    "development-apk": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "channel": "preview",
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      }
+    },
+    "preview-apk": {
+      "channel": "preview",
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "resourceClass": "large",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview-apk-staged": {
+      "channel": "staging",
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "resourceClass": "large",
+      "env": {
+        "EAS_USE_CACHE": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "channel": "production",
+      "autoIncrement": true,
+      "yarn": "1.22.22",
+      "resourceClass": "large",
+      "env": {
+        "EAS_RESTORE_CACHE": "0",
+        "EAS_SAVE_CACHE": "1"
+      },
+      "ios": {
+        "cache": {
+          "paths": [
+            "./ios/Podfile.lock"
+          ]
+        }
+      },
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

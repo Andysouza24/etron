@@ -1,77 +1,24 @@
 // Author(s): Rhys Cleary
 
-const { saveStoredData, replaceStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { generateSchema } = require("@etron/data-sources-shared/utils/schema");
-const { translateData } = require("@etron/data-sources-shared/utils/translateData");
-const { toParquet } = require("@etron/data-sources-shared/utils/typeConversion");
-const { validateFormat } = require("@etron/data-sources-shared/utils/validateFormat");
 const dataSourceRepo = require("@etron/day-book-shared/repositories/dataSourceRepository");
-const { saveSchemaAndUpdateTable } = require("@etron/data-sources-shared/utils/schema");
-const { appendToStoredData } = require("@etron/data-sources-shared/repositories/dataBucketRepository");
-const { castDataToSchema } = require("@etron/data-sources-shared/utils/castDataToSchema");
+const { safeProcessIngest } = require("@etron/data-sources-shared/utils/ingestPipeline");
 
-
+// Process an uploaded CSV file through the shared safe ingest pipeline.
+// The pipeline handles:
+//   - first-ingest with no schema -> pending_review + auto string schema
+//   - schema drift -> temp schema + temp data, status error/schema_drift
+//   - any other failure -> temp data store best-effort, status error
 async function processUploadedFile(workspaceId, dataSourceId, rawData) {
-    // get the dataSource
     const dataSource = await dataSourceRepo.getDataSourceById(workspaceId, dataSourceId);
     if (!dataSource) {
         throw new Error(`Data source not found: ${dataSourceId}`);
     }
 
-    try {
-        const translatedData = translateData(rawData);
-
-        if (translatedData.length === 0) {
-            console.warn(`Empty file for ${dataSource.dataSourceId}`);
-            await dataSourceRepo.updateDataSourceStatus(
-                workspaceId, 
-                dataSourceId, 
-                { status: "no_data", errorMessage: "No data existent" }
-            );
-            return { success: false };
-        }
-
-        const {valid, error } = validateFormat(translatedData);
-        if (!valid) throw new Error(`Invalid data format: ${error}`);
-
-        // create the schema 
-        const schema = generateSchema(translatedData.slice(0, 100));
-
-        // cast rows to the schema
-        const castedData = castDataToSchema(translatedData, schema);
-
-        // convert to parquet
-        const parquetBuffer = await toParquet(castedData, schema);
-
-        // save data depending on method
-        if (dataSource.method === "extend") {
-            await appendToStoredData(workspaceId, dataSourceId, castedData, schema);
-        } else {
-            await replaceStoredData(workspaceId, dataSourceId, parquetBuffer);
-        }
-
-        // save the schema to S3
-        await saveSchemaAndUpdateTable(workspaceId, dataSourceId, schema);
-
-        // update status
-        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
-            status: "active",
-            errorMessage: null
-        });
-
-        return { success: true };
-
-    } catch (error) {
-        // update status to error
-        await dataSourceRepo.updateDataSourceStatus(workspaceId, dataSourceId, {
-            status: "error",
-            errorMessage: error.message
-        });
-        throw error;
-    }
-    
+    return safeProcessIngest(workspaceId, dataSource, rawData, {
+        logPrefix: "[FileUpload]",
+    });
 }
 
 module.exports = {
-    processUploadedFile
+    processUploadedFile,
 };

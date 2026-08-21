@@ -10,6 +10,8 @@ const IconButton = ({
   fullWidth = false,
   style,
   loading = false,
+  mode = "elevated",
+  backgroundColor,
 }) => {
   const theme = useTheme();
 
@@ -17,20 +19,20 @@ const IconButton = ({
     <View>
       <Button
           icon={() => (
-            <Icon source={icon} size={24} color={theme.colors.themeGrey} />
+            <Icon source={icon} size={24} color={theme.colors.text} />
           )}
         compact
-        mode="elevated"
-        textColor={theme.colors.themeGrey}
+        mode={mode}
+        textColor={theme.colors.text}
         loading={loading}
         style={[
           styles.button,
           fullWidth ? styles.fullWidth : styles.fixedWidth,
           style,
-          {backgroundColor: theme.colors.buttonBackground, }
+          {backgroundColor: backgroundColor || theme.colors.buttonBackgroundAlt}
         ]}
         contentStyle={styles.content}
-        labelStyle={styles.label}
+        //labelStyle={styles.label}
         onPress={onPress}
       >
         {label}

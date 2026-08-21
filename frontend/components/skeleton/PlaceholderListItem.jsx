@@ -4,6 +4,7 @@ import { useTheme } from "react-native-paper";
 import ShimmerPlaceholder from "react-native-shimmer-placeholder";
 import LinearGradient from "react-native-linear-gradient";
 
+// Shimmer placeholder for a single list row (icon, two text lines, trailing icon).
 const PlaceholderListItem = () => {
   const theme = useTheme();
 

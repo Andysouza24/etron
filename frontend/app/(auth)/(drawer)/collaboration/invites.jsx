@@ -1,7 +1,7 @@
 // Author(s): Matthew Page
 
 import { useEffect, useState, useCallback } from "react";
-import { View, FlatList, Pressable, StyleSheet, TouchableOpacity, RefreshControl } from "react-native";
+import { View, FlatList, Pressable, StyleSheet, TouchableOpacity } from "react-native";
 import { ActivityIndicator, Card, Text, useTheme, List, Divider, IconButton, Dialog, Portal, Button, Snackbar } from "react-native-paper";
 import { router } from "expo-router";
 
@@ -11,6 +11,7 @@ import { apiGet, apiDelete } from "../../../../utils/api/apiClient";
 import endpoints from "../../../../utils/api/endpoints";
 import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 import ResponsiveScreen from "../../../../components/layout/ResponsiveScreen";
+import ThemedRefreshControl from "../../../../components/common/ThemedRefreshControl";
 import formatTTLDate from "../../../../utils/format/formatTTLDate";
 import { useFocusEffect } from "@react-navigation/native";
 import { hasPermission } from "../../../../utils/permissions";
@@ -124,7 +125,7 @@ const Invites = () => {
 					data={invites}
 					keyExtractor={(item) => item.inviteId}
 					refreshControl = {
-						<RefreshControl refreshing={refreshing} onRefresh={loadInvitesAndRoles} />
+						<ThemedRefreshControl refreshing={refreshing} onRefresh={loadInvitesAndRoles} />
 					}
 					contentContainerStyle={{ paddingVertical: 16 }}
 					renderItem={renderInviteItem}

@@ -1,0 +1,58 @@
+[
+  {
+    "name": "threshold",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "totalDormantValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "count",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "unitCost",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "stockQty",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "supplier",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "dormantStockValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]
