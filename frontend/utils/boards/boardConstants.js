@@ -25,11 +25,11 @@ export const BOARD_COLOUR_PALETTE = [
 ];
 
 export const DEFAULT_CHART_APPEARANCE = {
-  background: "#0f1622",
-  axisColor: "#9fb3d1",
-  tickLabelColor: "#f4f7ff",
+  background: "transparent",
+  axisColor: "black",
+  tickLabelColor: "black",
   gridColor: "rgba(159,179,209,0.28)",
-  showGrid: true,
+  showGrid: false,
   xAxisLabelAngle: 45,
 };
 

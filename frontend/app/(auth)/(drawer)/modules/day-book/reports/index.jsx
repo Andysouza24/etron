@@ -8,11 +8,26 @@ import DescriptiveButton from "../../../../../../components/common/buttons/Descr
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
 import PermissionGate from "../../../../../../components/common/PermissionGate";
 import { hasPermission } from "../../../../../../utils/permissions";
+import { useHasPermission } from "../../../../../../hooks/useHasPermission";
 
+const ReportsMenuItem = ({ item }) => {
+    const allowed = hasPermission(item.permKey);
+    return (
+        <PermissionGate
+            key={item.label}
+            allowed={allowed}
+            onAllowed={item.onPress}
+        >
+            <DescriptiveButton
+                icon={item.icon}
+                label={item.label}
+                description={item.description}
+            />
+        </PermissionGate>
+    );
+}
 
 const ReportsAndExportsManagement = () => {
-    const [menuOptions, setMenuOptions] = useState([]);
-   
     const menuButtonMap = useMemo(() => [
         {
             permKey: "modules.daybook.reports.view_reports",
@@ -43,28 +58,6 @@ const ReportsAndExportsManagement = () => {
             onPress: () => router.navigate("/modules/day-book/reports/exports"),
         },
     ], []);
-
-    const [allowedMap, setAllowedMap] = useState({});
-
-    useEffect(() => {
-        mapAllowedButtons();
-    }, [menuButtonMap]);
-
-    async function mapAllowedButtons() {
-        const entries = await Promise.all(
-            menuButtonMap.map(async (option) => {
-                if (!option.permKey) return [option.label, true];
-                try {
-                    const allowed = await hasPermission(option.permKey);
-                    return [option.label, allowed];
-                } catch {
-                    return [option.label, false];
-                }
-            })
-        );
-        setAllowedMap(Object.fromEntries(entries));
-    }
-
     return (
         <ResponsiveScreen
             header={<Header title="Reports and Exports" showMenu />}
@@ -72,22 +65,9 @@ const ReportsAndExportsManagement = () => {
             scroll={true}
         >
             <StackLayout spacing={12}>
-                {menuButtonMap.map((item) => {
-                    const allowed = item.permKey ? allowedMap[item.label] : true;
-                    return (
-                        <PermissionGate
-                            key={item.label}
-                            allowed={allowed}
-                            onAllowed={item.onPress}
-                        >
-                            <DescriptiveButton
-                                icon={item.icon}
-                                label={item.label}
-                                description={item.description}
-                            />
-                        </PermissionGate>
-                    );
-                })}
+                {menuButtonMap.map((item) => (
+                    <ReportsMenuItem key={item.label} item={item} />
+                ))}
             </StackLayout>
             </ResponsiveScreen>
     );

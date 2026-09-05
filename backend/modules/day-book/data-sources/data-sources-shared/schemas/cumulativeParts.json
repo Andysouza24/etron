@@ -1,0 +1,105 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "itemNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "supplier",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "cost",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "transactionValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "cumulativeQuantity",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "cumulativeValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "createdAt",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "updatedAt",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "systemDate",
+    "type": "string",
+    "category": "date"
+  },
+  {
+    "name": "postingDate",
+    "type": "string",
+    "category": "date"
+  },
+  {
+    "name": "document",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "warehouse",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "quantity",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "currency",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "rate",
+    "type": "double",
+    "category": "value"
+  }
+]

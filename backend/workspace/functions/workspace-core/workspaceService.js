@@ -7,6 +7,10 @@ const { getUserById } = require("@etron/shared/utils/auth");
 const {v4 : uuidv4} = require('uuid');
 const { hasPermission } = require("@etron/shared/utils/permissions");
 const { logAuditEvent } = require("@etron/shared/utils/auditLogger");
+const { getEffectivePermissions } = require("@etron/shared/utils/permissions"); // TODO: fix double require file
+const { getUser } = require("@etron/shared/repositories/workspaceUsersRepository");
+const { permissionCache } = require("@etron/shared/utils/permissionCache");
+const { validateWorkspaceId } = require("@etron/shared/utils/validation");
 
 // Permissions for this service
 const PERMISSIONS = {
@@ -315,6 +319,14 @@ async function transferWorkspaceOwnership(authUserId, workspaceId, payload) {
     }
 
     const updatedUser = await workspaceUsersRepo.updateUser(workspaceId, authUserId, updatedUserItem);
+    
+    // invalidate cache for both users
+    permissionCache.invalidate(workspaceId, receipientUserId);
+    permissionCache.invalidate(workspaceId, authUserId);
+
+    // bump version for both users
+    await workspaceUsersRepo.bumpPermissionsVersion(workspaceId, receipientUserId);
+    await workspaceUsersRepo.bumpPermissionsVersion(workspaceId, authUserId);
 
     return {
         newOwner,
@@ -327,11 +339,41 @@ async function getWorkspacePermissions() {
     return appConfigRepo.getAppPermissions();
 }
 
+// returns the permissions version for a user  - lightweight version check
+async function getUserPermissionsVersion(authUserId, workspaceId) {
+    await validateWorkspaceId(workspaceId);
+
+    const user = await workspaceUsersRepo.getUser(workspaceId, authUserId);
+    if (!user) {
+        throw new Error("User not found in workspace");
+    }
+
+    return {
+        version: user.permissionsVersion || 0
+    };
+}
+
+// returns the effective permissions for a user - full permission fetch
+async function getUserEffectivePermissions(authUserId, workspaceId) {
+    await validateWorkspaceId(workspaceId);
+
+    const effective = await getEffectivePermissions(authUserId, workspaceId);
+
+    return {
+        permissions: effective.permissions,
+        isOwner: effective.isOwner,
+        hideGatedComponents: effective.hideGatedComponents === true,
+        version: effective.version
+    };
+}
+
 module.exports = {
     createWorkspace,
     updateWorkspace,
     getWorkspaceByWorkspaceId,
     getWorkspaceByUserId,
     transferWorkspaceOwnership,
-    getWorkspacePermissions
+    getWorkspacePermissions,
+    getUserPermissionsVersion,
+    getUserEffectivePermissions
 };

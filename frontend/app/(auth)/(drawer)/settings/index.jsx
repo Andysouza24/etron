@@ -9,11 +9,27 @@ import StackLayout from '../../../../components/layout/StackLayout';
 import DescriptiveButton from '../../../../components/common/buttons/DescriptiveButton';
 import PermissionGate from '../../../../components/common/PermissionGate';
 import { hasPermission } from '../../../../utils/permissions';
+import { useHasPermission } from '../../../../hooks/useHasPermission';
+
+const SettingsItem = ({ item}) => {
+    const {allowed} = useHasPermission(item.permKey);
+    return (
+        <PermissionGate
+            key={item.label}
+            allowed={allowed}
+            onAllowed={item.onPress}
+        >
+            <DescriptiveButton
+                icon={item.icon}
+                image={item.image}
+                label={item.label}
+                description={item.description}
+            />
+        </PermissionGate>
+    );
+}
 
 const Settings = () => { 
-    const [menuOptions, setMenuOptions] = useState([]);
-
-
     const settingButtonMap = useMemo(() => [
         {
             permKey: 'app.workspace.view_workspace_settings',
@@ -45,28 +61,6 @@ const Settings = () => {
             label: "Terms and Conditions",
         },*/
     ], []);
-
-    const [allowedMap, setAllowedMap] = useState({});
-
-    useEffect(() => {
-        mapAllowedButtons();
-    }, [settingButtonMap]);
-
-    async function mapAllowedButtons() {
-        const entries = await Promise.all(
-            settingButtonMap.map(async (option) => {
-                if (!option.permKey) return [option.label, true];
-                try {
-                    const allowed = await hasPermission(option.permKey);
-                    return [option.label, allowed];
-                } catch {
-                    return [option.label, false];
-                }
-            })
-        );
-        setAllowedMap(Object.fromEntries(entries));
-    }
-
     return (
         <ResponsiveScreen
             header={
@@ -76,23 +70,9 @@ const Settings = () => {
             scroll={true}
         >
             <StackLayout spacing={12}>
-                {settingButtonMap.map((item) => {
-                    const allowed = item.permKey ? allowedMap[item.label] : true;
-                    return (
-                        <PermissionGate
-                            key={item.label}
-                            allowed={allowed}
-                            onAllowed={item.onPress}
-                        >
-                            <DescriptiveButton
-                                icon={item.icon}
-                                image={item.image}
-                                label={item.label}
-                                description={item.description}
-                            />
-                        </PermissionGate>
-                    );
-                })}
+                {settingButtonMap.map((item) => (
+                    <SettingsItem key={item.label} item={item} />
+                ))}
                 <Text>More options will be added to this page in the future.</Text>
             </StackLayout>
         </ResponsiveScreen>

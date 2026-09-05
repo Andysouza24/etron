@@ -1,6 +1,5 @@
 // Author(s): Rhys Cleary
 
-import { useTheme } from "react-native-paper";
 import BasicDialog from "./BasicDialog";
 
 const UnsavedChangesDialog = ({
@@ -9,8 +8,6 @@ const UnsavedChangesDialog = ({
     handleLeftAction = () => {},
     handleRightAction = () => {}
 }) => {
-    const theme = useTheme();
-
     return (
         <BasicDialog
             visible={visible}

@@ -24,10 +24,14 @@ TARGET_FOLDERS = [
     "modules/day-book/data-sources/functions/polling/data-source-poller",
     "modules/day-book/data-sources/functions/polling/data-source-poller-initialiser",
     "modules/day-book/data-sources/functions/data-source-upload-processor",
-    "modules/day-book/data-sources/functions/data-source-update-notifier",
+    "modules/day-book/data-sources/functions/data-update-notifier",
+    "modules/day-book/data-sources/functions/dashboard-raw-data-ingest",
+    "modules/day-book/data-sources/functions/dashboard-raw-data-transform",
     "audit/functions/audit-core",
     "audit/functions/archive-audit-logs",
-    "audit/functions/audit-processor"
+    "audit/functions/audit-processor",
+    "notification/functions/notification-core",
+    "notification/functions/notification-evaluator",
 ]
 
 SHARED_FOLDERS = [

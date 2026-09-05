@@ -1,5 +1,10 @@
+// Hex/rgb colour parsing and conversion helpers.
+// Used by display settings to validate user input and apply alpha to chart colours.
+
 const HEX_COLOR_REGEX = /^#([0-9A-F]{3}|[0-9A-F]{6}|[0-9A-F]{8})$/i;
 
+// Normalise user-entered hex into a full uppercase #RRGGBB string.
+// Returns "" for anything that is not a valid hex colour.
 export function sanitizeHexColor(value) {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -26,6 +31,8 @@ export function isValidHexColor(value) {
   return HEX_COLOR_REGEX.test(candidate);
 }
 
+// Convert a hex, rgb, or rgba colour to an rgba string, optionally overriding alpha.
+// Falls back to transparent black when the input cannot be parsed.
 export function hexToRgba(hex, alpha) {
   if (!hex || typeof hex !== "string") return "rgba(0,0,0,0)";
   const trimmed = hex.trim();

@@ -3,6 +3,9 @@ import { View, StyleSheet } from 'react-native';
 import { IconButton, useTheme } from 'react-native-paper';
 import { router } from 'expo-router';
 import BasicButton from '../common/buttons/BasicButton';
+import PermissionGate from '../common/PermissionGate';
+import { useHasPermission } from '../../hooks/useHasPermission';
+import { getPermissionForRoute } from '../../utils/routePermissions';
 
 const alignmentMap = {
     left: 'flex-start',
@@ -41,6 +44,18 @@ const ButtonCard = ({ item, isEditing, onEdit, disableEditActions = false }) => 
     const destinationRoute = typeof destination === 'string'
         ? destination
         : destination?.route ?? null;
+
+    // looks the destination up in the central route permission map. `undefined`
+    // means the route is not in the map → treat as denied (default-deny).
+    // `null` means explicitly public. otherwise it's the required permission key.
+    const requiredPermission = destinationRoute
+        ? getPermissionForRoute(destinationRoute)
+        : null;
+    const isRouteKnown = requiredPermission !== undefined;
+    const { allowed: hasRequiredPermission } = useHasPermission(
+        isRouteKnown ? requiredPermission : null
+    );
+    const canNavigate = isRouteKnown && hasRequiredPermission;
 
     const resolvedWidth = buttonWidth ?? width;
     const resolvedMinWidth = buttonMinWidth ?? minWidth;
@@ -113,14 +128,30 @@ const ButtonCard = ({ item, isEditing, onEdit, disableEditActions = false }) => 
                         widthStyle
                     ]}
                 >
-                    <BasicButton
-                        label={buttonLabel}
-                        onPress={isEditing ? undefined : handleButtonPress}
-                        disabled={shouldDisableButton}
-                        fullWidth={shouldFullWidth}
-                        icon={buttonIcon}
-                        {...restButtonProps}
-                    />
+                    {isEditing ? (
+                        <BasicButton
+                            label={buttonLabel}
+                            onPress={undefined}
+                            disabled={shouldDisableButton}
+                            fullWidth={shouldFullWidth}
+                            icon={buttonIcon}
+                            {...restButtonProps}
+                        />
+                    ) : (
+                        <PermissionGate
+                            allowed={canNavigate}
+                            onAllowed={handleButtonPress}
+                        >
+                            <BasicButton
+                                label={buttonLabel}
+                                onPress={handleButtonPress}
+                                disabled={shouldDisableButton}
+                                fullWidth={shouldFullWidth}
+                                icon={buttonIcon}
+                                {...restButtonProps}
+                            />
+                        </PermissionGate>
+                    )}
                 </View>
             </View>
         </View>
@@ -132,7 +163,7 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
         height: '100%',
-        padding: 12,
+        padding: 4,
         position: 'relative',
     },
     editOverlay: {
@@ -156,10 +187,8 @@ const styles = StyleSheet.create({
     },
     buttonInnerFull: {
         width: '100%',
-        minHeight: 48,
     },
     buttonInnerAuto: {
-        minHeight: 48,
     },
 });
 

@@ -4,15 +4,13 @@ import { Card, Text, useTheme } from 'react-native-paper';
 import { commonStyles } from '../../assets/styles/stylesheets/common';
 import Divider from '../layout/Divider';
 
-const TestResultCard = ({ 
-    result, 
-    error, 
+const TestResultCard = ({
+    result,
+    error,
     title = "Test Results"
 }) => {
     const theme = useTheme();
-    
-    if (!result && !error) return null;
-    
+
     const { isError, isSuccess } = useMemo(() => ({
         isError: !!error,
         isSuccess: result?.status === 'success'
@@ -23,6 +21,8 @@ const TestResultCard = ({
         isSuccess ? theme.colors.themeGreen :
         theme.colors.secondary
     ), [isError, isSuccess, theme.colors]);
+
+    if (!result && !error) return null;
 
     const statusColor = isSuccess ? theme.colors.themeGreen : theme.colors.error;
 

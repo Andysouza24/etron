@@ -56,27 +56,29 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-web-browser",
       [
-        "react-native-app-auth",
+        "expo-build-properties",
         {
-          "redirectUrls": ["myapp://auth"]
+          "android": {
+            "buildArchs": ["x86_64"]
+          }
         }
-      ]
+      ],
+      "expo-web-browser",
+      "./plugins/withAppAuthRedirectScheme"
     ],
     "experiments": {
       "typedRoutes": true
     },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/6137eb4a-cf50-41a5-8205-e53fd149cc15"
+    },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "31895f3a-82a4-46f0-9971-39e13e5134b5"
+        "projectId": "6137eb4a-cf50-41a5-8205-e53fd149cc15"
       }
-    },
-    "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/003b5c2f-3456-427b-ab80-4311639976e5"
-    },
-    "owner": "insyncdev"
+    }
   }
 }

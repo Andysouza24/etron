@@ -1,10 +1,11 @@
 // Author(s): Rhys Cleary
 
-import { useRouter } from "expo-router"
-import { Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Avatar, Card, Icon, IconButton, Text, useTheme } from "react-native-paper"
 import { commonStyles } from "../../assets/styles/stylesheets/common";
 
+// Generic list/detail card: optional left element, title/subtitle/content,
+// and a right icon that can be static or pressable. Wraps in a touchable when onPress is set.
 const ListCard = ({
     leftElement,
     leftElementType = "icon",

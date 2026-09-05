@@ -1,27 +1,45 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useContext } from "react";
 import metricDataService from "../services/MetricDataService";
+import MetricContext from "../contexts/MetricContext";
 
+// Manages per-board metric data with built-in year filtering.
+// Each metric in `metricStates` carries:
+//   key, config, data, yKeys, availableYears, selectedYear, loading, error
+// `setMetricYear(itemId, year)` triggers a refetch with the chosen year.
 export const useMetricStates = (boardItems) => {
   const [metricStates, setMetricStates] = useState({});
   const metricStatesRef = useRef(metricStates);
+  // optional: consume per-dataSource update Vals from MetricContext so graphs refetch when the underlying data source data changes
+  const metricCtx = useContext(MetricContext);
+  const dataUpdateVals = metricCtx?.dataUpdateVals ?? null;
+  const dataUpdateValsRef = useRef(dataUpdateVals);
 
   useEffect(() => {
     metricStatesRef.current = metricStates;
   }, [metricStates]);
 
+  useEffect(() => {
+    dataUpdateValsRef.current = dataUpdateVals;
+  }, [dataUpdateVals]);
+
   const fetchMetricDataForItem = useCallback(
-    async (itemId, config, stateKey) => {
+    async (itemId, config, stateKey, fetchParams = {}) => {
       try {
-        const rawData = await metricDataService.getMetricData(
+        // Pass the data-source update Val as `dataVersion` so the service
+        // cache key matches this hook's state key (both bump together when
+        // the underlying data source data changes).
+        const dataVersion = dataUpdateValsRef.current?.[config.dataSourceId];
+        const response = await metricDataService.getMetricData(
           config.metricId,
-          config.dataSourceId
+          config.dataSourceId,
+          { ...fetchParams, dataVersion }
         );
-        if (!rawData) {
+        if (!response) {
           throw new Error("No metric data available.");
         }
 
-        const processed = metricDataService.processDataForChart(
-          rawData.data || [],
+        const { data: processed, yKeys } = metricDataService.buildChartPayload(
+          response,
           config
         );
 
@@ -36,6 +54,14 @@ export const useMetricStates = (boardItems) => {
             [itemId]: {
               ...current,
               data: processed,
+              // Keep the full periods bundle so consumers (e.g. the board
+              // metric detail view) can toggle aggregation locally without
+              // refetching.
+              periods: response.periods ?? null,
+              yKeys,
+              availableYears: response.availableYears,
+              selectedYear: response.appliedFilter?.year ?? null,
+              mode: response.mode,
               loading: false,
               error: null,
             },
@@ -69,7 +95,7 @@ export const useMetricStates = (boardItems) => {
 
   const ensureMetricState = useCallback(
     (item, options = {}) => {
-      const { forceRefresh = false } = options;
+      const { forceRefresh = false, fetchParams = null } = options;
       const config = item?.config || {};
       const metricId = config.metricId;
       const dataSourceId = config.dataSourceId;
@@ -116,16 +142,19 @@ export const useMetricStates = (boardItems) => {
       ) {
         keyParts.push(`rows:${config.selectedRows.join("|")}`);
       }
+      // include data-source update Val so a fresh fetch is triggered when the data source's underlying data changes
+      const Val = dataUpdateValsRef.current?.[dataSourceId];
+      if (Val) {
+        keyParts.push(`Val:${Val}`);
+      }
       const stateKey = keyParts.join("::");
       const existing = metricStatesRef.current?.[item.id];
 
-      if (
-        !forceRefresh &&
-        existing &&
-        existing.key === stateKey &&
-        !existing.loading &&
-        !existing.error
-      ) {
+      // skip refetch when the key is unchanged. this covers loaded,
+      // in-flight, and previously-errored states — retries only happen
+      // when something in the key actually changes (e.g. data-source
+      // update Val bumps) or when forceRefresh is passed
+      if (!forceRefresh && existing && existing.key === stateKey) {
         return;
       }
 
@@ -135,12 +164,39 @@ export const useMetricStates = (boardItems) => {
           key: stateKey,
           config,
           data: existing?.key === stateKey ? existing.data : [],
+          yKeys: existing?.key === stateKey ? existing.yKeys : [],
+          availableYears: existing?.key === stateKey ? existing.availableYears : null,
+          selectedYear: existing?.key === stateKey ? existing.selectedYear : null,
           loading: true,
           error: null,
         },
       }));
 
-      fetchMetricDataForItem(item.id, config, stateKey);
+      // First load: let the backend pick the default year (most recent).
+      fetchMetricDataForItem(item.id, config, stateKey, fetchParams || {});
+    },
+    [fetchMetricDataForItem]
+  );
+
+  // Re-fetch a metric for a specific year. Pass `"all"` to fetch the entire
+  // range (subject to backend nextToken safety valve).
+  const setMetricYear = useCallback(
+    (itemId, year) => {
+      const current = metricStatesRef.current?.[itemId];
+      if (!current || !current.config) return;
+      if (current.selectedYear === year && !current.error) return;
+
+      setMetricStates((prev) => ({
+        ...prev,
+        [itemId]: {
+          ...prev[itemId],
+          selectedYear: year,
+          loading: true,
+          error: null,
+        },
+      }));
+
+      fetchMetricDataForItem(itemId, current.config, current.key, { year });
     },
     [fetchMetricDataForItem]
   );
@@ -170,8 +226,17 @@ export const useMetricStates = (boardItems) => {
     metricItems.forEach((item) => ensureMetricState(item));
   }, [boardItems, ensureMetricState]);
 
+  // re-evaluate states when data-source update Vals change so cached graphs refresh after the underlying data source data updates
+  useEffect(() => {
+    if (!boardItems || !dataUpdateVals) return;
+    boardItems
+      .filter((item) => item?.type === "metric")
+      .forEach((item) => ensureMetricState(item));
+  }, [dataUpdateVals, boardItems, ensureMetricState]);
+
   return {
     metricStates,
     ensureMetricState,
+    setMetricYear,
   };
 };

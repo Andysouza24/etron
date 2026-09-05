@@ -12,11 +12,10 @@ const profilePhotoUriKey = "profilePhotoUri"
 
 export async function loadProfilePhoto() {
     try {
-        // Load the photo from local storage if possible
         const cachedUri = await AsyncStorage.getItem(profilePhotoUriKey);
         if (cachedUri) return cachedUri;
 
-        // If not in local storage, then get from S3
+        // Fall back to S3 when no local cache exists.
         const userAttributes = await fetchUserAttributes();
         const S3Path = userAttributes.picture;
         if (!S3Path) return null;

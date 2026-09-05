@@ -1,46 +1,36 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Text, IconButton, useTheme } from 'react-native-paper';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import Header from '../../../../components/layout/Header';
 import BoardService from '../../../../services/BoardService';
 import ResponsiveScreen from '../../../../components/layout/ResponsiveScreen';
 import SearchBar from '../../../../components/common/input/SearchBar';
 import BasicButton from '../../../../components/common/buttons/BasicButton';
-import BoardCard from './components/BoardCard';
+import BoardCard from '../../../../components/boards/BoardCard';
 import { formatTimeAgo } from '../../../../utils/boards/dateUtils';
+import { useHasPermission } from '../../../../hooks/useHasPermission';
+import { useBoardContext } from '../../../../contexts/BoardContext';
+import useFocusRefresh from '../../../../hooks/system/useFocusRefresh';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const BoardsManagement = () => {
     const theme = useTheme();
-    const [boards, setBoards] = useState([]);
+    const { allowed: canManageBoards } = useHasPermission(MANAGE_BOARDS_PERM);
+    const { boards, loading, ensureBoards, deleteBoard, duplicateBoard, refresh } = useBoardContext();
     const [searchQuery, setSearchQuery] = useState('');
-    const [loading, setLoading] = useState(true);
     const [activeBoardId, setActiveBoardId] = useState(null);
-    // Load boards
-    const loadBoards = useCallback(async () => {
-        try {
-            setLoading(true);
-            const allBoards = await BoardService.getAllBoards();
-            const activeId = await BoardService.getActiveDashboardId(allBoards);
-            setBoards(allBoards);
-            setActiveBoardId(activeId);
-        } catch (error) {
-            console.error('Error loading boards:', error);
-            Alert.alert('Error', 'Failed to load boards');
-        } finally {
-            setLoading(false);
-        }
+
+    // First focus uses cached boards (or fetches); later focuses refresh to
+    // pick up changes from other screens. The loaded list drives the active
+    // dashboard highlight.
+    const handleBoardsLoaded = useCallback(async (loadedBoards) => {
+        const activeId = await BoardService.getActiveDashboardId(loadedBoards);
+        setActiveBoardId(activeId);
     }, []);
 
-    useEffect(() => {
-        loadBoards();
-    }, [loadBoards]);
-
-    useFocusEffect(
-        useCallback(() => {
-            loadBoards();
-        }, [loadBoards])
-    );
+    useFocusRefresh({ ensure: ensureBoards, refresh, currentData: boards, onResult: handleBoardsLoaded });
 
     const filteredBoards = useMemo(() => {
         const trimmedQuery = searchQuery.trim().toLowerCase();
@@ -68,10 +58,9 @@ const BoardsManagement = () => {
 
     const handleDuplicateBoard = async (board) => {
         try {
-            const duplicated = await BoardService.duplicateBoard(board.id);
+            const duplicated = await duplicateBoard(board.id);
             if (duplicated) {
                 Alert.alert('Success', `Board "${board.name}" duplicated`);
-                loadBoards();
             } else {
                 Alert.alert('Error', 'Failed to duplicate board');
             }
@@ -92,13 +81,8 @@ const BoardsManagement = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const success = await BoardService.deleteBoard(board.id);
-                            if (success) {
-                                Alert.alert('Success', 'Board deleted');
-                                loadBoards();
-                            } else {
-                                Alert.alert('Error', 'Failed to delete board');
-                            }
+                            await deleteBoard(board.id);
+                            Alert.alert('Success', 'Board deleted');
                         } catch (error) {
                             console.error('Error deleting board:', error);
                             Alert.alert('Error', 'Failed to delete board');
@@ -139,6 +123,7 @@ const BoardsManagement = () => {
                     title="Boards"
                     showMenu
                     showPlus
+                    rightIconPermission={canManageBoards}
                     onRightIconPress={handleCreateBoard}
                 />
             )}
@@ -168,7 +153,7 @@ const BoardsManagement = () => {
                                     ? 'Try a different search term'
                                     : 'Create your first board to get started'}
                             </Text>
-                            {!searchQuery && (
+                            {!searchQuery && canManageBoards && (
                                 <BasicButton
                                     label="Create Board"
                                     onPress={handleCreateBoard}
@@ -194,6 +179,7 @@ const BoardsManagement = () => {
                                         lastUpdated={formatTimeAgo(board.metadata?.updatedAt)}
                                         owner={owner}
                                         isShared={isShared}
+                                        canManage={canManageBoards}
                                         onView={handleViewBoard}
                                         onEdit={handleEditBoard}
                                         onSetAsDashboard={handleSetAsActive}

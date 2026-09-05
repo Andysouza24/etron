@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import ViewShot from "react-native-view-shot"; // or "expo-view-shot"
-import GraphTypes from "../../app/(auth)/(drawer)/modules/day-book/metrics/graph-types";
+import GraphTypes from "../components/modules/day-book/metrics/graph-types";
 import { apiGet } from "../../utils/api/apiClient";
 import endpoints from "../../utils/api/endpoints";
 import { getWorkspaceId } from "../../storage/workspaceStorage";
@@ -65,7 +65,7 @@ export default function SnapshotMetric({
 
   if (!dataRows) return null;
 
-  const graphDef = GraphTypes[metric.config.type];
+  const graphDef = GraphTypes[metric.config.type] || GraphTypes[metric.config.graphType];
   if (!graphDef) {
     onError?.(new Error("Unknown graph type"));
     return null;

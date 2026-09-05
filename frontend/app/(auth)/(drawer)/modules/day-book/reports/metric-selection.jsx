@@ -2,17 +2,18 @@
 
 import SearchBar from "../../../../../../components/common/input/SearchBar.jsx";
 import Divider from "../../../../../../components/layout/Divider.jsx";
-import { View, Button, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from "react-native";
+import { View, Button, ActivityIndicator, ScrollView, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import Header from "../../../../../../components/layout/Header.jsx";
 import { useRouter } from "expo-router";
 import { Text, useTheme, Card } from "react-native-paper";
 import { useEffect, useState, useCallback } from "react";
 import { getWorkspaceId } from "../../../../../../storage/workspaceStorage.jsx";
-import GraphTypes from "../metrics/graph-types.jsx";
+import GraphTypes from "../../../../../../components/modules/day-book/metrics/graph-types";
 import endpoints from "../../../../../../utils/api/endpoints.js";
 import { apiGet } from "../../../../../../utils/api/apiClient.jsx";
 import { getCurrentUser } from "aws-amplify/auth";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen.jsx";
+import ThemedRefreshControl from "../../../../../../components/common/ThemedRefreshControl.jsx";
 
 const MetricSelection = ({ asModal = false, onMetricSelect }) => {
     const router = useRouter();
@@ -86,14 +87,14 @@ const MetricSelection = ({ asModal = false, onMetricSelect }) => {
             scroll={false}
         >
             <View style={{ flex: 1 }}>
-                <SearchBar 
+                <SearchBar
                     placeholder="Search metrics"
                     onSearch={setSearchQuery}
                 />
 
                 <ScrollView
                     style = {{ flex: 1 }}
-                    refreshControl = {<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    refreshControl = {<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     contentContainerStyle= {{ flexGrow: 1 }}
                     bounces = {true}
                     alwaysBounceVertical = {true}
@@ -104,15 +105,15 @@ const MetricSelection = ({ asModal = false, onMetricSelect }) => {
                             Created by you
                         </Text>
                         {loadingMetrics && <ActivityIndicator />}
-                        {metricCardList(loadingMetrics, metricsUser, selectedMetrics, toggleSelectedMetric, asModal, onMetricSelect)}
+                        <MetricCardList loadingMetrics={loadingMetrics} metrics={metricsUser} selectedMetrics={selectedMetrics} toggleSelectedMetric={toggleSelectedMetric} asModal={asModal} onMetricSelect={onMetricSelect} />
 
                         <Divider/>
-                        
+
                         <Text style={{ fontSize: 16, color: theme.colors.placeholderText}}>
                             Created by others
                         </Text>
                         {loadingMetrics && <ActivityIndicator />}
-                        {metricCardList(loadingMetrics, metricsOther, selectedMetrics, toggleSelectedMetric, asModal, onMetricSelect)}
+                        <MetricCardList loadingMetrics={loadingMetrics} metrics={metricsOther} selectedMetrics={selectedMetrics} toggleSelectedMetric={toggleSelectedMetric} asModal={asModal} onMetricSelect={onMetricSelect} />
                     </View>
                 </ScrollView>
             </View>
@@ -120,7 +121,7 @@ const MetricSelection = ({ asModal = false, onMetricSelect }) => {
     )
 }
 
-const metricCardList = (loadingMetrics, metrics, selectedMetrics, toggleSelectedMetric, asModal, onMetricSelect) => {
+const MetricCardList = ({ loadingMetrics, metrics, selectedMetrics, toggleSelectedMetric, asModal, onMetricSelect }) => {
     const theme = useTheme();
     return (
         <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
@@ -187,7 +188,6 @@ const styles = StyleSheet.create({
         overflow: "hidden",
         borderRadius: 5,
         padding: 10,
-        overflow: "hidden"
     },
     cardCover: {
         width: 120,

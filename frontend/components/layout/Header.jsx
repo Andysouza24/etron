@@ -40,6 +40,7 @@ const Header = ({
     
     return (
         <Appbar.Header mode="center-aligned"
+            statusBarHeight={0}
             style={{
                 backgroundColor: theme.colors.background,
                 marginBottom: 12
@@ -99,6 +100,7 @@ const Header = ({
                     <PermissionGate
                         allowed={rightIconPermission}
                         onAllowed={onRightIconPress}
+                        preserveLayoutWhenHidden
                     >
                         <Appbar.Action
                             icon={

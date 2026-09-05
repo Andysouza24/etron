@@ -6,13 +6,23 @@ import Header from '../../../../components/layout/Header';
 import BoardService from '../../../../services/BoardService';
 import ResponsiveScreen from '../../../../components/layout/ResponsiveScreen';
 import BasicButton from '../../../../components/common/buttons/BasicButton';
+import { useHasPermission } from '../../../../hooks/useHasPermission';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
 
 const CreateBoard = () => {
+    const { allowed: canManageBoards, loading: permLoading } = useHasPermission(MANAGE_BOARDS_PERM);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [creating, setCreating] = useState(false);
     const hasCompletedCreationRef = useRef(false);
     const hasDraftChangesRef = useRef(false);
+
+    useEffect(() => {
+        if (!permLoading && !canManageBoards) {
+            router.back();
+        }
+    }, [permLoading, canManageBoards]);
 
     useEffect(() => {
         return () => {
@@ -70,6 +80,7 @@ const CreateBoard = () => {
                     title="Create Board"
                     showBack
                     showCheck
+                    rightIconPermission={canManageBoards}
                     onRightIconPress={handleCreate}
                 />
             )}

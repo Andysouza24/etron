@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Text, IconButton } from 'react-native-paper';
+import { useHasPermission } from '../../hooks/useHasPermission';
 
 const MetricDetailHeader = ({ 
     item, 
@@ -9,6 +10,13 @@ const MetricDetailHeader = ({
     onClose, 
     styles 
 }) => {
+    const { allowed: canManageMetrics } = useHasPermission(
+        "modules.daybook.metrics.manage_metrics",
+    );
+    const { allowed: canManageBoards } = useHasPermission(
+        "app.workspace.manage_boards",
+    );
+
     if (!item) {
         return null;
     }
@@ -33,21 +41,25 @@ const MetricDetailHeader = ({
                 ) : null}
             </View>
             <View style={styles.metricDetailHeaderActions}>
-                <IconButton
-                    icon="pencil"
-                    size={20}
-                    onPress={() => onEdit(metricId)}
-                    disabled={!metricId}
-                    style={styles.metricDetailHeaderIcon}
-                    accessibilityLabel="Edit metric"
-                />
-                <IconButton
-                    icon="delete-outline"
-                    size={20}
-                    onPress={() => onDelete(item.id)}
-                    style={styles.metricDetailHeaderIcon}
-                    accessibilityLabel="Remove from board"
-                />
+                {canManageMetrics && (
+                    <IconButton
+                        icon="pencil"
+                        size={20}
+                        onPress={() => onEdit(metricId)}
+                        disabled={!metricId}
+                        style={styles.metricDetailHeaderIcon}
+                        accessibilityLabel="Edit metric"
+                    />
+                )}
+                {canManageBoards && (
+                    <IconButton
+                        icon="delete-outline"
+                        size={20}
+                        onPress={() => onDelete(item.id)}
+                        style={styles.metricDetailHeaderIcon}
+                        accessibilityLabel="Remove from board"
+                    />
+                )}
                 <IconButton
                     icon="close"
                     size={20}

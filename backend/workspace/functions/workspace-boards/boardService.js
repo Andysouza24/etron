@@ -1,4 +1,5 @@
 const workspaceRepo = require("@etron/shared/repositories/workspaceRepository");
+const workspaceUsersRepo = require("@etron/shared/repositories/workspaceUsersRepository");
 const {
   deleteFolder,
   getUploadUrl,
@@ -10,6 +11,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const PERMISSIONS = {
   MANAGE_BOARDS: "app.workspace.manage_boards",
+  VIEW_BOARDS: "app.workspace.view_boards",
 };
 
 async function createBoardInWorkspace(authUserId, workspaceId, payload) {
@@ -101,11 +103,46 @@ async function deleteBoardInWorkspace(authUserId, workspaceId, boardId) {
 async function getBoardInWorkspace(authUserId, workspaceId, boardId) {
   await validateWorkspaceId(workspaceId);
 
-  return workspaceRepo.getBoardById(workspaceId, boardId);
+  // workspace membership is always required
+  const membership = await workspaceUsersRepo.getUser(workspaceId, authUserId);
+  if (!membership) {
+    throw new Error("User is not a member of this workspace");
+  }
+
+  const board = await workspaceRepo.getBoardById(workspaceId, boardId);
+  if (!board) {
+    return null;
+  }
+
+  // the workspace dashboard is exempt from view_boards — any workspace
+  // member can view it (it is the home page for users without board access)
+  if (!board.isDashboard) {
+    const isAuthorised = await hasPermission(
+      authUserId,
+      workspaceId,
+      PERMISSIONS.VIEW_BOARDS
+    );
+
+    if (!isAuthorised) {
+      throw new Error("User does not have permission to perform action");
+    }
+  }
+
+  return board;
 }
 
 async function getBoardsInWorkspace(authUserId, workspaceId) {
   await validateWorkspaceId(workspaceId);
+
+  const isAuthorised = await hasPermission(
+    authUserId,
+    workspaceId,
+    PERMISSIONS.VIEW_BOARDS
+  );
+
+  if (!isAuthorised) {
+    throw new Error("User does not have permission to perform action");
+  }
 
   // get all boards in a workspace
   const boards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
@@ -128,6 +165,51 @@ async function getBoardsInWorkspace(authUserId, workspaceId) {
   return results;
 }
 
+// returns the workspace's active dashboard board (isDashboard: true) without
+// requiring view_boards permission. Any workspace member can see the dashboard.
+// Returns null if no dashboard has been set.
+async function getDashboardInWorkspace(authUserId, workspaceId) {
+  await validateWorkspaceId(workspaceId);
+
+  // ensure the caller is a member of the workspace
+  const membership = await workspaceUsersRepo.getUser(workspaceId, authUserId);
+  if (!membership) {
+    throw new Error("User is not a member of this workspace");
+  }
+
+  const boards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
+
+  if (!boards || boards.length === 0) {
+    return null;
+  }
+
+  const enrichWithThumbnail = async (b) => ({
+    ...b,
+    thumbnailUrl: b.thumbnailKey ? await getDownloadUrl(b.thumbnailKey) : null,
+  });
+
+  // Priority 1: board explicitly assigned to this user
+  const userDashboard = boards.find((b) =>
+    (b.dashboardAssignments?.userIds || []).includes(authUserId)
+  );
+  if (userDashboard) return enrichWithThumbnail(userDashboard);
+
+  // Priority 2: board assigned to the user's role
+  const userRoleId = membership?.roleId || null;
+  if (userRoleId) {
+    const roleDashboard = boards.find((b) =>
+      (b.dashboardAssignments?.roleIds || []).includes(userRoleId)
+    );
+    if (roleDashboard) return enrichWithThumbnail(roleDashboard);
+  }
+
+  // Priority 3: workspace-wide default
+  const workspaceDashboard = boards.find((b) => b.isDashboard);
+  if (!workspaceDashboard) return null;
+
+  return enrichWithThumbnail(workspaceDashboard);
+}
+
 async function updateBoardInWorkspace(
   authUserId,
   workspaceId,
@@ -142,7 +224,7 @@ async function updateBoardInWorkspace(
     throw new Error("Board not found");
   }
 
-  const { name, config, isDashboard, isThumbnailUpdated, ownerId } = payload;
+  const { name, config, isDashboard, isThumbnailUpdated, ownerId, dashboardAssignments } = payload;
   const currentDate = new Date().toISOString();
 
   // ensure only unique users are added to editedBy
@@ -173,6 +255,60 @@ async function updateBoardInWorkspace(
 
   if (typeof isDashboard === "boolean") {
     boardUpdateItem.isDashboard = isDashboard;
+
+    // When promoting a board to dashboard, clear the flag from all other boards
+    // that currently have it set so getDashboardInWorkspace returns the right one.
+    if (isDashboard) {
+      const allBoards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
+      const previousDashboards = allBoards.filter(
+        (b) => b.isDashboard && b.boardId !== boardId
+      );
+      await Promise.all(
+        previousDashboards.map((b) =>
+          workspaceRepo.updateBoard(workspaceId, b.boardId, {
+            isDashboard: false,
+            updatedAt: currentDate,
+          })
+        )
+      );
+    }
+  }
+
+  if (dashboardAssignments) {
+    const userIds = Array.isArray(dashboardAssignments.userIds)
+      ? dashboardAssignments.userIds.filter(Boolean).map(String)
+      : [];
+    const roleIds = Array.isArray(dashboardAssignments.roleIds)
+      ? dashboardAssignments.roleIds.filter(Boolean).map(String)
+      : [];
+
+    boardUpdateItem.dashboardAssignments = { userIds, roleIds };
+
+    // Remove these users/roles from every other board's dashboardAssignments so
+    // each user/role can only have one board as their dashboard at a time.
+    if (userIds.length || roleIds.length) {
+      const allBoards = await workspaceRepo.getBoardsByWorkspaceId(workspaceId);
+      await Promise.all(
+        allBoards
+          .filter((b) => b.boardId !== boardId)
+          .map(async (b) => {
+            const existing = b.dashboardAssignments || {};
+            const prevUserIds = Array.isArray(existing.userIds) ? existing.userIds : [];
+            const prevRoleIds = Array.isArray(existing.roleIds) ? existing.roleIds : [];
+            const nextUserIds = prevUserIds.filter((uid) => !userIds.includes(uid));
+            const nextRoleIds = prevRoleIds.filter((rid) => !roleIds.includes(rid));
+            if (
+              nextUserIds.length !== prevUserIds.length ||
+              nextRoleIds.length !== prevRoleIds.length
+            ) {
+              await workspaceRepo.updateBoard(workspaceId, b.boardId, {
+                dashboardAssignments: { userIds: nextUserIds, roleIds: nextRoleIds },
+                updatedAt: currentDate,
+              });
+            }
+          })
+      );
+    }
   }
 
   if (isThumbnailUpdated) {
@@ -203,5 +339,6 @@ module.exports = {
   deleteBoardInWorkspace,
   getBoardInWorkspace,
   getBoardsInWorkspace,
+  getDashboardInWorkspace,
   updateBoardInWorkspace,
 };

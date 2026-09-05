@@ -1,3 +1,23 @@
+// Vertical placement snaps to half rows so items can occupy gaps left by
+// half-height elements (e.g. text blocks).
+export const Y_SNAP_STEP = 0.5;
+
+// Project board items down to the minimal { id, x, y, w, h } layout shape.
+export const mapToLayoutItems = (items = []) =>
+  items.map((item) => ({
+    id: item.id,
+    x: item.x,
+    y: item.y,
+    w: item.w,
+    h: item.h,
+  }));
+
+// Round a value to the nearest multiple of step (step falls back to 1).
+export const snapToStep = (value, step) => {
+  const safeStep = step > 0 ? step : 1;
+  return Math.round(value / safeStep) * safeStep;
+};
+
 export const getBottom = (item) => {
   return item.y + item.h;
 };
@@ -97,6 +117,7 @@ export const cloneLayout = (layout) => {
 };
 
 export const getFirstAvailablePosition = (layout, width, height, cols) => {
+  const Y_STEP = 0.5;
   let y = 0;
 
   while (true) {
@@ -108,7 +129,7 @@ export const getFirstAvailablePosition = (layout, width, height, cols) => {
         return { x, y };
       }
     }
-    y++;
+    y += Y_STEP;
   }
 };
 

@@ -1,34 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import AuthService from "../services/AuthService";
+import { getWorkspaceId } from "./workspaceStorage";
+import { getUserStorageKey, loadMap, saveMap } from "./storageHelpers";
 
 const boardsMapKey = "boardsByUser";
 const activeBoardKey = "activeBoardByUser";
 
-async function getUserStorageKey() {
+async function getActiveBoardScopeKey() {
+    const userKey = await getUserStorageKey();
+    if (!userKey) return null;
+    let workspaceId = null;
     try {
-        const info = await AuthService.getCurrentUserInfo();
-        const userKey = info?.userId || info?.username || info?.email || null;
-        return userKey ? String(userKey) : null;
+        workspaceId = await getWorkspaceId();
     } catch {
-        return null;
+        workspaceId = null;
     }
-}
-
-async function loadBoardsMap() {
-    try {
-        const raw = await AsyncStorage.getItem(boardsMapKey);
-        return raw ? JSON.parse(raw) : {};
-    } catch {
-        return {};
-    }
-}
-
-async function saveBoardsMap(map) {
-    try {
-        await AsyncStorage.setItem(boardsMapKey, JSON.stringify(map || {}));
-    } catch (error) {
-        console.error('[boardStorage] saveBoardsMap error:', error);
-    }
+    return workspaceId ? `${userKey}::${workspaceId}` : userKey;
 }
 
 export async function saveBoards(boards) {
@@ -39,9 +25,9 @@ export async function saveBoards(boards) {
             return false;
         }
 
-        const map = await loadBoardsMap();
+        const map = await loadMap(boardsMapKey);
         map[userKey] = boards || [];
-        await saveBoardsMap(map);
+        await saveMap(boardsMapKey, map, '[boardStorage] saveBoardsMap error:');
         console.log('[boardStorage] saveBoards success', { boardCount: boards?.length });
         return true;
     } catch (error) {
@@ -58,7 +44,7 @@ export async function loadBoards() {
             return [];
         }
 
-        const map = await loadBoardsMap();
+        const map = await loadMap(boardsMapKey);
         const boards = map[userKey] || [];
         console.log('[boardStorage] loadBoards success', { boardCount: boards.length });
         return boards;
@@ -113,12 +99,12 @@ export async function getBoard(boardId) {
 
 export async function setActiveBoard(boardId) {
     try {
-        const userKey = await getUserStorageKey();
-        if (!userKey) return false;
+        const scopeKey = await getActiveBoardScopeKey();
+        if (!scopeKey) return false;
 
         const raw = await AsyncStorage.getItem(activeBoardKey);
         const map = raw ? JSON.parse(raw) : {};
-        map[userKey] = boardId;
+        map[scopeKey] = boardId;
         await AsyncStorage.setItem(activeBoardKey, JSON.stringify(map));
         console.log('[boardStorage] setActiveBoard success', { boardId });
         return true;
@@ -130,15 +116,33 @@ export async function setActiveBoard(boardId) {
 
 export async function getActiveBoardId() {
     try {
-        const userKey = await getUserStorageKey();
-        if (!userKey) return null;
+        const scopeKey = await getActiveBoardScopeKey();
+        if (!scopeKey) return null;
 
         const raw = await AsyncStorage.getItem(activeBoardKey);
         const map = raw ? JSON.parse(raw) : {};
-        return map[userKey] || null;
+        return map[scopeKey] || null;
     } catch (error) {
         console.error('[boardStorage] getActiveBoardId error:', error);
         return null;
+    }
+}
+
+export async function clearActiveBoard() {
+    try {
+        const scopeKey = await getActiveBoardScopeKey();
+        if (!scopeKey) return false;
+
+        const raw = await AsyncStorage.getItem(activeBoardKey);
+        const map = raw ? JSON.parse(raw) : {};
+        if (scopeKey in map) {
+            delete map[scopeKey];
+            await AsyncStorage.setItem(activeBoardKey, JSON.stringify(map));
+        }
+        return true;
+    } catch (error) {
+        console.error('[boardStorage] clearActiveBoard error:', error);
+        return false;
     }
 }
 
@@ -176,23 +180,6 @@ export async function duplicateBoard(boardId) {
 
 const draftsKey = "boardDraftsByUser";
 
-async function loadDraftsMap() {
-    try {
-        const raw = await AsyncStorage.getItem(draftsKey);
-        return raw ? JSON.parse(raw) : {};
-    } catch {
-        return {};
-    }
-}
-
-async function saveDraftsMap(map) {
-    try {
-        await AsyncStorage.setItem(draftsKey, JSON.stringify(map || {}));
-    } catch (error) {
-        console.error('[boardStorage] saveDraftsMap error:', error);
-    }
-}
-
 export async function saveDraft(draft) {
     try {
         const userKey = await getUserStorageKey();
@@ -201,13 +188,13 @@ export async function saveDraft(draft) {
             return false;
         }
 
-        const map = await loadDraftsMap();
+        const map = await loadMap(draftsKey);
         if (!map[userKey]) {
             map[userKey] = {};
         }
         
         map[userKey][draft.boardId] = draft;
-        await saveDraftsMap(map);
+        await saveMap(draftsKey, map, '[boardStorage] saveDraftsMap error:');
         console.log('[boardStorage] saveDraft success', { boardId: draft.boardId });
         return true;
     } catch (error) {
@@ -224,7 +211,7 @@ export async function loadDraft(boardId) {
             return null;
         }
 
-        const map = await loadDraftsMap();
+        const map = await loadMap(draftsKey);
         const draft = map[userKey]?.[boardId] || null;
         console.log('[boardStorage] loadDraft', { boardId, hasDraft: !!draft });
         return draft;
@@ -239,10 +226,10 @@ export async function clearDraft(boardId) {
         const userKey = await getUserStorageKey();
         if (!userKey) return false;
 
-        const map = await loadDraftsMap();
+        const map = await loadMap(draftsKey);
         if (map[userKey] && map[userKey][boardId]) {
             delete map[userKey][boardId];
-            await saveDraftsMap(map);
+            await saveMap(draftsKey, map, '[boardStorage] saveDraftsMap error:');
             console.log('[boardStorage] clearDraft success', { boardId });
         }
         return true;
@@ -257,7 +244,7 @@ export async function getAllDrafts() {
         const userKey = await getUserStorageKey();
         if (!userKey) return [];
 
-        const map = await loadDraftsMap();
+        const map = await loadMap(draftsKey);
         const userDrafts = map[userKey] || {};
         return Object.values(userDrafts);
     } catch (error) {

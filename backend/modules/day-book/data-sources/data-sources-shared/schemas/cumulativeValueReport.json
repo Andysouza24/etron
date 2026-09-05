@@ -1,0 +1,105 @@
+[
+  {
+    "name": "partCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "description",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "unitCost",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "stockOnHand",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "supplier",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "cumulativeValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "cumulativeTotal",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "cumulativePercentage",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "YTDQtySold",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "YTDSales",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "YTDCOGS",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "lastYearSales",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "twoYearAgoSales",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "threeYearAgoSales",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "activeStock",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "dormantStock",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "stockTotals_active",
+    "type": "decimal(18,2)",
+    "category": "value",
+    "group": "stockTotals"
+  },
+  {
+    "name": "stockTotals_dormant",
+    "type": "decimal(18,2)",
+    "category": "value",
+    "group": "stockTotals"
+  }
+]

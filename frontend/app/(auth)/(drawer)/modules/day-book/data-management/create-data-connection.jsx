@@ -11,17 +11,31 @@ import { router } from "expo-router";
 import DescriptiveButton from "../../../../../../components/common/buttons/DescriptiveButton";
 import { getAdaptersForUI } from "../../../../../../adapters/day-book/data-sources/DataAdapterFactory";
 import ResponsiveScreen from "../../../../../../components/layout/ResponsiveScreen";
+import { useDataSourceContext } from "../../../../../../contexts/DataSourceContext";
 
 const CreateDataConnection = () => {
     const theme = useTheme();
+    const { dataSources } = useDataSourceContext();
 
-    const sourceTypes = getAdaptersForUI().map(category => ({
-        ...category,
-        type: category.adapters.map(adapter => ({
-            ...adapter,
-            onPress: () => router.navigate(adapter.route)
-        }))
-    }));
+    const hasMicromaxConnection = (dataSources?.list || []).some(
+        (s) => (s.sourceType || s.type) === "micromax-dashboard"
+    );
+
+    const sourceTypes = getAdaptersForUI()
+        .map((category) => {
+            const filteredAdapters = category.adapters.filter(
+                (adapter) => !(hasMicromaxConnection && adapter.type === "micromax-dashboard")
+            );
+            return { ...category, adapters: filteredAdapters };
+        })
+        .filter((category) => category.adapters.length > 0)
+        .map((category) => ({
+            ...category,
+            type: category.adapters.map((adapter) => ({
+                ...adapter,
+                onPress: () => router.navigate(adapter.route),
+            })),
+        }));
 
     return (
         <ResponsiveScreen 

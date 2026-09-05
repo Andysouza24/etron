@@ -117,14 +117,32 @@ async function runDDL(query, database, outputLocation) {
     return queryExecutionId;
 }
 
+function toAthenaType(type) {
+    switch (type) {
+        case "bigint":
+            return "bigint";
+        case "double":
+        case "decimal(18,2)":
+            return "double";
+        case "boolean":
+            return "boolean";
+        case "timestamp":
+            return "timestamp";
+        case "string":
+        default:
+            return "string";
+    }
+
+}
+
 async function createAthenaTable(schema, tableName, dataLocation, database, outputLocation) {
     if (!Array.isArray(schema) || schema.length === 0) {
         throw new Error("Cannot create Athena table: the schema is empty");
     }
     const sanitisedTableName = sanitiseIdentifier(tableName); 
-    const columns = schema.map(column => `${sanitiseIdentifier(column.name)} ${column.type}`).join(", ");
+    const columns = schema.map(column => `\`${sanitiseIdentifier(column.name)}\` ${toAthenaType(column.type)}`).join(", ");
 
-    const ddl = `CREATE EXTERNAL TABLE ${sanitisedTableName} (${columns}) STORED AS PARQUET LOCATION '${dataLocation}'`;
+    const ddl = `CREATE EXTERNAL TABLE \`${sanitisedTableName}\` (${columns}) STORED AS PARQUET LOCATION '${dataLocation}'`;
 
     console.log("Athena DDL:\n", ddl);
 

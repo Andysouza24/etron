@@ -29,6 +29,9 @@ Parameters:
     Type: String
   UserPoolArn:
     Type: String
+  DashboardRawDataBucketName:
+    Type: String
+    Default: micromax-dashboard-raw-data
 
 Resources:
 
@@ -47,6 +50,8 @@ Resources:
         AppConfigurationBucketName: !Ref AppConfigurationBucketName
         WorkspaceBucketName: !Ref WorkspaceBucketName
         AuditQueueUrl: !Ref AuditQueueUrl
+        AppSyncUrl: !Ref AppSyncUrl
+        AppSyncApiKey: !Ref AppSyncApiKey
         UserPoolArn: !Ref UserPoolArn
 
   AuditDomainFunctions:
@@ -80,4 +85,13 @@ Resources:
         AuditQueueUrl: !Ref AuditQueueUrl
         AppSyncUrl: !Ref AppSyncUrl
         AppSyncApiKey: !Ref AppSyncApiKey
+        UserPoolArn: !Ref UserPoolArn
+        DashboardRawDataBucketName: !Ref DashboardRawDataBucketName
+        
+  NotificationDomainFunctions:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./notification/template.yaml
+      Parameters:
+        AuditQueueUrl: !Ref AuditQueueUrl
         UserPoolArn: !Ref UserPoolArn

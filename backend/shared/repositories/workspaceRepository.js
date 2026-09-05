@@ -75,6 +75,12 @@ async function updateRole(workspaceId, roleId, data) {
     expressionAttributeNames["#hasAccess"] = "hasAccess";
   }
 
+  if (data.hideGatedComponents !== undefined) {
+    updateFields.push("#hideGatedComponents = :hideGatedComponents");
+    expressionAttributeValues[":hideGatedComponents"] = data.hideGatedComponents;
+    expressionAttributeNames["#hideGatedComponents"] = "hideGatedComponents";
+  }
+
   updateFields.push("#updatedAt = :updatedAt");
   expressionAttributeValues[":updatedAt"] = new Date().toISOString();
   expressionAttributeNames["#updatedAt"] = "updatedAt";
@@ -314,7 +320,7 @@ async function getBoardsByWorkspaceId(workspaceId) {
     })
   );
 
-  return (result.Items || null).map(({ sk, ...rest }) => ({
+  return (result.Items || []).map(({ sk, ...rest }) => ({
     ...rest,
     boardId: sk.replace("board#", ""),
   }));

@@ -1,0 +1,43 @@
+[
+  {
+    "name": "accountManager",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "totalStockQty",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "totalValue",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "target",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "overstock",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "dormant",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

@@ -1,18 +1,17 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity,  } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import {
   Card,
   IconButton,
-  Chip,
   Menu,
   useTheme,
   ActivityIndicator,
 } from "react-native-paper";
 import { commonStyles } from "../../../assets/styles/stylesheets/common";
+import StatusChip from "../StatusChip";
 
-const activeIcon = require("../../../assets/images/check.png");
-const inactiveIcon = require("../../../assets/images/cross.png");
 
+// TODO: figure out if component needed, remove/replace where/if required.
 const DataConnectionButton = ({
   label = "Data Connection 1",
   type = "Custom Source",
@@ -31,20 +30,6 @@ const DataConnectionButton = ({
 
   const openMenu = () => setMenuVisible(true);
   const closeMenu = () => setMenuVisible(false);
-
-  const getStatusColor = () => {
-    switch (status) {
-      case "connected":
-        return theme.colors.themeGreen;
-      case "error":
-        return theme.colors.error;
-      case "syncing":
-      case "testing":
-        return theme.colors.primary;
-      default:
-        return theme.colors.disabled;
-    }
-  };
 
   const formatLastSync = (dateString) => {
     if (!dateString) return "Never";
@@ -77,31 +62,7 @@ const DataConnectionButton = ({
           { color: theme.colors.text },
         ]}
         right={() => (
-          <View
-            style={[
-              styles.statusContainer,
-              { backgroundColor: `${getStatusColor()}22` },
-            ]}
-          >
-            <Image
-              source={status === "connected" ? activeIcon : inactiveIcon}
-              style={[styles.statusIcon, { tintColor: getStatusColor() }]}
-              resizeMode="contain"
-            />
-            <Chip
-              mode="outlined"
-              textStyle={[styles.statusChipText, { color: getStatusColor() }]}
-              style={[
-                styles.statusChip,
-                {
-                  borderColor: getStatusColor(),
-                  backgroundColor: `${getStatusColor()}11`,
-                },
-              ]}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </Chip>
-          </View>
+          <StatusChip status={status} style={{ marginRight: 16 }} />
         )}
         style={commonStyles.titleText}
       />
@@ -195,32 +156,6 @@ const styles = StyleSheet.create({
   },
   title: {
     flexShrink: 1,
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center", 
-    justifyContent: "center",
-    borderRadius: 20,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    transitionDuration: "200ms",
-  },
-
-  statusIcon: {
-    width: 22,
-    height: 22,
-    marginRight: 6,
-  },
-  statusChip: {
-    height: 26,
-    borderWidth: 1.5,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-  },
-  statusChipText: {
-    paddingVertical: 0,
-    fontWeight: "600",
-    lineHeight: "10",
   },
   cardDetails: {
     flexDirection: "column",

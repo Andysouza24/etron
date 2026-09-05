@@ -1,0 +1,70 @@
+[
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "transactionType",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "docNo",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "postingDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "dueDate",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "customerRefNumber",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "currency",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "amount",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "balanceDue",
+    "type": "double",
+    "category": "value"
+  },
+  {
+    "name": "age",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

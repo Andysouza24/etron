@@ -2,13 +2,14 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, StyleSheet, Alert, Dimensions, ScrollView } from 'react-native';
 import { Text, IconButton, Menu, ActivityIndicator, FAB, List, Divider, useTheme, Appbar } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useDrawerStatus } from '@react-navigation/drawer';
 import Header from '../../../../../components/layout/Header';
 import { GridLayout } from '../../../../../components/layout/Grid';
 import CustomBottomSheet from '../../../../../components/BottomSheet';
 import MetricPicker from '../../../../../components/boards/MetricPicker';
 import ButtonPicker from '../../../../../components/boards/ButtonPicker';
 import ResponsiveScreen from '../../../../../components/layout/ResponsiveScreen';
-import { useBoardData } from '../../../../../hooks/useBoardData';
+import { useBoardData } from '../../../../../hooks/boards/useBoardData';
 import { useMetricStates } from '../../../../../hooks/useMetricStates';
 import { useDisplaySettings } from '../../../../../hooks/useDisplaySettings';
 import AddItemPicker from '../../../../../components/boards/AddItemPicker';
@@ -17,29 +18,32 @@ import MetricDetailContent from '../../../../../components/boards/MetricDetailCo
 import DisplaySettingsSheet from '../../../../../components/boards/DisplaySettingsSheet';
 import TextItemEditor from '../../../../../components/boards/TextItemEditor';
 import { createGridItemBuilder, createAddItemOptions } from '../../../../../components/boards/boardItemRegistry';
-import { createMetricItem, createButtonItem, createTextItem, mapItemsToLayout, calculateButtonGridWidth } from '../../../../../utils/boards/itemHandlers';
 import { sanitizeColourValue } from '../../../../../utils/boards/boardUtils';
+import { useHasPermission } from '../../../../../hooks/useHasPermission';
+import { useMetricContext } from '../../../../../contexts/MetricContext';
+import { useDataSourceContext } from '../../../../../contexts/DataSourceContext';
+import useButtonItemEditor from '../../../../../hooks/boards/useButtonItemEditor';
+import useTextItemEditor from '../../../../../hooks/boards/useTextItemEditor';
+import useMetricPickerState from '../../../../../hooks/boards/useMetricPickerState';
+import useMetricDetailSheet from '../../../../../hooks/boards/useMetricDetailSheet';
+import useBoardEditMode from '../../../../../hooks/boards/useBoardEditMode';
+
+const MANAGE_BOARDS_PERM = "app.workspace.manage_boards";
+const MANAGE_METRICS_PERM = "modules.daybook.metrics.manage_metrics";
 
 const GRID_COLS = 12;
 const GRID_HORIZONTAL_PADDING = 16;
 const INITIAL_GRID_WIDTH = Math.max(0, Dimensions.get('window').width - GRID_HORIZONTAL_PADDING * 2);
 const DEFAULT_METRIC_MAX_HEIGHT = 8;
 const DEFAULT_BUTTON_MAX_HEIGHT = 3;
-const DEFAULT_TEXT_ITEM_CONFIG = {
-    text: '',
-    alignment: 'left',
-    fontSize: 18,
-    padding: 16,
-    textColor: '',
-    backgroundColor: '',
-    maxLines: undefined
-};
 
 const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
     const params = useLocalSearchParams();
     const routeBoardId = params?.id;
     const id = overrideBoardId ?? routeBoardId;
     const theme = useTheme();
+    const { allowed: canManageBoards } = useHasPermission(MANAGE_BOARDS_PERM);
+    const { allowed: canManageMetrics } = useHasPermission(MANAGE_METRICS_PERM);
     const navigationHeaderProps = overrideBoardId ? { showMenu: true } : { showBack: true };
 
     const { 
@@ -53,7 +57,58 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
         updateItem 
     } = useBoardData(id);
     
-    const { metricStates, ensureMetricState } = useMetricStates(board?.items);
+    const { metricStates, ensureMetricState, setMetricYear } = useMetricStates(board?.items);
+    const { metrics: workspaceMetrics, ensureMetrics } = useMetricContext();
+    const { dataSources, refreshDataSources } = useDataSourceContext();
+
+    useEffect(() => {
+        ensureMetrics?.();
+    }, [ensureMetrics]);
+
+    useEffect(() => {
+        refreshDataSources?.();
+    }, [refreshDataSources]);
+
+    // Lookup of data sources keyed by dataSourceId. Used to flag metrics
+    // whose underlying data source is currently in an error state so the
+    // user can be warned that the data may not be up to date.
+    const dataSourceById = useMemo(() => {
+        const map = {};
+        for (const ds of dataSources?.list || []) {
+            if (ds?.dataSourceId) map[ds.dataSourceId] = ds;
+        }
+        return map;
+    }, [dataSources]);
+
+    // Lookup of source-metric appearance keyed by metricId. Board metric
+    // cards inherit their appearance from this and apply per-board overrides
+    // on top via mergeAppearance().
+    const metricAppearancesById = useMemo(() => {
+        const map = {};
+        (workspaceMetrics || []).forEach((metric) => {
+            if (metric?.metricId) {
+                map[metric.metricId] = metric.config?.appearance || metric.appearance || {};
+            }
+        });
+        return map;
+    }, [workspaceMetrics]);
+
+    // Lookup of full metric records keyed by metricId. Used to detect when
+    // a board item references a metric that no longer exists (or whose
+    // data source has been deleted) so a placeholder can be rendered.
+    // Returns null until the workspace metric list has loaded so that
+    // loading state isn't mistaken for deletion.
+    const metricsById = useMemo(() => {
+        if (!Array.isArray(workspaceMetrics)) return null;
+        const map = {};
+        workspaceMetrics.forEach((metric) => {
+            if (metric?.metricId) {
+                map[metric.metricId] = metric;
+            }
+        });
+        return map;
+    }, [workspaceMetrics]);
+
     const {
         displayConfigItem,
         displayConfigDraft,
@@ -65,28 +120,71 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
         resetAppearance
     } = useDisplaySettings(board);
     
-    const [menuVisible, setMenuVisible] = useState(false);
-    const [showMetricPicker, setShowMetricPicker] = useState(false);
-    const [showButtonPicker, setShowButtonPicker] = useState(false);
     const [showAddItemPicker, setShowAddItemPicker] = useState(false);
-    const [activeMetricItemId, setActiveMetricItemId] = useState(null);
-    const [showMetricDetails, setShowMetricDetails] = useState(false);
     const [showDisplaySettings, setShowDisplaySettings] = useState(false);
-    const [showEditOptions, setShowEditOptions] = useState(false);
-    const [editOptionsItem, setEditOptionsItem] = useState(null);
-    const [activeResizeItemId, setActiveResizeItemId] = useState(null);
-    const [showTextEditor, setShowTextEditor] = useState(false);
-    const [textEditorMode, setTextEditorMode] = useState('create');
-    const [textEditorInitialConfig, setTextEditorInitialConfig] = useState({});
-    const [textEditorTargetId, setTextEditorTargetId] = useState(null);
-    const [buttonEditorMode, setButtonEditorMode] = useState('create');
-    const [buttonEditorInitialConfig, setButtonEditorInitialConfig] = useState({});
-    const [buttonEditorTargetId, setButtonEditorTargetId] = useState(null);
-    const [gridWidth, setGridWidth] = useState(INITIAL_GRID_WIDTH);
 
     const editingActive = showHeader && isEditing;
-    const isResizeActive = activeResizeItemId !== null;
     const styles = useMemo(() => createStyles(theme), [theme]);
+
+    const {
+        showButtonPicker,
+        buttonEditorMode,
+        buttonEditorInitialConfig,
+        buttonEditorTargetId,
+        openCreate: openButtonEditorCreate,
+        openEdit: openButtonEditorEdit,
+        close: handleCloseButtonPicker,
+        handleSelected: handleButtonSelected,
+    } = useButtonItemEditor({ board, addItem, updateItem, editingActive, gridCols: GRID_COLS });
+
+    const {
+        showTextEditor,
+        textEditorMode,
+        textEditorInitialConfig,
+        openCreate: openTextEditorCreate,
+        openEdit: openTextEditorEdit,
+        close: closeTextEditor,
+        handleSave: handleTextEditorSave,
+    } = useTextItemEditor({ board, addItem, updateItem, editingActive, gridCols: GRID_COLS });
+
+    const {
+        showMetricPicker,
+        open: openMetricPicker,
+        close: closeMetricPicker,
+        handleMetricSelected,
+    } = useMetricPickerState({ board, addItem, gridCols: GRID_COLS });
+
+    const {
+        showMetricDetails,
+        activeMetricItem,
+        open: handleOpenMetricDetails,
+        close: handleCloseMetricDetails,
+    } = useMetricDetailSheet({ board, editingActive, ensureMetricState });
+
+    const activeMetricState = activeMetricItem ? metricStates[activeMetricItem.id] : null;
+
+    const {
+        menuVisible,
+        setMenuVisible,
+        activeResizeItemId,
+        isResizeActive,
+        gridWidth,
+        showEditOptions,
+        editOptionsItem,
+        handleGridLayout,
+        handleItemLongPress,
+        handleExitResizeMode,
+        handleOpenItemOptions,
+        handleCloseItemOptions,
+    } = useBoardEditMode({
+        editingActive,
+        boardItems: board?.items,
+        initialGridWidth: INITIAL_GRID_WIDTH,
+        gridHorizontalPadding: GRID_HORIZONTAL_PADDING,
+        onCloseButtonPicker: handleCloseButtonPicker,
+        onCloseMetricPicker: closeMetricPicker,
+        onCloseAddItemPicker: () => setShowAddItemPicker(false),
+    });
 
     const gridItemBuilder = useMemo(() => createGridItemBuilder({
         gridCols: GRID_COLS,
@@ -96,24 +194,18 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
 
     const handleAddMetric = useCallback(() => {
         setShowAddItemPicker(false);
-        setShowMetricPicker(true);
-    }, []);
+        openMetricPicker();
+    }, [openMetricPicker]);
 
     const handleAddButton = useCallback(() => {
         setShowAddItemPicker(false);
-        setButtonEditorMode('create');
-        setButtonEditorInitialConfig({});
-        setButtonEditorTargetId(null);
-        setShowButtonPicker(true);
-    }, []);
+        openButtonEditorCreate();
+    }, [openButtonEditorCreate]);
 
     const handleAddText = useCallback(() => {
         setShowAddItemPicker(false);
-        setTextEditorMode('create');
-        setTextEditorInitialConfig({ ...DEFAULT_TEXT_ITEM_CONFIG });
-        setTextEditorTargetId(null);
-        setShowTextEditor(true);
-    }, []);
+        openTextEditorCreate();
+    }, [openTextEditorCreate]);
 
     const addItemOptions = useMemo(() => createAddItemOptions(
         gridItemBuilder.definitions,
@@ -124,167 +216,11 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
         }
     ), [gridItemBuilder, handleAddMetric, handleAddButton, handleAddText]);
 
-    const activeMetricItem = useMemo(() => {
-        if (!board?.items || !activeMetricItemId) return null;
-        return board.items.find(item => item.id === activeMetricItemId) || null;
-    }, [board?.items, activeMetricItemId]);
-
-    const activeMetricState = activeMetricItem ? metricStates[activeMetricItem.id] : null;
-
-    useEffect(() => {
-        if (!editingActive) {
-            setShowEditOptions(false);
-            setEditOptionsItem(null);
-            setShowTextEditor(false);
-            setTextEditorTargetId(null);
-            setShowButtonPicker(false);
-            setButtonEditorMode('create');
-            setButtonEditorInitialConfig({});
-            setButtonEditorTargetId(null);
-        }
-    }, [editingActive]);
-
-    useEffect(() => {
-        if (!editingActive && activeResizeItemId !== null) {
-            setActiveResizeItemId(null);
-        }
-    }, [editingActive, activeResizeItemId]);
-
     useEffect(() => {
         if (!showHeader && isEditing) {
             setIsEditing(false);
         }
     }, [showHeader, isEditing, setIsEditing]);
-
-    useEffect(() => {
-        if (!activeResizeItemId) return;
-        const hasItem = board?.items?.some(item => item.id === activeResizeItemId);
-        if (!hasItem) {
-            setActiveResizeItemId(null);
-        }
-    }, [activeResizeItemId, board?.items]);
-
-    const handleMetricSelected = useCallback(async (metric) => {
-        if (!board) return;
-
-        const existingLayout = mapItemsToLayout(board.items, GRID_COLS);
-        const newItem = createMetricItem(metric, existingLayout, GRID_COLS);
-
-        await addItem(newItem);
-        setShowMetricPicker(false);
-    }, [board, addItem]);
-
-    const handleCloseButtonPicker = useCallback(() => {
-        setShowButtonPicker(false);
-        setButtonEditorTargetId(null);
-        setButtonEditorInitialConfig({});
-        setButtonEditorMode('create');
-    }, []);
-
-    const handleButtonSelected = useCallback(async (buttonConfig) => {
-        if (!board) {
-            handleCloseButtonPicker();
-            return;
-        }
-
-        const trimmedLabel = typeof buttonConfig?.label === 'string'
-            ? buttonConfig.label.trim()
-            : '';
-
-        if (buttonEditorMode === 'edit' && buttonEditorTargetId) {
-            const existingItem = board.items?.find(item => item.id === buttonEditorTargetId);
-
-            if (!existingItem) {
-                handleCloseButtonPicker();
-                return;
-            }
-
-            const destinationRoute = typeof buttonConfig.destination === 'string'
-                ? buttonConfig.destination
-                : buttonConfig.destination?.route
-                    ?? existingItem.config?.destination
-                    ?? null;
-
-            const updatedLabel = trimmedLabel || existingItem.config?.label || 'Button';
-
-            const updatedConfig = {
-                ...existingItem.config,
-                label: updatedLabel,
-                destination: destinationRoute,
-                color: buttonConfig.color ?? existingItem.config?.color,
-                icon: buttonConfig.icon ?? existingItem.config?.icon,
-                buttonProps: {
-                    ...(existingItem.config?.buttonProps ?? {}),
-                    icon: buttonConfig.icon ?? existingItem.config?.buttonProps?.icon
-                }
-            };
-
-            const targetWidth = calculateButtonGridWidth(updatedLabel, GRID_COLS);
-            let targetX = existingItem.x ?? 0;
-            if (targetX + targetWidth > GRID_COLS) {
-                targetX = Math.max(0, GRID_COLS - targetWidth);
-            }
-
-            const updates = {
-                config: updatedConfig
-            };
-
-            if (existingItem.w !== targetWidth) {
-                updates.w = targetWidth;
-            }
-            if (existingItem.x !== targetX) {
-                updates.x = targetX;
-            }
-
-            await updateItem(existingItem.id, updates);
-        } else {
-            const existingLayout = mapItemsToLayout(board.items, GRID_COLS);
-            const newItem = createButtonItem(buttonConfig, existingLayout, GRID_COLS);
-
-            await addItem(newItem);
-        }
-
-        handleCloseButtonPicker();
-    }, [board, buttonEditorMode, buttonEditorTargetId, addItem, updateItem, handleCloseButtonPicker]);
-
-    const normalizeTextConfig = useCallback((config) => {
-        return createTextItem(config, [], GRID_COLS).config;
-    }, [createTextItem]);
-
-    const handleCreateTextItem = useCallback(async (config) => {
-        if (!board) return;
-
-        const existingLayout = mapItemsToLayout(board.items, GRID_COLS);
-        const newItem = createTextItem(config, existingLayout, GRID_COLS);
-
-        await addItem(newItem);
-    }, [board, addItem, mapItemsToLayout, createTextItem]);
-
-    const handleUpdateTextItem = useCallback(async (itemId, config) => {
-        if (!board || !itemId) return;
-
-        const existingItem = board.items?.find(item => item.id === itemId);
-        const normalizedConfig = normalizeTextConfig(config);
-
-        await updateItem(itemId, {
-            config: {
-                ...(existingItem?.config ?? {}),
-                ...normalizedConfig
-            }
-        });
-    }, [board, normalizeTextConfig, updateItem]);
-
-    const handleTextEditorSave = useCallback(async (config) => {
-        if (textEditorMode === 'create') {
-            await handleCreateTextItem(config);
-        } else if (textEditorMode === 'edit' && textEditorTargetId) {
-            await handleUpdateTextItem(textEditorTargetId, config);
-        }
-
-        setShowTextEditor(false);
-        setTextEditorTargetId(null);
-        setTextEditorInitialConfig({});
-    }, [handleCreateTextItem, handleUpdateTextItem, textEditorMode, textEditorTargetId]);
 
     const handleRemoveItem = useCallback((itemId) => {
         Alert.alert(
@@ -301,23 +237,6 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
         );
     }, [removeItem]);
 
-    const handleOpenMetricDetails = useCallback((itemId) => {
-        if (editingActive) return;
-        
-        setActiveMetricItemId(itemId);
-        setShowMetricDetails(true);
-
-        const item = board?.items?.find(boardItem => boardItem.id === itemId);
-        if (item) {
-            ensureMetricState(item, { forceRefresh: true });
-        }
-    }, [editingActive, board?.items, ensureMetricState]);
-
-    const handleCloseMetricDetails = useCallback(() => {
-        setShowMetricDetails(false);
-        setActiveMetricItemId(null);
-    }, []);
-
     const handleEditMetric = useCallback((metricId) => {
         if (!metricId) return;
         handleCloseMetricDetails();
@@ -327,14 +246,24 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
     const handleOpenDisplaySettings = useCallback((item) => {
         if (!item) return;
         handleCloseMetricDetails();
-        openDisplaySettingsHook(item);
+        const metricAppearance = metricAppearancesById[item.config?.metricId];
+        openDisplaySettingsHook(item, metricAppearance);
         setShowDisplaySettings(true);
-    }, [handleCloseMetricDetails, openDisplaySettingsHook]);
+    }, [handleCloseMetricDetails, openDisplaySettingsHook, metricAppearancesById]);
 
     const handleCloseDisplaySettings = useCallback(() => {
         setShowDisplaySettings(false);
         closeDisplaySettingsHook();
     }, [closeDisplaySettingsHook]);
+
+    // Close transient overlays (metric details, display settings) whenever
+    // the navigation drawer opens so the sheet doesn't sit underneath it.
+    const drawerStatus = useDrawerStatus();
+    useEffect(() => {
+        if (drawerStatus !== 'open') return;
+        if (showMetricDetails) handleCloseMetricDetails();
+        if (showDisplaySettings) handleCloseDisplaySettings();
+    }, [drawerStatus, showMetricDetails, showDisplaySettings, handleCloseMetricDetails, handleCloseDisplaySettings]);
 
     const handleSaveDisplaySettings = useCallback(async () => {
         if (!displayConfigItem) return;
@@ -343,17 +272,30 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
             ? displayConfigDraft.colours.map(colour => sanitizeColourValue(colour)).filter(Boolean)
             : [];
 
-        const appearancePayload = {};
-        if (displayConfigDraft.background?.trim()) 
-            appearancePayload.background = displayConfigDraft.background.trim();
-        if (displayConfigDraft.axisColor?.trim()) 
-            appearancePayload.axisColor = displayConfigDraft.axisColor.trim();
-        if (displayConfigDraft.tickLabelColor?.trim()) 
-            appearancePayload.tickLabelColor = displayConfigDraft.tickLabelColor.trim();
-        if (displayConfigDraft.gridColor?.trim()) 
-            appearancePayload.gridColor = displayConfigDraft.gridColor.trim();
-        if (displayConfigDraft.showGrid === false) 
-            appearancePayload.showGrid = false;
+        const metricAppearance = metricAppearancesById[displayConfigItem.config?.metricId] || {};
+
+        // Build sparse override map: only keep entries the user actually
+        // changed away from the inherited metric appearance. Empty/blank
+        // entries always fall back to inherited.
+        const setOverrideIfDifferent = (overrides, key, draftValue, inheritedValue) => {
+            if (draftValue === undefined || draftValue === null) return;
+            if (typeof draftValue === 'string' && draftValue.trim() === '') return;
+            const normalized = typeof draftValue === 'string' ? draftValue.trim() : draftValue;
+            if (normalized === inheritedValue) return;
+            overrides[key] = normalized;
+        };
+
+        const overrides = {};
+        setOverrideIfDifferent(overrides, 'background', displayConfigDraft.background, metricAppearance.background);
+        setOverrideIfDifferent(overrides, 'axisColor', displayConfigDraft.axisColor, metricAppearance.axisColor);
+        setOverrideIfDifferent(overrides, 'tickLabelColor', displayConfigDraft.tickLabelColor, metricAppearance.tickLabelColor);
+        setOverrideIfDifferent(overrides, 'gridColor', displayConfigDraft.gridColor, metricAppearance.gridColor);
+
+        const inheritedShowGrid = metricAppearance.showGrid !== undefined ? metricAppearance.showGrid : true;
+        if (displayConfigDraft.showGrid !== inheritedShowGrid) {
+            overrides.showGrid = displayConfigDraft.showGrid;
+        }
+
         const rawAngle = typeof displayConfigDraft.xAxisLabelAngle === 'number'
             ? `${displayConfigDraft.xAxisLabelAngle}`
             : displayConfigDraft.xAxisLabelAngle ?? '';
@@ -362,15 +304,19 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
             const parsedAngle = Number(trimmedAngle);
             if (!Number.isNaN(parsedAngle)) {
                 const clampedAngle = Math.max(-90, Math.min(90, parsedAngle));
-                appearancePayload.xAxisLabelAngle = clampedAngle;
+                if (clampedAngle !== metricAppearance.xAxisLabelAngle) {
+                    overrides.xAxisLabelAngle = clampedAngle;
+                }
             }
-        } else if (displayConfigItem.config?.appearance?.xAxisLabelAngle !== undefined) {
-            appearancePayload.xAxisLabelAngle = null;
         }
 
         const updatedConfig = {
             ...displayConfigItem.config,
-            label: displayConfigDraft.label?.trim() || displayConfigItem.config?.name || 'Metric'
+            label: displayConfigDraft.label?.trim() || displayConfigItem.config?.name || 'Metric',
+            // Replace board appearance entirely — only keep the user's
+            // overrides. Cleared fields fall back to the metric's appearance
+            // automatically at render time via mergeAppearance().
+            appearance: overrides,
         };
 
         if (colourTokens.length > 0) {
@@ -378,29 +324,14 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
             updatedConfig.colors = colourTokens;
         }
 
-        if (Object.keys(appearancePayload).length > 0) {
-            updatedConfig.appearance = appearancePayload;
-        }
-
         await updateItem(displayConfigItem.id, { config: updatedConfig });
         handleCloseDisplaySettings();
-    }, [displayConfigItem, displayConfigDraft, updateItem, handleCloseDisplaySettings]);
+    }, [displayConfigItem, displayConfigDraft, metricAppearancesById, updateItem, handleCloseDisplaySettings]);
 
     const handleRemoveMetricFromBoard = useCallback((itemId) => {
         handleCloseMetricDetails();
         handleRemoveItem(itemId);
     }, [handleCloseMetricDetails, handleRemoveItem]);
-
-    const handleOpenItemOptions = useCallback((item) => {
-        if (!item || isResizeActive) return;
-        setEditOptionsItem(item);
-        setShowEditOptions(true);
-    }, [isResizeActive]);
-
-    const handleCloseItemOptions = useCallback(() => {
-        setShowEditOptions(false);
-        setEditOptionsItem(null);
-    }, []);
 
     const handleDisplaySettingsFromOptions = useCallback((item) => {
         if (!item) return;
@@ -424,58 +355,22 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
     const handleEditTextFromOptions = useCallback((item) => {
         if (!item) return;
         handleCloseItemOptions();
-        setTextEditorMode('edit');
-        setTextEditorInitialConfig(item.config || {});
-        setTextEditorTargetId(item.id);
-        setShowTextEditor(true);
-    }, [handleCloseItemOptions]);
+        openTextEditorEdit(item);
+    }, [handleCloseItemOptions, openTextEditorEdit]);
 
     const handleEditButtonFromOptions = useCallback((item) => {
         if (!item) return;
         handleCloseItemOptions();
-        setButtonEditorMode('edit');
-        setButtonEditorInitialConfig({ ...(item.config || {}) });
-        setButtonEditorTargetId(item.id);
-        setShowButtonPicker(true);
-    }, [handleCloseItemOptions]);
-
-    const handleGridLayout = useCallback((event) => {
-        const rawWidth = event?.nativeEvent?.layout?.width ?? 0;
-        if (rawWidth > 0) {
-            const adjustedWidth = Math.max(0, rawWidth - GRID_HORIZONTAL_PADDING * 2);
-            setGridWidth(prev => (prev === adjustedWidth ? prev : adjustedWidth));
-        }
-    }, []);
-
-    const handleItemLongPress = useCallback((itemId) => {
-        if (!editingActive) return;
-        setActiveResizeItemId(prev => {
-            const nextId = prev === itemId ? null : itemId;
-            if (nextId !== prev) {
-                setShowEditOptions(false);
-                setEditOptionsItem(null);
-                setShowAddItemPicker(false);
-                setShowMetricPicker(false);
-                handleCloseButtonPicker();
-            }
-            return nextId;
-        });
-    }, [editingActive, handleCloseButtonPicker]);
-
-    const handleResizeSessionEnd = useCallback((itemId) => {
-        setActiveResizeItemId(prev => (prev === itemId ? null : prev));
-    }, []);
-
-    const handleExitResizeMode = useCallback(() => {
-        setActiveResizeItemId(null);
-        setShowEditOptions(false);
-        setEditOptionsItem(null);
-    }, []);
+        openButtonEditorEdit(item);
+    }, [handleCloseItemOptions, openButtonEditorEdit]);
 
     const gridItems = useMemo(() => gridItemBuilder({
         items: board?.items,
         editingActive,
         metricStates,
+        metricAppearancesById,
+        metricsById,
+        dataSourceById,
         isResizeActive,
         styles,
         handlers: {
@@ -487,6 +382,9 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
         board?.items,
         editingActive,
         metricStates,
+        metricAppearancesById,
+        metricsById,
+        dataSourceById,
         isResizeActive,
         handleOpenMetricDetails,
         handleOpenItemOptions,
@@ -522,11 +420,11 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
             {...navigationHeaderProps}
             titleAlignment="right"
             rightActions={[
-                {
+                ...(canManageBoards ? [{
                     key: 'toggle-edit',
                     icon: editingActive ? 'check' : 'pencil',
                     onPress: () => setIsEditing(!isEditing)
-                },
+                }] : []),
                 {
                     key: 'menu',
                     render: () => (
@@ -541,14 +439,16 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                             }
                             anchorPosition="bottom"
                         >
-                            <Menu.Item
-                                leadingIcon="cog"
-                                title="Settings"
-                                onPress={() => {
-                                    setMenuVisible(false);
-                                    router.navigate(`/boards/${id}/settings`);
-                                }}
-                            />
+                            {canManageBoards && (
+                                <Menu.Item
+                                    leadingIcon="cog"
+                                    title="Settings"
+                                    onPress={() => {
+                                        setMenuVisible(false);
+                                        router.navigate(`/boards/${id}/settings`);
+                                    }}
+                                />
+                            )}
                         </Menu>
                     )
                 }
@@ -591,7 +491,6 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                                     activeResizeItemId={activeResizeItemId}
                                     onItemLongPress={editingActive ? handleItemLongPress : undefined}
                                     onBackgroundPress={handleExitResizeMode}
-                                    onResizeSessionEnd={handleResizeSessionEnd}
                                     onLayoutChange={updateLayout}
                                     containerStyle={styles.gridContainer}
                                     containerWidth={gridWidth ?? undefined}
@@ -603,9 +502,10 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                     {editingActive && !isResizeActive && (
                         <FAB
                             icon="plus"
-                            style={[styles.fab, { backgroundColor: theme.colors.primary }]}
-                            color={theme.colors.onPrimary ?? '#ffffff'}
+                            style={[styles.fab/*, { backgroundColor: theme.colors.metricsBlue }*/]}
+                            /*color={theme.colors.primary ?? '#ffffff'}*/
                             onPress={() => setShowAddItemPicker(true)}
+                            variant="surface"
                         />
                     )}
                 </View>
@@ -640,13 +540,15 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
 
                         {editOptionsItem.type === 'metric' && (
                             <View style={styles.editOptionsSection}>
-                                <List.Item
-                                    title="Edit Metric"
-                                    description="Modify the underlying metric configuration"
-                                    left={(props) => <List.Icon {...props} icon="pencil" />}
-                                    disabled={!editOptionsItem?.config?.metricId}
-                                    onPress={() => handleEditMetricFromOptions(editOptionsItem)}
-                                />
+                                {canManageMetrics && (
+                                    <List.Item
+                                        title="Edit Metric"
+                                        description="Modify the underlying metric configuration"
+                                        left={(props) => <List.Icon {...props} icon="pencil" />}
+                                        disabled={!editOptionsItem?.config?.metricId}
+                                        onPress={() => handleEditMetricFromOptions(editOptionsItem)}
+                                    />
+                                )}
                                 <List.Item
                                     title="Display Settings"
                                     description="Adjust how this metric appears on the board"
@@ -717,7 +619,12 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                     <MetricDetailContent
                         item={activeMetricItem}
                         metricState={activeMetricState}
+                        metricAppearance={metricAppearancesById[activeMetricItem.config?.metricId]}
+                        onYearChange={(year) => setMetricYear(activeMetricItem.id, year)}
                         styles={styles}
+                        dataSourceErrored={
+                            dataSourceById?.[activeMetricItem.config?.dataSourceId]?.status === 'error'
+                        }
                     />
                 </CustomBottomSheet>
             )}
@@ -744,13 +651,13 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                         showClose: true
                     }}
                     onChange={(index) => {
-                        if (index === -1) setShowMetricPicker(false);
+                        if (index === -1) closeMetricPicker();
                     }}
-                    onClose={() => setShowMetricPicker(false)}
+                    onClose={() => closeMetricPicker()}
                 >
                     <MetricPicker
                         onSelect={handleMetricSelected}
-                        onCancel={() => setShowMetricPicker(false)}
+                        onCancel={() => closeMetricPicker()}
                         multiSelect={false}
                     />
                 </CustomBottomSheet>
@@ -791,26 +698,16 @@ const BoardView = ({ boardId: overrideBoardId, showHeader = true } = {}) => {
                     }}
                     onChange={(index) => {
                         if (index === -1) {
-                            setShowTextEditor(false);
-                            setTextEditorTargetId(null);
-                            setTextEditorInitialConfig({});
+                            closeTextEditor();
                         }
                     }}
-                    onClose={() => {
-                        setShowTextEditor(false);
-                        setTextEditorTargetId(null);
-                        setTextEditorInitialConfig({});
-                    }}
+                    onClose={closeTextEditor}
                 >
                     <TextItemEditor
                         initialConfig={textEditorInitialConfig}
                         mode={textEditorMode}
                         onSave={handleTextEditorSave}
-                        onCancel={() => {
-                            setShowTextEditor(false);
-                            setTextEditorTargetId(null);
-                            setTextEditorInitialConfig({});
-                        }}
+                        onCancel={closeTextEditor}
                     />
                 </CustomBottomSheet>
             )}
@@ -950,7 +847,7 @@ const createStyles = (theme) => {
         },
         metricPreviewChartInner: {
             flex: 1,
-            padding: 8
+            paddingVertical: 8
         },
         metricPreviewPlaceholder: {
             flex: 1,
@@ -1007,15 +904,16 @@ const createStyles = (theme) => {
             flex: 1
         },
         metricDetailChart: {
-            height: 280,
+            // Match the view-metric screen: a square chart area that
+            // grows with screen width rather than a fixed short height.
+            // Constrain height for bottom sheet display to ensure bottom axis
+            // and labels remain visible on small screens.
+            aspectRatio: 1,
+            maxHeight: 320,
             marginBottom: 16,
             borderRadius: 8,
             overflow: 'hidden',
             backgroundColor: colors.surface ?? colors.buttonBackground ?? '#1a1d2e'
-        },
-        metricDetailChartInner: {
-            flex: 1,
-            padding: 12
         },
         metricStatus: {
             flex: 1,

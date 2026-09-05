@@ -11,7 +11,7 @@ import { getWorkspaceId } from "../../../../storage/workspaceStorage";
 import endpoints from "../../../../utils/api/endpoints";
 import ResponsiveScreen from "../../../../components/layout/ResponsiveScreen";
 import { useFocusEffect } from "@react-navigation/native";
-import { RefreshControl } from "react-native";
+import ThemedRefreshControl from "../../../../components/common/ThemedRefreshControl";
 import { hasPermission } from "../../../../utils/permissions";
 
 const Users = () => {
@@ -178,8 +178,7 @@ const Users = () => {
                     keyboardDismissMode="on-drag"
                     keyboardShouldPersistTaps="handled"
                     stickySectionHeadersEnabled={false}
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
+                    refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                     style={{ flex:1 }}
                     renderSectionHeader={({ section: { title } }) => (
                         <Pressable

@@ -109,7 +109,6 @@ export default function ViewRole() {
     const [permIndex, setPermIndex] = useState({});
     const [loading, setLoading] = useState(true);
     const [roleExists, setRoleExists] = useState(true);
-    const [boards, setBoards] = useState([]);
     const [openAccordions, setOpenAccordions] = useState({});
     const [manageRolePermission, setManageRolePermission] = useState(false);
 
@@ -128,9 +127,6 @@ export default function ViewRole() {
 
             result = await apiGet(endpoints.workspace.core.getDefaultPermissions);
             setPermIndex(buildPermissionIndex(result?.data));
-
-            result = await apiGet(endpoints.workspace.boards.getBoards(workspaceId));
-			setBoards(Array.isArray(result?.data) ? result.data : []);
         } catch (error) {
             console.error("Error fetching role:", error);
             setRoleExists(false);
@@ -158,17 +154,6 @@ export default function ViewRole() {
     const groupedReadable = useMemo(
         () => groupSelectedPermissions(normalizedPermissions, permIndex),
         [normalizedPermissions, permIndex]
-    );
-
-    const accessibleBoardIds = useMemo(
-        () => {
-            if (!Array.isArray(role?.hasAccess?.boards)) return [];
-            const ids = role.hasAccess.boards
-                .map((boardId) => (boardId !== undefined && boardId !== null ? String(boardId) : null))
-                .filter(Boolean);
-            return Array.from(new Set(ids));
-        },
-        [role]
     );
 
     useFocusEffect(
@@ -201,35 +186,9 @@ export default function ViewRole() {
                     <List.Item title="Last Updated" description={formatDateTime(role.updatedAt)} />
                 </Card>
 
+                {/* TODO: Board access per role should be handled via the permission gating system in the future. */}
                 {!role?.owner && (
                     <StackLayout spacing={16}>
-                        <Card>
-                            <Card.Title title="Board Access" />
-                            <Card.Content>
-                                <View style={styles.chipsWrap}>
-                                    {accessibleBoardIds.map((roleBoard) => {
-                                        const matchingBoard = Array.isArray(boards)
-                                            ? boards.find((board) => board?.id === roleBoard)
-                                            : null;
-                                        const boardLabel = matchingBoard?.name || String(roleBoard);
-                                        return (
-                                            <Chip
-                                                key={roleBoard}
-                                                mode="outlined"
-                                                style={styles.chip}
-                                                onPress={() => router.navigate(`/boards/${roleBoard}`)}
-                                            >
-                                                {boardLabel}
-                                            </Chip>
-                                        );
-                                    })}
-                                    {(accessibleBoardIds.length === 0) && (
-                                        <Text style={styles.muted}>No boards assigned.</Text>
-                                    )}
-                                </View>
-                            </Card.Content>
-                        </Card>
-
                         <Card>
                             <Card.Title title={`Permissions (${normalizedPermissions.length})`} />
                             <Card.Content>
@@ -290,8 +249,6 @@ export default function ViewRole() {
 
 const styles = StyleSheet.create({
     loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
-    chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    chip: { marginBottom: 8 },
     bucketTitle: { fontWeight: "600", marginBottom: 6 },
     muted: { opacity: 0.7 },
     actionsRow: { alignItems: "flex-end", marginTop: 8 },

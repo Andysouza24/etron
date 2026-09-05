@@ -1,4 +1,7 @@
-// utility functions can be used across different adapters
+// shared utilities and a composable base adapter
+// common states -> connections list, current connection, isConnected
+// exposes overrrideable hooks
+
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const validateSourceId = (sourceId) => {
@@ -29,11 +32,7 @@ export const sanitizeConnectionData = (connectionData) => {
   const sanitized = {};
   Object.keys(connectionData).forEach((key) => {
     const value = connectionData[key];
-    if (typeof value === "string") {
-      sanitized[key] = value.trim();
-    } else {
-      sanitized[key] = value;
-    }
+    sanitized[key] = typeof value === "string" ? value.trim() : value;
   });
   return sanitized;
 };
@@ -70,5 +69,81 @@ export const createTestResult = (success, data = {}, error = null) => {
     data: success ? data : null,
     error: error ? error.message || error : null,
     ...data,
+  };
+};
+
+// Default search filter used by connection-list adapters
+// Concrete adapters can override `filterDataSources` if they need richer matching
+const defaultFilterDataSources = (query, dataSources = []) => {
+  if (!query) return dataSources;
+  const q = String(query).toLowerCase();
+  return dataSources.filter((source) => {
+    const name = source?.name?.toLowerCase?.() || "";
+    const path = source?.path?.toLowerCase?.() || "";
+    const type = source?.type?.toLowerCase?.() || "";
+    return name.includes(q) || path.includes(q) || type.includes(q);
+  });
+};
+
+// Composable base for connection-style adapters (api, ftp, mysql, ...)
+// Returns a state record with helpers that mutate it.
+// Concrete adapters destructure the helpers they want and add provider-specific behaviour
+export const createBaseAdapter = ({ provider, type } = {}) => {
+  const state = {
+    connections: [],
+    currentConnection: null,
+    isConnected: false,
+  };
+
+  const setCurrentConnection = (connection) => {
+    state.currentConnection = connection;
+    state.isConnected = !!connection;
+    if (connection) {
+      state.connections = [
+        connection,
+        ...state.connections.filter((c) => c.id !== connection.id),
+      ];
+    }
+  };
+
+  const clear = () => {
+    state.currentConnection = null;
+    state.connections = [];
+    state.isConnected = false;
+  };
+
+  const switchConnection = async (connectionId) => {
+    const connection = state.connections.find((c) => c.id === connectionId);
+    if (!connection) {
+      throw new Error("Connection not found");
+    }
+    state.currentConnection = connection;
+    state.isConnected = true;
+    return { success: true, connected: true, connection };
+  };
+
+  const getConnectionInfo = (extra = {}) => ({
+    isConnected: state.isConnected,
+    connection: state.currentConnection,
+    provider,
+    dataSourceCount: state.connections.length,
+    isDemoMode: false,
+    ...extra,
+  });
+
+  const requireConnected = (message) => {
+    if (!state.isConnected) {
+      throw new Error(message || `Not connected to ${provider || type}`);
+    }
+  };
+
+  return {
+    state,
+    setCurrentConnection,
+    clear,
+    switchConnection,
+    getConnectionInfo,
+    requireConnected,
+    filterDataSources: defaultFilterDataSources,
   };
 };

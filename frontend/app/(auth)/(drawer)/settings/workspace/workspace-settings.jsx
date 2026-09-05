@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import StackLayout from "../../../../../components/layout/StackLayout";
 import BasicDialog from "../../../../../components/overlays/BasicDialog";
 import { useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPut } from "../../../../../utils/api/apiClient";
+import { apiDelete, apiPut } from "../../../../../utils/api/apiClient";
 import { useTheme } from "react-native-paper";
 import { verifyPassword } from "../../../../../utils/verifyPassword";
 import Header from "../../../../../components/layout/Header";
@@ -14,15 +14,30 @@ import DescriptiveButton from "../../../../../components/common/buttons/Descript
 import BasicButton from "../../../../../components/common/buttons/BasicButton";
 import endpoints from "../../../../../utils/api/endpoints";
 import { getWorkspaceId } from "../../../../../storage/workspaceStorage";
-import {
-    getCurrentUser,
-} from 'aws-amplify/auth';
 import DropDown from "../../../../../components/common/input/DropDown";
-import { isOwnerRole } from "../../../../../storage/permissionsStorage";
 import { hasPermission } from "../../../../../utils/permissions";
 import ResponsiveScreen from "../../../../../components/layout/ResponsiveScreen";
 import { Platform } from "react-native";
 import PermissionGate from "../../../../../components/common/PermissionGate";
+import { useHasPermission } from "../../../../../hooks/useHasPermission";
+import useOwnerCandidates from "../../../../../hooks/system/useOwnerCandidates";
+
+const WorkspaceSettingsItem = ({ option }) => {
+    const { allowed } = useHasPermission(option.permKey);
+    const router = useRouter();
+
+    return (
+        <PermissionGate
+            allowed={allowed}
+            onAllowed={() => router.navigate(option.route)}
+        >
+            <DescriptiveButton
+                label={option.label}
+                description={option.description}
+            />  
+        </PermissionGate>
+    );
+}
 
 const WorkspaceManagement = () => {
     const router = useRouter();
@@ -36,10 +51,9 @@ const WorkspaceManagement = () => {
 
     const [selectedUser, setSelectedUser] = useState("");
     const [selectedRole, setSelectedRole] = useState("");
-    const [users, setUsers] = useState([]);
-    const [roles, setRoles] = useState([]);
     const [workspaceId, setWorkspaceId] = useState(null);
-    const [isOwner, setIsOwner] = useState(false);
+
+    const { isOwner, users, roles } = useOwnerCandidates();
 
     const [loading, setLoading] = useState(false);
 
@@ -65,62 +79,13 @@ const WorkspaceManagement = () => {
         },*/
     ];
 
-    const [menuOptions, setMenuOptions] = useState([]);
 
     useEffect(() => {
-        fetchData();
+        (async () => {
+            const id = await getWorkspaceId();
+            setWorkspaceId(id);
+        })();
     }, []);
-
-    async function fetchData() {
-        const workspaceId = await getWorkspaceId();
-        setWorkspaceId(workspaceId);
-
-        let ownerCheck
-        try {
-            ownerCheck = await isOwnerRole();
-            setIsOwner(ownerCheck);
-        } catch (error) {
-            console.error("Error checking owner role:", error);
-            setIsOwner(false);
-        }
-
-        // filter menu buttons by permissions
-        const evaluatedMenuOptions = [];
-        for (const option of permissionButtonMap) {
-            const allowed = option.permKey ? await hasPermission(option.permKey) : true;
-
-            evaluatedMenuOptions.push({ ...option, allowed, key:option.label});
-        }
-        setMenuOptions(evaluatedMenuOptions);
-
-        if (!ownerCheck) return;
-
-        try {
-            const currentUser = await getCurrentUser();
-            const currentUserId = currentUser.userId;
-
-            const response = await apiGet(endpoints.workspace.users.getUsers(workspaceId));
-            const users = response.data;
-
-            // filter out the current user (expected to be the current owner)
-            const filteredList = users.filter(user => user.userId !== currentUserId);
-            console.log("FilteredList:", filteredList);
-            setUsers(filteredList);
-        } catch (error) {
-            console.error("Error loading users:", error);
-        }
-
-        // fetch workspace roles (excluding owner)
-        try {
-            const response = await apiGet(endpoints.workspace.roles.getRoles(workspaceId));
-            const roles = response.data;
-            const filteredList = roles.filter(role => !role.owner);
-            setRoles(filteredList);
-        } catch (error) {
-            console.error("Error fetching roles:", error);
-        }
-
-    }
 
     // DELETE WORKSPACE
     async function handleConfirmDeletion() {
@@ -237,7 +202,9 @@ const WorkspaceManagement = () => {
             loadingOverlayActive={loading}
         >
             <StackLayout spacing={12}>
-                {menuOptions.map(renderOption)}
+                {permissionButtonMap.map((option)  => (
+                    <WorkspaceSettingsItem option={option} key={option.label} />
+                ))}
             </StackLayout>
             
             {isOwner && (

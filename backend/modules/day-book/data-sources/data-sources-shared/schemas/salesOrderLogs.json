@@ -1,0 +1,64 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "salesEmployee",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "dateCreated",
+    "type": "timestamp",
+    "category": "date",
+    "userDateFormat": "DD/MM/YY"
+  },
+  {
+    "name": "soNumber",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "customerName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "custOrderNum",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "orderAmountInAUD",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "orderAmountInUSD",
+    "type": "decimal(18,2)",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  }
+]

@@ -1,0 +1,78 @@
+[
+  {
+    "name": "_id",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "itemCode",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "itemName",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "totalStock",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInWhs01",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInDemoWhs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInTS01Whs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInNSW01Whs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInQLD01Whs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInVIC01Whs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "qtyInWA01Whs",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "__v",
+    "type": "bigint",
+    "category": "value"
+  },
+  {
+    "name": "timestamp",
+    "type": "timestamp",
+    "category": "date",
+    "dateFormat": "YMD_DASH"
+  },
+  {
+    "name": "rowId",
+    "type": "string",
+    "category": "dimension"
+  },
+  {
+    "name": "longDescription",
+    "type": "string",
+    "category": "dimension"
+  }
+]

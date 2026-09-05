@@ -1,490 +1,301 @@
 // Author(s): Noah Bradley
-import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
-import React, { useState, useEffect, useMemo, useCallback, use } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { View } from "react-native";
+import { ActivityIndicator } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { getCurrentUser } from "aws-amplify/auth";
+
+
 import Header from "../../../../../../../components/layout/Header";
-import {
-	Text,
-	Card,
-	ActivityIndicator,
-	DataTable,
-	Modal,
-	Portal,
-	Chip,
-	useTheme,
-	IconButton,
-	Snackbar,
-    Button,
-} from "react-native-paper";
+import ResponsiveScreen from "../../../../../../../components/layout/ResponsiveScreen";
 import BasicButton from "../../../../../../../components/common/buttons/BasicButton";
-import DropDown from '../../../../../../../components/common/input/DropDown';
-import TextField from '../../../../../../../components/common/input/TextField';
-import MetricCheckbox from '../../../../../../../components/common/buttons/MetricCheckbox';
-import MetricRadioButton from '../../../../../../../components/common/buttons/MetricRadioButton';
-import GraphTypes from '../graph-types';
+import MetricDetails from "../../../../../../../components/modules/day-book/metrics/pages/MetricDetails";
 
+import useMetricForm from "../../../../../../../hooks/modules/day_book/metrics/useMetricForm";
+import useMetricDataSource from "../../../../../../../hooks/modules/day_book/metrics/useMetricDataSource";
+import useMetricSubmission from "../../../../../../../hooks/modules/day_book/metrics/useMetricSubmission";
+import useCurrencySymbolSeed from "../../../../../../../hooks/modules/day_book/metrics/useCurrencySymbolSeed";
+
+import metricService from "../../../../../../../services/MetricService";
 import { getWorkspaceId } from "../../../../../../../storage/workspaceStorage";
-import endpoints from '../../../../../../../utils/api/endpoints';
-import { apiGet, apiPatch } from '../../../../../../../utils/api/apiClient';
+import { apiGet } from "../../../../../../../utils/api/apiClient";
+import endpoints from "../../../../../../../utils/api/endpoints";
 
-import ColorPicker from 'react-native-wheel-color-picker';
-import throttle from 'lodash.throttle';
-import ResponsiveScreen from '../../../../../../../components/layout/ResponsiveScreen';
+import { DEFAULT_NUMBER_FORMAT } from "../../../../../../../utils/constants/modules/day-book/metrics/numberFormat";
+import { simpleStyles } from "../../../../../../../assets/styles/stylesheets/day-book/modules/metrics/simpleMetric";
 
 const EditMetric = () => {
-	const router = useRouter();
-	const theme = useTheme();
-	const { metricId } = useLocalSearchParams();
+    const router = useRouter();
+    const { metricId } = useLocalSearchParams();
 
-	const [saving, setSaving] = useState(false);
-	const [snack, setSnack] = useState({ visible: false, text: "" });
+    const ds = useMetricDataSource();
+    const form = useMetricForm();
+    const { viewShotRef } = useMetricSubmission();
 
-	const [dataSourceMappings, setDataSourceMappings] = useState([]);
-	const [loadingSources, setLoadingSources] = useState(true);
+    const [loadingMetric, setLoadingMetric] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-	const [loadingMetric, setLoadingMetric] = useState(true);
+    // Snapshot of the loaded metric so we can preserve fields the edit
+    // surface doesn't expose (data source, variable selections, etc.).
+    const [originalMetric, setOriginalMetric] = useState(null);
 
-	const [metricName, setMetricName] = useState("");
-	const [selectedMetric, setSelectedMetric] = useState(null);
-	const [dataSourceId, setDataSourceId] = useState(null);
+    // Chart selections seeded from the saved metric. Data source, variables
+    // and row selection are intentionally read-only on this screen so we
+    // mirror the last step of the create-metric wizard.
+    const [selectedMetric, setSelectedMetric] = useState("line");
+    const [independentVariable, setIndependentVariable] = useState(null);
+    const [dependentVariables, setDependentVariables] = useState([]);
+    const [dimensionField, setDimensionField] = useState(null);
+    const [aggregation, setAggregation] = useState(null);
+    const [selectedRows, setSelectedRows] = useState([]);
 
-	const [dataSourceData, setDataSourceData] = useState([]);
-	const [dataSourceVariableNames, setDataSourceVariableNames] = useState([]);
-	const [dataDownloadStatus, setDataDownloadStatus] = useState("unstarted");
+    // Customise options (match the create-simple wizard state shape).
+    const [maxValue, setMaxValue] = useState(null);
+    const [capPercentAt100, setCapPercentAt100] = useState(false);
+    const [boxGrouping, setBoxGrouping] = useState("all");
+    const [boxTimePeriod, setBoxTimePeriod] = useState("date");
+    const [pieLabelPlacement, setPieLabelPlacement] = useState("outside");
+    const [rounding, setRounding] = useState({ mode: "none", decimalPlaces: 2 });
+    const [percentRounding, setPercentRounding] = useState({ mode: "none", decimalPlaces: 1 });
+    const [axisNumberFormat, setAxisNumberFormat] = useState(null);
+    const [boxUseRawData, setBoxUseRawData] = useState(false);
+    const [numberFormat, setNumberFormat] = useState({ ...DEFAULT_NUMBER_FORMAT });
+    const [xAxisDateFormat, setXAxisDateFormat] = useState("auto");
+    const [xAxisChronological, setXAxisChronological] = useState(true);
+    const [alerts, setAlerts] = useState([]);
+    const [thresholds, setThresholds] = useState([]);
 
-	const [chosenIndependentVariable, setChosenIndependentVariable] = useState("");
-	const [chosenDependentVariables, setChosenDependentVariables] = useState([]);
-	const [selectedRows, setSelectedRows] = useState([]);
-	const [coloursState, setColoursState] = useState(['#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522']);
-	const [wheelIndex, setWheelIndex] = useState(0);
-
-	const rowLoadAmount = 5;
-	const [rowLimit, setRowLimit] = useState(rowLoadAmount);
-	const displayedRows = useMemo(() => dataSourceData.slice(0, rowLimit), [dataSourceData, rowLimit]);
-	const [loadingMoreRows, setLoadingMoreRows] = useState(false);
-
-	const onPreviewBottomReached = useCallback(() => {
-		if (loadingMoreRows) return;
-		if (rowLimit >= dataSourceData.length) return;
-		setLoadingMoreRows(true);
-		requestAnimationFrame(() => {
-			setRowLimit(prev => Math.min(prev + rowLoadAmount, dataSourceData.length));
-			setLoadingMoreRows(false);
-		});
-	}, [dataSourceData.length, rowLimit, loadingMoreRows]);
-
-	const [dataVisible, setDataVisible] = useState(false);
-	const showDataModal = () => setDataVisible(true);
-	const hideDataModal = () => setDataVisible(false);
-
-	const [showChecklist, setShowChecklist] = useState(false);
-
-	useEffect(() => {
-		(async () => {
-			setLoadingSources(true);
-			try {
-				const workspaceId = await getWorkspaceId();
-				const srcResult = await apiGet(endpoints.modules.day_book.data_sources.getDataSources, { workspaceId });
-				const srcs = srcResult.data || [];
-				setDataSourceMappings(srcs.map(ds => ({ id: ds.dataSourceId, name: ds.name })));
-			} catch (error) {
-				console.error("Error loading sources:", error);
-			} finally {
-				setLoadingSources(false);
-			}
-		})();
-	}, []);
-
-	useEffect(() => {
-		(async () => {
-			setLoadingMetric(true);
-			try {
-				const workspaceId = await getWorkspaceId();
-				const metricRes = await apiGet(endpoints.modules.day_book.metrics.getMetric(metricId), { workspaceId });
-				const metric = metricRes.data;
-
-				// Seed UI with existing metric config
-				setMetricName(metric.name || "");
-				setSelectedMetric(metric.config?.type || null);
-				setDataSourceId(metric.dataSourceId || null);
-				setChosenIndependentVariable(metric.config?.independentVariable || "");
-				setChosenDependentVariables(metric.config?.dependentVariables || []);
-				setColoursState(metric.config?.colours?.length ? metric.config.colours : coloursState);
-				setSelectedRows(Array.isArray(metric.config?.selectedRows) ? metric.config.selectedRows : []);
-			} catch (e) {
-				console.error("Error loading metric:", e);
-			} finally {
-				setLoadingMetric(false);
-			}
-		})();
-	}, [metricId]);
-
-	// When dataSourceId changes (or initial metric loads), fetch data + schema for that source
-	useEffect(() => {
-		if (!dataSourceId) return;
-		(async () => {
-			setDataDownloadStatus("downloading");
-			try {
-				const workspaceId = await getWorkspaceId();
-				const res = await apiGet(endpoints.modules.day_book.data_sources.viewData(dataSourceId), { workspaceId });
-				const { data, schema } = res.data || {};
-				setDataSourceData(Array.isArray(data) ? data : []);
-				setDataSourceVariableNames(Array.isArray(schema) ? schema.map(v => v.name) : []);
-				setDataDownloadStatus("downloaded");
-				// If variables were empty (e.g., user switched sources), reset
-				if (!chosenIndependentVariable || !dataSourceVariableNames.includes(chosenIndependentVariable)) {
-					setChosenIndependentVariable(schema?.[0]?.name || "");
-				}
-				// Filter dependent vars to ones that exist in this source
-				setChosenDependentVariables(prev =>
-					Array.isArray(prev) ? prev.filter(k => (schema || []).some(s => s.name === k)) : []
-				);
-				// If selected rows exist, keep only rows whose ID still exists
-				if (selectedRows?.length && schema?.[0]?.name) {
-					const idKey = schema[0].name;
-					const validIds = new Set((data || []).map(r => r[idKey]));
-					setSelectedRows(sr => sr.filter(id => validIds.has(id)));
-				}
-			} catch (e) {
-				console.error("Error loading data for source:", e);
-				setDataDownloadStatus("unstarted");
-			}
-		})();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [dataSourceId]);
-
-	const convertToGraphData = (rows) => {
-		// Mimic ViewMetric: include X and only chosen Ys, coerce numerics
-		return rows.map(row => {
-			const obj = {};
-			// X
-			const xv = row[chosenIndependentVariable];
-			obj[chosenIndependentVariable] = Number(xv) || xv;
-			// Ys
-			for (const y of chosenDependentVariables) {
-				const val = row[y];
-				const asNum = Number(val);
-				obj[y] = !isNaN(asNum) ? asNum : val;
-			}
-			return obj;
-		});
-	};
-
-	const dependentArray = Array.isArray(chosenDependentVariables)
-		? chosenDependentVariables
-		: chosenDependentVariables
-			? [chosenDependentVariables]
-			: [];
-
-	const handleDataSourceSelect = async (sourceId) => {
-		setDataSourceId(sourceId);
-		// Reset paginated preview
-		setRowLimit(rowLoadAmount);
-	};
-
-	const handleSave = async () => {
-		try {
-			setSaving(true);
-			const workspaceId = await getWorkspaceId();
-
-			await apiPatch(endpoints.modules.day_book.metrics.update(metricId), {
-                workspaceId,
-                name: metricName,
-                dataSourceId,
-                config: {
-					type: selectedMetric,
-					independentVariable: chosenIndependentVariable,
-					dependentVariables: dependentArray,
-					colours: coloursState,
-					selectedRows,
-				},
-            });
-			setSnack({ visible: true, text: "Metric updated" });
-		} catch (error) {
-			console.error("Error saving metric:", error);
-			setSnack({ visible: true, text: "Failed to save metric" });
-		} finally {
-			setSaving(false);
-		}
-	};
-
-	const graphDef = selectedMetric ? GraphTypes[selectedMetric] : null;
-
-	const graphData = useMemo(() => {
-		const base =
-			selectedRows.length > 0 && dataSourceVariableNames.length > 0
-				? dataSourceData.filter(r => selectedRows.includes(r[dataSourceVariableNames[0]]))
-				: dataSourceData;
-		return convertToGraphData(base);
-	}, [dataSourceData, selectedRows, dataSourceVariableNames, chosenIndependentVariable, chosenDependentVariables]);
-
+    // Workspace + user context needed by the alerts UI inside CustomiseOptions.
+    const [workspaceId, setWorkspaceId] = useState(null);
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [workspaceUsers, setWorkspaceUsers] = useState([]);
+    // Editable field aliases for chips (mirrors create-metric flows)
+    const [fieldAliases, setFieldAliases] = useState({});
 
     useEffect(() => {
-        setColoursState(prev => {
-            const next = [...prev];
-            while (next.length < dependentArray.length) next.push("#5f80c7ff"); // default
-            return next.slice(0, dependentArray.length);
-        });
-    }, [dependentArray.length]);
+        (async () => {
+            try {
+                const wsId = await getWorkspaceId();
+                setWorkspaceId(wsId);
+                const { userId } = await getCurrentUser();
+                setCurrentUserId(userId);
+                if (wsId) {
+                    const res = await apiGet(endpoints.workspace.users.getUsers(wsId));
+                    setWorkspaceUsers(res?.data ?? res ?? []);
+                }
+            } catch (err) {
+                console.error("[EditMetric] Error loading workspace data:", err);
+            }
+        })();
+    }, []);
 
-    const onColourChange = useMemo (() => throttle((newColor) => {
-        setColoursState(prev => {
-            const next = [...prev];
-            next[wheelIndex] = newColor;
-            return next;
-        });
-    }, 50), [wheelIndex])
+    // Seed fieldAliases from loaded metric config
+    useEffect(() => {
+        if (originalMetric?.config?.fieldAliases) {
+            setFieldAliases(originalMetric.config.fieldAliases);
+        }
+    }, [originalMetric]);
 
-    const canSave =
-        !!metricName.trim() &&
-        !!selectedMetric &&
-        !!dataSourceId &&
-        !!chosenIndependentVariable &&
-        Array.isArray(dependentArray) && dependentArray.length > 0 &&
-        !saving;
+    // Load the metric, seed all editable state, then trigger the data source
+    // download so the preview chart can render.
+    useEffect(() => {
+        (async () => {
+            if (!metricId) return;
+            setLoadingMetric(true);
+            try {
+                const result = await metricService.getMetric(metricId);
+                const metric = result?.data ?? result;
+                if (!metric) return;
+                setOriginalMetric(metric);
 
-	if (loadingSources || loadingMetric || dataDownloadStatus != "downloaded") {
-		return (
-			<ResponsiveScreen header={<Header title="Edit Metric" showBack />} center={false} padded={false} scroll={false}>
-				<View style={styles.loaderWrap}>
-					<ActivityIndicator size="large" />
-				</View>
-			</ResponsiveScreen>
-		);
-	}
+                form.setMetricName(metric.name || "");
 
-	return (
-		<ResponsiveScreen
-            header={<Header
-                title={"Edit Metric"}
-                showBack
-                showCheck={!saving && canSave}
-                onRightIconPress={handleSave}
-		    />}
-            center={false} padded 
-            tapToDismissKeyboard={false}
+                const config = metric.config || {};
+                setSelectedMetric(config.type || "line");
+                setIndependentVariable(config.independentVariable || null);
+                setDependentVariables(Array.isArray(config.dependentVariables) ? config.dependentVariables : []);
+                setDimensionField(config.dimensionField ?? null);
+                setAggregation(config.aggregation ?? null);
+                setSelectedRows(Array.isArray(config.selectedRows) ? config.selectedRows : []);
+
+                if (Array.isArray(config.colours) && config.colours.length > 0) {
+                    form.setColoursState(config.colours);
+                }
+
+                if (config.maxValue != null) setMaxValue(config.maxValue);
+                if (config.capPercentAt100 != null) setCapPercentAt100(config.capPercentAt100);
+                if (config.boxGrouping) setBoxGrouping(config.boxGrouping);
+                if (config.boxTimePeriod) setBoxTimePeriod(config.boxTimePeriod);
+                if (config.pieLabelPlacement) setPieLabelPlacement(config.pieLabelPlacement);
+                if (config.rounding) setRounding(config.rounding);
+                if (config.percentRounding) setPercentRounding(config.percentRounding);
+                if (config.axisNumberFormat != null) setAxisNumberFormat(config.axisNumberFormat);
+                if (config.boxUseRawData != null) setBoxUseRawData(config.boxUseRawData);
+                if (config.numberFormat) setNumberFormat(config.numberFormat);
+                if (config.xAxisDateFormat) setXAxisDateFormat(config.xAxisDateFormat);
+                if (config.xAxisChronological != null) setXAxisChronological(config.xAxisChronological);
+                if (Array.isArray(config.alerts)) setAlerts(config.alerts);
+                if (Array.isArray(config.thresholds)) setThresholds(config.thresholds);
+
+                if (metric.dataSourceId) {
+                    await ds.selectDataSource(metric.dataSourceId);
+                }
+            } catch (err) {
+                console.error("[EditMetric] Error loading metric:", err);
+            } finally {
+                setLoadingMetric(false);
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [metricId]);
+
+    useCurrencySymbolSeed(
+        dependentVariables[0] ?? null,
+        ds.classifiedFields?.valueFields,
+        setNumberFormat
+    );
+
+    const handleSave = useCallback(async () => {
+        if (!form.metricName.trim() || !originalMetric) return;
+        setSaving(true);
+        try {
+            await metricService.updateMetric(metricId, {
+                name: form.metricName,
+                type: originalMetric.type,
+                dataSourceId: originalMetric.dataSourceId,
+                config: {
+                    ...(originalMetric.config || {}),
+                    type: selectedMetric,
+                    independentVariable,
+                    dependentVariables,
+                    dimensionField,
+                    aggregation,
+                    colours: form.coloursState,
+                    selectedRows,
+                    maxValue,
+                    capPercentAt100,
+                    boxGrouping,
+                    boxTimePeriod,
+                    pieLabelPlacement,
+                    rounding,
+                    numberFormat,
+                    percentRounding,
+                    axisNumberFormat,
+                    boxUseRawData,
+                    xAxisDateFormat,
+                    xAxisChronological,
+                    alerts,
+                    thresholds,
+                    fieldAliases,
+                },
+            });
+            router.back();
+        } catch (err) {
+            console.error("[EditMetric] Error saving metric:", err);
+        } finally {
+            setSaving(false);
+        }
+    }, [
+        form.metricName, form.coloursState, originalMetric, metricId, router,
+        selectedMetric, independentVariable, dependentVariables, dimensionField,
+        aggregation, selectedRows, maxValue, capPercentAt100, boxGrouping,
+        boxTimePeriod, pieLabelPlacement, rounding, numberFormat, percentRounding,
+        axisNumberFormat, boxUseRawData, xAxisDateFormat, xAxisChronological, alerts, thresholds, fieldAliases,
+    ]);
+
+    const saveDisabled = useMemo(
+        () => !form.metricName.trim() || saving || ds.downloadStatus !== "downloaded",
+        [form.metricName, saving, ds.downloadStatus]
+    );
+
+    if (loadingMetric || ds.downloadStatus !== "downloaded") {
+        return (
+            <ResponsiveScreen
+                header={<Header title="Edit Metric" showBack />}
+                center
+                padded={false}
+                scroll={false}
+            >
+                <ActivityIndicator size="large" />
+            </ResponsiveScreen>
+        );
+    }
+
+    return (
+        <ResponsiveScreen
+            header={<Header title="Edit Metric" showBack />}
+            center={false}
+            padded
+            scroll
             loadingOverlayActive={saving}
         >
-            <DropDown
-                title="Data Source"
-                items={
-                    loadingSources
-                        ? ["Loading..."]
-                        : dataSourceMappings.map(dataSource => ({ value: dataSource.id, label: dataSource.name }))
-                }
-                onSelect={handleDataSourceSelect}
-                value={dataSourceId}
-            />
-
-            <Button icon="file" mode="text" onPress={showDataModal}>
-                View Data
-            </Button>
-
-            <DropDown
-                title="Metric Type"
-                items={Object.values(GraphTypes).map((g) => ({
-                    value: g.value,
-                    label: g.label
-                }))}
-                showRouterButton={false}
-                onSelect={setSelectedMetric}
-                value={selectedMetric}
-            />
-
-            <Text style={{ marginTop: 8 }}>Independent Variable (X-Axis)</Text>
-            <MetricRadioButton
-                items={dataSourceVariableNames}
-                selected={chosenIndependentVariable}
-                onChange={(x) => setChosenIndependentVariable(x)}
-            />
-
-            <Text style={{ marginTop: 12 }}>Dependent Variables (Y-Axis)</Text>
-            {["bar", "pie"].includes(selectedMetric) ? (
-                <MetricRadioButton
-                    items={dataSourceVariableNames}
-                    selected={
-                        Array.isArray(chosenDependentVariables)
-                            ? chosenDependentVariables[0]
-                            : chosenDependentVariables
-                    }
-                    onChange={(sel) => setChosenDependentVariables(sel ? [sel] : [])}
+            <View style={simpleStyles.content}>
+                <MetricDetails
+                    metricName={form.metricName}
+                    setMetricName={form.setMetricName}
+                    coloursState={form.coloursState}
+                    setColoursState={form.setColoursState}
+                    wheelIndex={form.wheelIndex}
+                    setWheelIndex={form.setWheelIndex}
+                    dependentVariables={dependentVariables}
+                    viewShotRef={viewShotRef}
+                    graphType={selectedMetric}
+                    graphData={[]}
+                    xKey={independentVariable}
+                    yKeys={dependentVariables}
+                    dataSourceId={ds.dataSourceId}
+                    aggregation={aggregation}
+                    dimensionField={dimensionField}
+                    selectedRows={selectedRows}
+                    selectedMetric={selectedMetric}
+                    setSelectedMetric={setSelectedMetric}
+                    maxValue={maxValue}
+                    setMaxValue={setMaxValue}
+                    capPercentAt100={capPercentAt100}
+                    setCapPercentAt100={setCapPercentAt100}
+                    boxGrouping={boxGrouping}
+                    setBoxGrouping={setBoxGrouping}
+                    boxTimePeriod={boxTimePeriod}
+                    setBoxTimePeriod={setBoxTimePeriod}
+                    pieLabelPlacement={pieLabelPlacement}
+                    setPieLabelPlacement={setPieLabelPlacement}
+                    rounding={rounding}
+                    setRounding={setRounding}
+                    numberFormat={numberFormat}
+                    setNumberFormat={setNumberFormat}
+                    percentRounding={percentRounding}
+                    setPercentRounding={setPercentRounding}
+                    axisNumberFormat={axisNumberFormat}
+                    setAxisNumberFormat={setAxisNumberFormat}
+                    rawGraphData={null}
+                    boxUseRawData={boxUseRawData}
+                    setBoxUseRawData={setBoxUseRawData}
+                    xAxisDateFormat={xAxisDateFormat}
+                    setXAxisDateFormat={setXAxisDateFormat}
+                    xAxisChronological={xAxisChronological}
+                    setXAxisChronological={setXAxisChronological}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    thresholds={thresholds}
+                    setThresholds={setThresholds}
+                    userId={currentUserId}
+                    workspaceId={workspaceId}
+                    workspaceUsers={workspaceUsers}
+                    fieldAliases={fieldAliases}
+                    setFieldAliases={setFieldAliases}
                 />
-            ) : (
-                <MetricCheckbox
-                    items={dataSourceVariableNames}
-                    selected={Array.isArray(chosenDependentVariables) ? chosenDependentVariables : []}
-                    onChange={(sel) => setChosenDependentVariables(Array.isArray(sel) ? sel : sel ? [sel] : [])}
-                />
-            )}
 
-            
-            <View style={{paddingBottom: 20}}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text>Select Data Points (Optional)</Text>
-
-                    <Chip
-                        onPress={() => {
-                            if (!dataSourceVariableNames.length) return;
-                            const idKey = dataSourceVariableNames[0];
-                            const allIds = dataSourceData.map(r => r[idKey]);
-                            if (selectedRows.length === allIds.length) setSelectedRows([]);
-                            else setSelectedRows(allIds);
-                        }}
-                        style={{ backgroundColor: theme.colors.background }}
-                        textStyle={{ color: theme.colors.primary }}
-                    >
-                        {selectedRows.length === dataSourceData.length ? "Deselect All" : "Select All"}
-                    </Chip>
-
-                    <IconButton
-                        icon={showChecklist ? "chevron-up" : "chevron-down"}
-                        size={20}
-                        onPress={() => setShowChecklist(!showChecklist)}
+                <View style={{ alignItems: "flex-end" }}>
+                    <BasicButton
+                        label="Save"
+                        onPress={handleSave}
+                        disabled={saveDisabled}
+                        style={simpleStyles.button}
                     />
                 </View>
-
-                {showChecklist && dataSourceVariableNames.length > 0 && (
-                    <MetricCheckbox
-                        items={dataSourceData.map(row => row[dataSourceVariableNames[0]])}
-                        selected={selectedRows}
-                        onChange={setSelectedRows}
-                    />
-                )}
             </View>
-
-            <TextField
-                label="Metric Name"
-                placeholder="Metric Name"
-                value={metricName}
-                onChangeText={setMetricName}
-            />
-
-            {graphDef && (
-                <>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginVertical: 6 }}>
-                        {dependentArray.map((variable, index) => (
-                            <Chip
-                                key={`${variable}-${index}`}
-                                selected={wheelIndex === index}
-                                onPress={() => setWheelIndex(index)}
-                                style={{
-                                    marginTop: 4,
-                                    backgroundColor: wheelIndex === index ? theme.colors.primary : theme.colors.placeholder,
-                                }}
-                                showSelectedCheck={false}
-                            >
-                                {variable ?? `Y${index + 1}`}
-                            </Chip>
-                        ))}
-                    </View>
-
-                    {dependentArray.length > 0 && (
-                        <View style={{ marginTop: 0, justifyContent: "center", flexDirection: "row" }}>
-                            <View pointerEvents="box-none">
-                            <ColorPicker
-                                color={coloursState[wheelIndex] || '#ed1c24'}
-                                onColorChange = {onColourChange}
-                                thumbSize={30}
-                                sliderSize={30}
-                                noSnap
-                                gapSize={10}
-                                palette={['#000000','#ed1c24','#d11cd5','#5f80c7ff','#57ff0a','#ffde17','#f26522','#ffffffff']}
-                            />
-                            </View>
-                        </View>
-                    )}
-
-                    <Card style={[styles.card]}>
-                        <Card.Content>
-                            <View
-                                style={styles.graphCardContainer}
-                                pointerEvents="box-none"
-                            >
-                                {graphDef.render({
-                                    data: graphData,
-                                    xKey: chosenIndependentVariable,
-                                    yKeys: dependentArray,
-                                    colours: coloursState,
-                                })}
-                            </View>
-                        </Card.Content>
-                    </Card>
-                </>
-            )}
-
-            <Portal>
-                <Modal visible={dataVisible} onDismiss={hideDataModal} style={styles.modalContainer}>
-                    <Card style={styles.modalCard}>
-                        <Card.Content>
-                            <ScrollView horizontal showsHorizontalScrollIndicator>
-                                <View style={{ minWidth: (dataSourceVariableNames.length) * 100 }}>
-                                    <DataTable>
-                                        <DataTable.Header>
-                                            {dataSourceVariableNames.map((variableName, index) => (
-                                                <DataTable.Title key={index} numberOfLines={1}>
-                                                    <Text>{String(variableName)}</Text>
-                                                </DataTable.Title>
-                                            ))}
-                                        </DataTable.Header>
-                                        <FlatList
-                                            data={displayedRows}
-                                            renderItem={({ item }) => (
-                                                <DataTable.Row>
-                                                    {dataSourceVariableNames.map((variableName, index) => (
-                                                        <DataTable.Cell key={index} style={{ width: 100 }} numberOfLines={1}>
-                                                            <Text>{String(item[variableName])}</Text>
-                                                        </DataTable.Cell>
-                                                    ))}
-                                                </DataTable.Row>
-                                            )}
-                                            nestedScrollEnabled
-                                            style={{ maxHeight: 180 }}
-                                            initialNumToRender={5}
-                                            windowSize={10}
-                                            removeClippedSubviews
-                                            onEndReached={onPreviewBottomReached}
-                                            onEndReachedThreshold={0.1}
-                                            ListFooterComponent={loadingMoreRows ? <ActivityIndicator size="small" /> : null}
-                                        />
-                                    </DataTable>
-                                </View>
-                            </ScrollView>
-                        </Card.Content>
-                    </Card>
-                </Modal>
-            </Portal>
-
-			<Snackbar
-				visible={snack.visible}
-				onDismiss={() => setSnack(s => ({ ...s, visible: false }))}
-				duration={2000}
-				style={{ marginBottom: 8 }}
-			>
-				{snack.text}
-			</Snackbar>
-		</ResponsiveScreen>
-	);
+        </ResponsiveScreen>
+    );
 };
 
 export default EditMetric;
-
-const styles = StyleSheet.create({
-	modalContainer: {
-		flex: 1, justifyContent: "center", alignItems: "center", padding: 20,
-	},
-	modalCard: {
-		width: "100%",
-	},
-	card: {
-		height: 250, width: "100%", marginTop: 20,
-	},
-	graphCardContainer: {
-		width: "100%", height: "100%",
-	},
-	loaderWrap: {
-		flex: 1, justifyContent: "center", alignItems: "center",
-	},
-	button: {
-		marginTop: 20,
-	},
-});

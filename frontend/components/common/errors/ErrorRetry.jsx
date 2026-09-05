@@ -1,18 +1,19 @@
 import { View, StyleSheet } from 'react-native';
-import { Chip, Text } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 
+// Full-screen error message with an optional Retry button.
 const ErrorRetry = ({ message = "Something went wrong.", onRetry }) => {
     return (
         <View style={styles.container}>
-            <Text style={styles.message}>{message}</Text>
+            <Text variant="bodyLarge">{message}</Text>
             {onRetry && (
-                <Chip
+                <Button
                     mode="outlined"
                     onPress={onRetry}
-                    style={styles.chip}
+                    style={styles.button}
                 >
                     Retry
-                </Chip>
+                </Button>
             )}
         </View>
     );
@@ -25,10 +26,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingTop: 100,
     },
-    message: {
-        fontSize: 16,
-    },
-    chip: {
+    button: {
         marginTop: 8,
     },
 });

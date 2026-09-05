@@ -3,6 +3,7 @@ import { DEFAULT_BOARD_COLOUR } from "../utils/boards/boardConstants";
 import {
   createDisplaySettingsDraft,
   buildDisplayColoursForItem,
+  mergeAppearance,
 } from "../utils/boards/boardUtils";
 
 export const useDisplaySettings = (board) => {
@@ -10,6 +11,10 @@ export const useDisplaySettings = (board) => {
   const [displayConfigDraft, setDisplayConfigDraft] = useState(() =>
     createDisplaySettingsDraft()
   );
+  // Effective (metric + board override) appearance captured when the modal
+  // was opened. Used so save/reset can compare draft values against the
+  // inherited baseline and only persist genuine board-level overrides.
+  const [inheritedAppearance, setInheritedAppearance] = useState({});
 
   const displayConfigItem = useMemo(() => {
     if (!board?.items || !displayConfigItemId) return null;
@@ -46,12 +51,7 @@ export const useDisplaySettings = (board) => {
     );
   }, [displayConfigItem, displayConfigDraft.colours]);
 
-  const openDisplaySettings = (item) => {
-    if (!item) return;
-
-    setDisplayConfigItemId(item.id);
-    const appearance = item.config?.appearance || {};
-    const initialColours = buildDisplayColoursForItem(item);
+  const buildDraftFromAppearance = (item, appearance) => {
     const angleValue = appearance?.xAxisLabelAngle;
     let draftAngle = "";
 
@@ -61,21 +61,33 @@ export const useDisplaySettings = (board) => {
       draftAngle = angleValue.trim();
     }
 
-    setDisplayConfigDraft({
+    return {
       label: item.config?.label || item.config?.name || "",
-      colours: initialColours,
+      colours: buildDisplayColoursForItem(item),
       background: appearance.background || "",
       axisColor: appearance.axisColor || "",
       tickLabelColor: appearance.tickLabelColor || "",
       gridColor: appearance.gridColor || "",
-      showGrid: appearance.showGrid !== undefined ? appearance.showGrid : true,
+      showGrid:
+        appearance.showGrid !== undefined ? appearance.showGrid : true,
       xAxisLabelAngle: draftAngle,
-    });
+    };
+  };
+
+  const openDisplaySettings = (item, metricAppearance) => {
+    if (!item) return;
+
+    setDisplayConfigItemId(item.id);
+    const effective = mergeAppearance(metricAppearance, item.config?.appearance);
+    const inherited = mergeAppearance(metricAppearance);
+    setInheritedAppearance(inherited);
+    setDisplayConfigDraft(buildDraftFromAppearance(item, effective));
   };
 
   const closeDisplaySettings = () => {
     setDisplayConfigItemId(null);
     setDisplayConfigDraft(createDisplaySettingsDraft());
+    setInheritedAppearance({});
   };
 
   const updateDraft = (updates) => {
@@ -90,22 +102,16 @@ export const useDisplaySettings = (board) => {
 
   const resetAppearance = () => {
     if (!displayConfigItem) return;
-    const appearance = displayConfigItem.config?.appearance || {};
+    const effective = mergeAppearance(
+      inheritedAppearance,
+      displayConfigItem.config?.appearance
+    );
     setDisplayConfigDraft((prev) => ({
       ...prev,
-      background: appearance.background || "",
-      axisColor: appearance.axisColor || "",
-      tickLabelColor: appearance.tickLabelColor || "",
-      gridColor: appearance.gridColor || "",
-      showGrid: appearance.showGrid !== undefined ? appearance.showGrid : true,
-      xAxisLabelAngle:
-        typeof appearance.xAxisLabelAngle === "number" &&
-        Number.isFinite(appearance.xAxisLabelAngle)
-          ? `${appearance.xAxisLabelAngle}`
-          : typeof appearance.xAxisLabelAngle === "string" &&
-            appearance.xAxisLabelAngle.trim().length > 0
-          ? appearance.xAxisLabelAngle.trim()
-          : "",
+      ...buildDraftFromAppearance(displayConfigItem, effective),
+      // preserve the in-progress label/colours edits — only appearance fields reset
+      label: prev.label,
+      colours: prev.colours,
     }));
   };
 
@@ -113,6 +119,7 @@ export const useDisplaySettings = (board) => {
     displayConfigItem,
     displayConfigDraft,
     displayColourLabels,
+    inheritedAppearance,
     openDisplaySettings,
     closeDisplaySettings,
     updateDraft,

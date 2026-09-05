@@ -1,0 +1,15 @@
+{
+  "name": "dashboard-raw-data-ingest",
+  "version": "1.0.0",
+  "description": "EventBridge handler that materialises micromax-dashboard-file data sources from S3 events.",
+  "author": "InSync",
+  "dependencies": {
+    "@etron/shared": "file:../../../../../shared/etron-shared-1.0.0.tgz",
+    "@etron/data-sources-shared": "file:../../data-sources-shared/etron-data-sources-shared-1.0.0.tgz",
+    "@etron/day-book-shared": "file:../../../day-book-shared/etron-day-book-shared-1.0.0.tgz"
+  },
+  "scripts": {},
+  "main": "dashboardRawDataIngestHandler.js",
+  "keywords": [],
+  "license": "ISC"
+}

@@ -4,6 +4,8 @@ import apiClient from '../utils/api/apiClient';
 import { getWorkspaceId } from '../storage/workspaceStorage';
 import AuthService from './AuthService';
 import { v4 as uuidv4 } from 'uuid';
+import { transformBoardFromBackend } from './board/boardTransform';
+import { createWorkspaceUserProfileCache } from './board/boardUserProfileCache';
 
 const DEFAULT_BOARD_SETTINGS = {
     cols: 12,
@@ -20,7 +22,7 @@ const DEFAULT_BUTTON_COLOR = "#2979FF";
 class BoardService {
     constructor() {
         this._defaultDashboardPromise = null;
-        this._workspaceUserCache = new Map();
+        this._loadWorkspaceUserProfile = createWorkspaceUserProfileCache();
         this._currentUserProfilePromise = null;
     }
 
@@ -56,7 +58,15 @@ class BoardService {
 
             return transformedBoards;
         } catch (error) {
-            console.error('[BoardService] getAllBoards error:', error);
+            const status = error?.response?.status;
+            const isPermissionError = status === 400 && (
+                error?.response?.data?.error?.includes('permission') ||
+                error?.response?.data?.message?.includes('permission') ||
+                error?.message?.includes('permission')
+            );
+            if (!isPermissionError) {
+                console.error('[BoardService] getAllBoards error:', error);
+            }
             return [];
         }
     }
@@ -76,6 +86,29 @@ class BoardService {
             return await this._transformBoardFromBackend(response.data, workspaceId);
         } catch (error) {
             console.error('[BoardService] getBoard error:', error);
+            return null;
+        }
+    }
+
+    // fetches the workspace's active dashboard board without requiring the
+    // view_boards permission. Returns null when no dashboard has been set
+    // (or the request fails). Safe to call for users who can only view the home page.
+    async getDashboard() {
+        try {
+            const workspaceId = await getWorkspaceId();
+            if (!workspaceId) {
+                console.error('[BoardService] No workspace ID available');
+                return null;
+            }
+
+            const url = endpoints.workspace.boards.getDashboard(workspaceId);
+            const response = await apiClient.get(url);
+
+            if (!response?.data) return null;
+
+            return await this._transformBoardFromBackend(response.data, workspaceId);
+        } catch (error) {
+            console.error('[BoardService] getDashboard error:', error);
             return null;
         }
     }
@@ -197,6 +230,14 @@ class BoardService {
 
             if (updates.isDashboard !== undefined) {
                 backendPayload.isDashboard = updates.isDashboard;
+            }
+
+            if ('dashboardAssignments' in updates) {
+                const { userIds = [], roleIds = [] } = updates.dashboardAssignments || {};
+                backendPayload.dashboardAssignments = {
+                    userIds: userIds.filter(Boolean).map(String),
+                    roleIds: roleIds.filter(Boolean).map(String),
+                };
             }
 
             if ('items' in updates) {
@@ -343,40 +384,6 @@ class BoardService {
         }
     }
 
-    async _loadWorkspaceUserProfile(workspaceId, userId) {
-        if (!workspaceId || !userId) {
-            return null;
-        }
-
-        const cacheKey = `${workspaceId}:${userId}`;
-
-        if (this._workspaceUserCache.has(cacheKey)) {
-            return this._workspaceUserCache.get(cacheKey);
-        }
-
-        try {
-            const response = await apiClient.get(endpoints.workspace.users.getUser(workspaceId, userId));
-            const data = response?.data;
-            if (data?.userId) {
-                const nameParts = [data.given_name, data.family_name].filter(Boolean);
-                const fullName = nameParts.length ? nameParts.join(' ') : null;
-                const profile = {
-                    userId: String(data.userId),
-                    name: fullName || data.email || 'Workspace Member',
-                    email: data.email || null,
-                    picture: data.picture || data.avatarUrl || null
-                };
-                this._workspaceUserCache.set(cacheKey, profile);
-                return profile;
-            }
-        } catch (error) {
-            console.error('[BoardService] Failed to load workspace user profile:', error);
-        }
-
-        this._workspaceUserCache.set(cacheKey, null);
-        return null;
-    }
-
     async _getCurrentUserOwnerProfile() {
         if (!this._currentUserProfilePromise) {
             this._currentUserProfilePromise = (async () => {
@@ -414,124 +421,10 @@ class BoardService {
     }
 
     async _transformBoardFromBackend(backendBoard, workspaceId) {
-        if (!backendBoard) return null;
-
-        const rawConfig = backendBoard.config ?? {};
-        const config = { ...rawConfig };
-        const rawAccess = config.access ?? {};
-
-        const normalizedCollaborators = Array.isArray(rawAccess.collaborators)
-            ? rawAccess.collaborators
-                .map((entry) => {
-                    if (!entry) return null;
-                    const userId = entry.userId || entry.id || entry.user || entry.memberId;
-                    if (!userId) return null;
-
-                    const rawPermission = entry.permission || entry.role || entry.access || entry.level;
-                    const canEditFlag = entry.canEdit === true || entry.edit === true;
-                    const canViewFlag = entry.canView === true || entry.view === true;
-
-                    let permission = null;
-                    if (typeof rawPermission === 'string') {
-                        const lowered = rawPermission.toLowerCase();
-                        if (lowered === 'edit' || lowered === 'editor') {
-                            permission = 'edit';
-                        } else if (lowered === 'view' || lowered === 'viewer' || lowered === 'read') {
-                            permission = 'view';
-                        }
-                    }
-
-                    if (!permission) {
-                        if (canEditFlag) {
-                            permission = 'edit';
-                        } else if (canViewFlag) {
-                            permission = 'view';
-                        }
-                    }
-
-                    if (!permission) {
-                        return null;
-                    }
-
-                    return {
-                        userId: String(userId),
-                        permission: permission === 'edit' ? 'edit' : 'view'
-                    };
-                })
-                .filter(Boolean)
-            : [];
-
-        const ownerId = rawAccess.ownerId || backendBoard.createdBy || null;
-        let ownerProfile = null;
-
-        if (workspaceId && ownerId) {
-            ownerProfile = await this._loadWorkspaceUserProfile(workspaceId, ownerId);
-        }
-
-        const currentUserProfile = await this._getCurrentUserOwnerProfile();
-
-        const baseOwner = ownerProfile
-            ? { ...ownerProfile, id: ownerProfile.userId }
-            : ownerId
-                ? { id: String(ownerId), userId: String(ownerId), name: null, email: null, picture: null }
-                : null;
-
-        let resolvedOwner = baseOwner;
-
-        if (currentUserProfile) {
-            if (!resolvedOwner && backendBoard.isDashboard) {
-                resolvedOwner = { ...currentUserProfile };
-            } else if (resolvedOwner?.userId === currentUserProfile.userId) {
-                resolvedOwner = {
-                    ...resolvedOwner,
-                    name: resolvedOwner.name || currentUserProfile.name,
-                    email: resolvedOwner.email || currentUserProfile.email,
-                    picture: resolvedOwner.picture || currentUserProfile.picture
-                };
-            }
-        }
-
-        const accessOwnerId = resolvedOwner ? resolvedOwner.userId : ownerId ? String(ownerId) : null;
-
-        if (config.access || accessOwnerId || normalizedCollaborators.length) {
-            config.access = {
-                ...(config.access || {}),
-                ownerId: accessOwnerId,
-                collaborators: normalizedCollaborators
-            };
-        }
-
-        return {
-            id: backendBoard.boardId,
-            name: backendBoard.name,
-            description: config.description || '',
-            items: config.items || [],
-            settings: config.settings || {
-                cols: 12,
-                rowHeight: 100,
-                margin: [12, 12],
-                backgroundColor: null
-            },
-            isDashboard: backendBoard.isDashboard || false,
-            thumbnailUrl: backendBoard.thumbnailUrl,
-            thumbnailUploadUrl: backendBoard.thumbnailUploadUrl,
-            metadata: {
-                createdAt: backendBoard.createdAt,
-                updatedAt: backendBoard.updatedAt,
-                createdBy: backendBoard.createdBy,
-                editedBy: backendBoard.editedBy || [],
-                ownerId: accessOwnerId,
-                version: 1
-            },
-            owner: resolvedOwner,
-            access: config.access || {
-                ownerId: accessOwnerId,
-                collaborators: normalizedCollaborators
-            },
-            config,
-            // Keep original backend data for reference
-            _backend: backendBoard
-        };
+        return transformBoardFromBackend(backendBoard, workspaceId, {
+            loadWorkspaceUserProfile: (ws, userId) => this._loadWorkspaceUserProfile(ws, userId),
+            getCurrentUserProfile: () => this._getCurrentUserOwnerProfile(),
+        });
     }
 
     async addItem(boardId, item) {
@@ -627,14 +520,19 @@ class BoardService {
     }
 
     async getActiveDashboardId(existingBoards) {
-        const storedId = await BoardStorage.getActiveBoardId();
-        if (storedId) {
-            return storedId;
-        }
-
         let boards = Array.isArray(existingBoards)
             ? existingBoards
             : await this.getAllBoards();
+
+        const storedId = await BoardStorage.getActiveBoardId();
+        if (storedId && boards.some(board => board.id === storedId)) {
+            return storedId;
+        }
+
+        if (storedId) {
+            // stored id is stale (e.g. workspace was deleted/recreated) — clear it
+            await BoardStorage.clearActiveBoard();
+        }
 
         if (!boards.length) {
             return null;
@@ -657,8 +555,8 @@ class BoardService {
     }
 
     async markAsViewed(boardId) {
-        const board = await this.getBoard(boardId);
-        if (!board) return false;
+        // placeholder for future "last viewed" tracking
+        if (!boardId) return false;
         return true;
     }
 

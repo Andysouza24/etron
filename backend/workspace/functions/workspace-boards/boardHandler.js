@@ -4,7 +4,66 @@ const {
   deleteBoardInWorkspace,
   getBoardInWorkspace,
   getBoardsInWorkspace,
+  getDashboardInWorkspace,
 } = require("./boardService");
+const axios = require("axios");
+
+async function notifyBoardUpdate(board, action){
+  const mutation = `
+    mutation NotifyBoardUpdate(
+      $workspaceId: ID!,
+      $boardId: ID!,
+      $name: String,
+      $config: AWSJSON,
+      $isDashboard: Boolean,
+      $updatedAt: AWSDateTime,
+      $action: String
+    ) {
+      notifyBoardUpdate(
+        workspaceId: $workspaceId,
+        boardId: $boardId,
+        name: $name,
+        config: $config,
+        isDashboard: $isDashboard,
+        updatedAt: $updatedAt,
+        action: $action
+      ) {
+        workspaceId
+        boardId
+        name
+        config
+        isDashboard
+        updatedAt
+        action
+      }
+    }
+  `;
+
+  const variables = {
+    workspaceId: board.workspaceId,
+    boardId: board.boardId,
+    name: board.name,
+    config: board.config ? JSON.stringify(board.config) : null,
+    isDashboard: board.isDashboard,
+    updatedAt: board.updatedAt,
+    action,
+  };
+
+  try {
+    await axios.post( process.env.APPSYNC_URL,
+      { query: mutation, variables },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.APPSYNC_API_KEY,
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Unable to send board update notification: ", error.message);
+  }
+}
+
 
 exports.handler = async (event) => {
   let statusCode = 200;
@@ -37,6 +96,7 @@ exports.handler = async (event) => {
           pathParams.workspaceId,
           requestJSON
         );
+        await notifyBoardUpdate(body, "CREATE");
         break;
       }
 
@@ -60,6 +120,7 @@ exports.handler = async (event) => {
           pathParams.boardId,
           requestJSON
         );
+        await notifyBoardUpdate(body, "UPDATE");
         break;
       }
 
@@ -82,6 +143,7 @@ exports.handler = async (event) => {
           pathParams.workspaceId,
           pathParams.boardId
         );
+        await notifyBoardUpdate(body, "DELETE");
         break;
       }
 
@@ -121,9 +183,26 @@ exports.handler = async (event) => {
         break;
       }
 
+      // GET ACTIVE DASHBOARD (no view_boards permission required)
+      case "GET /workspace/{workspaceId}/dashboard": {
+        if (!pathParams.workspaceId) {
+          throw new Error("Missing required path parameters");
+        }
+
+        if (typeof pathParams.workspaceId !== "string") {
+          throw new Error("workspaceId must be a UUID, 'string'");
+        }
+
+        body = await getDashboardInWorkspace(
+          authUserId,
+          pathParams.workspaceId
+        );
+        break;
+      }
+
       default:
         statusCode = 404;
-        body = { message: `Unsupported route: ${event.routeKey}` };
+        body = { message: `Unsupported route: ${routeKey}` };
         break;
     }
   } catch (error) {

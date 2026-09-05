@@ -8,7 +8,7 @@ class AuthService {
       const user = await getCurrentUser();
       return !!user;
     } catch (error) {
-      console.log('No authenticated user:', error);
+      console.log('[AuthService] isAuthenticated:', error);
       return false;
     }
   }
@@ -24,7 +24,7 @@ class AuthService {
         isValid: !!tokens?.accessToken,
       };
     } catch (error) {
-      console.error('Failed to get auth session:', error);
+      console.error('[AuthService] getAuthSession:', error);
       return {
         accessToken: null,
         idToken: null,
@@ -48,7 +48,7 @@ class AuthService {
         'Content-Type': 'application/json',
       };
     } catch (error) {
-      console.error('Failed to get auth headers:', error);
+      console.error('[AuthService] getAuthHeaders:', error);
       return {
         'Content-Type': 'application/json',
       };
@@ -66,7 +66,7 @@ class AuthService {
         attributes: user.attributes || {},
       };
     } catch (error) {
-      console.error('Failed to get current user info:', error);
+      console.error('[AuthService] getCurrentUserInfo:', error);
       return {
         userId: null,
         username: null,
@@ -82,7 +82,7 @@ class AuthService {
       const user = await getCurrentUser();
       return { success: true, user };
     } catch (error) {
-      console.log('No authenticated user:', error);
+      console.log('[AuthService] getCurrentUser:', error);
       return { success: false, error: error.message };
     }
   }
@@ -132,7 +132,7 @@ class AuthService {
         },
       };
     } catch (error) {
-      console.error("Failed to create auth service object:", error);
+      console.error('[AuthService] createAuthServiceObject:', error);
       // Return a mock auth service for demo mode
       return {
         getCurrentUser: () => Promise.resolve({

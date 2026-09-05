@@ -12,10 +12,10 @@ import { Text, useTheme } from "react-native-paper";
 import { apiPost, apiGet } from "../../utils/api/apiClient";
 import endpoints from "../../utils/api/endpoints";
 import { saveWorkspaceInfo } from "../../storage/workspaceStorage";
-import { updateUserAttribute, signOut, fetchUserAttributes } from "aws-amplify/auth";
+import { signOut, fetchUserAttributes } from "aws-amplify/auth";
 import ResponsiveScreen from "../../components/layout/ResponsiveScreen";
-import { saveUserInfo } from "../../storage/userStorage";
-import { saveRole } from "../../storage/permissionsStorage";
+import workspaceService from "../../services/WorkspaceService";
+import { updateUserAttributeWithStep } from "../../utils/userAttributes";
 
 const CreateWorkspace = () => {
     const router = useRouter();
@@ -26,39 +26,7 @@ const CreateWorkspace = () => {
     const [description, setDescription] = useState("");
     const [errors, setErrors] = useState(false);
     const [creating, setCreating] = useState(false);
-
-    // updates user attributes in cognito
-    async function handleUpdateUserAttribute(attributeKey, value) {
-        try {
-            const output = await updateUserAttribute({
-                userAttribute: {
-                    attributeKey,
-                    value
-                }
-            });
-
-            const { nextStep } = output;
-
-            switch (nextStep.updateAttributeStep) {
-                case 'CONFIRM_ATTRIBUTE_WITH_CODE':
-                    const codeDeliveryDetails = nextStep.codeDeliveryDetails;
-                    console.log(`Confirmation code was sent to ${codeDeliveryDetails?.deliveryMedium} at ${codeDeliveryDetails?.destination}`);
-                    return { needsConfirmation: true };
-                case 'DONE':
-                    const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    console.log(`${fieldName} updated successfully`);
-                    return { needsConfirmation: false };
-                default:
-                    console.log(`${attributeKey.replace('_', ' ')} update completed`);
-                    return { needsConfirmation: false };
-            }
-        } catch (error) {
-            console.error("Error updating user attribute:", error);
-            const fieldName = attributeKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-            setMessage(`Error updating ${fieldName}: ${error.message}`);
-            return { needsConfirmation: false, error: true };
-        }
-    }
+    const [message, setMessage] = useState("");
 
     async function handleCreate() {
         Keyboard.dismiss();
@@ -83,34 +51,16 @@ const CreateWorkspace = () => {
 
             
             const result = await apiPost(endpoints.workspace.core.create, workspaceData);
-            
-            // save workspace and user info to local storage
-            const workspace = result.data
-            saveWorkspaceInfo(workspace);
-
+            const workspace = result.data;
             const userAttributes = await fetchUserAttributes();
-            try {
-                const result = await apiGet(endpoints.workspace.users.getUser(workspace.workspaceId, userAttributes.sub));
-                await saveUserInfo(result.data);  // Saves into local storage
-            } catch (error) {
-                console.error("Error saving user info into storage:", error);
-            }
 
-            try {
-                const result = await apiGet(endpoints.workspace.roles.getRoleOfUser(workspace.workspaceId));
-                await saveRole(result.data);
-            } catch (error) {
-                console.error("Error saving user's role details into local storage:", error);
-            }
-
-            // update user attribute to be in a workspace
-            await handleUpdateUserAttribute('custom:has_workspace', "true");
+            await workspaceService.setupWorkspaceStorage(workspace, userAttributes.sub);
+            await updateUserAttributeWithStep('custom:has_workspace', "true", { onError: setMessage });
 
             setCreating(false);
 
-
             // navigate to the profile
-            router.replace("/dashboard");
+            router.replace("/home");
         } catch (error) {
             setCreating(false);
             console.error("Error creating workspace: ", error);
