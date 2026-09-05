@@ -46,7 +46,7 @@ target 'eTRON' do
     :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
   )
 
-  post_install do |installer|
+    post_install do |installer|
     react_native_post_install(
       installer,
       config[:reactNativePath],
@@ -61,6 +61,18 @@ target 'eTRON' do
       target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
         resource_bundle_target.build_configurations.each do |config|
           config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        end
+      end
+    end
+
+    # Xcode 26's Clang rejects fmt 11.0.2's consteval FMT_STRING checks.
+    # RN 0.79 pins fmt 11.0.2; compiling just this pod as C++17 makes
+    # fmt/base.h fall through to FMT_USE_CONSTEVAL 0 and use runtime
+    # format-string validation. Remove when on RN >= 0.83.9 / SDK 56.
+    installer.pods_project.targets.each do |target|
+      if target.name == 'fmt'
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
         end
       end
     end
