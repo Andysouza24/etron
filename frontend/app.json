@@ -1,7 +1,7 @@
 {
   "expo": {
     "scheme": "myapp",
-    "name": "frontend",
+    "name": "eTRON",
     "slug": "etron",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "au.com.micromax.etron"
     },
     "android": {
       "package": "com.insync.etron",
