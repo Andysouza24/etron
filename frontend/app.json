@@ -13,7 +13,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "au.com.micromax.etron"
     },
     "android": {
       "package": "com.insync.etron",
@@ -64,7 +65,8 @@
         }
       ],
       "expo-web-browser",
-      "./plugins/withAppAuthRedirectScheme"
+      "./plugins/withAppAuthRedirectScheme",
+      "./plugins/withGoogleUtilitiesModularHeaders"
     ],
     "experiments": {
       "typedRoutes": true
