@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "micromax-dev",
     "scheme": "myapp",
     "name": "eTRON",
     "slug": "frontend",
@@ -60,7 +61,9 @@
         "expo-build-properties",
         {
           "android": {
-            "buildArchs": ["x86_64"]
+            "buildArchs": [
+              "x86_64"
+            ]
           }
         }
       ],
@@ -72,14 +75,14 @@
       "typedRoutes": true
     },
     "runtimeVersion": "1.0.0",
-    "updates": {
-      "url": "https://u.expo.dev/6137eb4a-cf50-41a5-8205-e53fd149cc15"
-    },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6137eb4a-cf50-41a5-8205-e53fd149cc15"
+        "projectId": "e5d04c65-04b7-4688-a4e9-d0cc43b5a1f3"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e5d04c65-04b7-4688-a4e9-d0cc43b5a1f3"
     }
   }
 }

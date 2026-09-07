@@ -14,10 +14,19 @@
       },
       "ios": {
         "cache": {
-          "paths": [
-            "./ios/Podfile.lock"
-          ]
+          "paths": ["./ios/Podfile.lock"]
         }
+      }
+    },
+    "development-simulator": {
+      "channel": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "yarn": "1.22.22",
+      "env": { "EAS_USE_CACHE": "1" },
+      "ios": {
+        "simulator": true,
+        "cache": { "paths": ["./ios/Podfile.lock"] }
       }
     },
     "development-large": {
@@ -31,9 +40,7 @@
       },
       "ios": {
         "cache": {
-          "paths": [
-            "./ios/Podfile.lock"
-          ]
+          "paths": ["./ios/Podfile.lock"]
         }
       }
     },
@@ -50,9 +57,7 @@
       },
       "ios": {
         "cache": {
-          "paths": [
-            "./ios/Podfile.lock"
-          ]
+          "paths": ["./ios/Podfile.lock"]
         }
       }
     },
@@ -65,9 +70,7 @@
       },
       "ios": {
         "cache": {
-          "paths": [
-            "./ios/Podfile.lock"
-          ]
+          "paths": ["./ios/Podfile.lock"]
         }
       }
     },
@@ -106,9 +109,7 @@
       },
       "ios": {
         "cache": {
-          "paths": [
-            "./ios/Podfile.lock"
-          ]
+          "paths": ["./ios/Podfile.lock"]
         }
       },
       "android": {
